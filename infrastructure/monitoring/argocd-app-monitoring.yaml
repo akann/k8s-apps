@@ -23,7 +23,8 @@ spec:
                       storage: 5Gi
         grafana:
           adminPassword: changeme
-          envFromSecret: grafana-authentik-secret
+          envFromSecrets:
+            - name: grafana-authentik-secret
           grafana.ini:
             server:
               root_url: https://grafana.yanatech.co.uk
