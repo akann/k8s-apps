@@ -1,18 +1,13 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-yanatech-tls
+  name: wildcard-yanatech
   namespace: ingress-nginx
 spec:
-  secretName: wildcard-yanatech-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  commonName: "*.yanatech.co.uk"
   dnsNames:
     - yanatech.co.uk
     - "*.yanatech.co.uk"
-  secretTemplate:
-    annotations:
-      # Reflector replicates this secret to all namespaces automatically
-      reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: wildcard-yanatech-tls
