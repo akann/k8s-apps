@@ -23,17 +23,8 @@ spec:
                       storage: 5Gi
         grafana:
           adminPassword: changeme
-          env:
-            GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
-              valueFrom:
-                secretKeyRef:
-                  name: grafana-authentik-secret
-                  key: client_id
-            GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
-              valueFrom:
-                secretKeyRef:
-                  name: grafana-authentik-secret
-                  key: client_secret
+          envFromSecrets:
+            - name: grafana-authentik-secret
           grafana.ini:
             server:
               root_url: https://grafana.yanatech.co.uk
@@ -41,8 +32,8 @@ spec:
               enabled: true
               name: Authentik
               icon: signin
-              client_id: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}
-              client_secret: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}
+              client_id: $__env{client_id}
+              client_secret: $__env{client_secret}
               scopes: openid email profile
               auth_url: https://auth.yanatech.co.uk/application/o/grafana/authorize/
               token_url: https://auth.yanatech.co.uk/application/o/token/
