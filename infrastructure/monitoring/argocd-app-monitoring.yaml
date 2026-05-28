@@ -10,6 +10,7 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: "*"
     helm:
+      releaseName: kube-prometheus-stack
       values: |
         alertmanager:
           alertmanagerSpec:
