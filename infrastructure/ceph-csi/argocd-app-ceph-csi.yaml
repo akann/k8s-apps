@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ceph-csi-rbd
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://ceph.github.io/csi-charts
+    chart: ceph-csi-rbd
+    targetRevision: "*"
+    helm:
+      values: |
+        csiConfig:
+          - clusterID: 92197a62-7cf9-49eb-a0cb-5e0b9bbff52a
+            monitors:
+              - 192.168.22.11:6789
+              - 192.168.22.12:6789
+              - 192.168.22.13:6789
+        secret:
+          create: false
+          name: csi-rbd-secret
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ceph-csi-rbd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
