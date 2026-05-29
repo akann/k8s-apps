@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-ui
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://provectus.github.io/kafka-ui-charts
+    chart: kafka-ui
+    targetRevision: "*"
+    helm:
+      values: |
+        yamlApplicationConfig:
+          kafka:
+            clusters:
+              - name: kafka-cluster
+                bootstrapServers: kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+          auth:
+            type: disabled
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          host: kafka.yanatech.co.uk
+          tls:
+            enabled: true
+            secretName: wildcard-yanatech-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

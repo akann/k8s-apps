@@ -19,5 +19,6 @@ echo "Applying apps..."
 kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
 kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
+kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
