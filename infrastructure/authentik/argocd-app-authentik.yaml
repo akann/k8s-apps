@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: authentik
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.goauthentik.io
+    chart: authentik
+    targetRevision: "*"
+    helm:
+      values: |
+        authentik:
+          existingSecret:
+            secretName: authentik-secret
+        postgresql:
+          enabled: true
+          auth:
+            username: authentik
+            password: 6a0acab6da6b20fe008fb653c7d4dcb29cbd5e6d
+            database: authentik
+          primary:
+            persistence:
+              storageClass: ceph-rbd
+        redis:
+          enabled: true
+          master:
+            persistence:
+              storageClass: ceph-rbd
+        server:
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - auth.yanatech.co.uk
+            tls:
+              - hosts:
+                  - auth.yanatech.co.uk
+                secretName: wildcard-yanatech-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: authentik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
