@@ -10,6 +10,7 @@ set -e
 echo "Applying infrastructure apps..."
 kubectl apply -f infrastructure/metallb/argocd-app-metallb.yaml
 kubectl apply -f infrastructure/metallb/argocd-app-metallb-config.yaml
+kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager.yaml
 kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager-config.yaml
 kubectl apply -f infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
 kubectl apply -f infrastructure/reflector/argocd-app-reflector.yaml
