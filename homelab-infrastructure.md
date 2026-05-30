@@ -236,6 +236,7 @@ kubectl get nodes
 
 ## TLS / cert-manager
 
+- **cert-manager version:** v1.20.2 (jetstack Helm chart, ArgoCD-managed — `infrastructure/cert-manager/argocd-app-cert-manager.yaml`, pinned `targetRevision: v1.20.2`)
 - **Issuer:** `letsencrypt-prod` (ClusterIssuer)
 - **Challenge:** DNS-01 via Cloudflare
 - **Cloudflare API token secret:** `cloudflare-api-token` in `cert-manager` namespace (stored in Vaultwarden)
@@ -406,3 +407,6 @@ ArgoCD detects change → deploys to cluster
 - Vaultwarden database is on Authentik's PostgreSQL instance — migrate to dedicated VM when ready
 - Strimzi 1.0.0 only supports Kafka 4.x — do not use 3.x versions
 - kube-prometheus-stack Helm release name is `kube-prometheus-stack` (set via releaseName in ArgoCD app)
+- `bootstrap.sh` enumerates every ArgoCD Application explicitly (no globbing) — a new app needs BOTH its `argocd-app-<name>.yaml` committed AND a matching `kubectl apply` line in `bootstrap.sh`, or it won't deploy on a fresh cluster (this gap previously hit authentik, velero, uptime-kuma)
+- ArgoCD does NOT honor Helm's `crds.keep` / `helm.sh/resource-policy: keep` annotation when pruning — deleting a CRD-bearing Application (cert-manager, metallb, etc.) can cascade-delete its CRDs and all dependent resources. Don't delete those Applications directly; `crds.keep: true` only protects against `helm uninstall`
+- cert-manager operator is ArgoCD-managed via the jetstack chart (was a manual `helm install` until migrated) — the `cert-manager` app must apply before `cert-manager-config` so CRDs exist before the ClusterIssuer; bootstrap.sh orders them correctly, and the config app self-heals if it races ahead
