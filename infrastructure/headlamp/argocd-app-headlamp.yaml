@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: headlamp
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/headlamp/
+    chart: headlamp
+    targetRevision: 0.42.0          # pin explicitly — floating risks a binary/flag mismatch CrashLoop
+    helm:
+      releaseName: headlamp
+      values: |
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - host: headlamp.yanatech.co.uk
+              paths:
+                - path: /
+                  type: Prefix
+          tls:
+            - secretName: wildcard-yanatech-tls
+              hosts:
+                - headlamp.yanatech.co.uk
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: headlamp
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

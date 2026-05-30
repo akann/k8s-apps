@@ -310,6 +310,7 @@ velero restore create --from-backup <backup-name>
 | Kafka UI | kafka | https://kafka.yanatech.co.uk | ArgoCD |
 | Velero | velero | - | ArgoCD |
 | Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
+| Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
 | yanatech website | yanatech | https://www.yanatech.co.uk | ArgoCD |
 
 ---
@@ -340,6 +341,7 @@ k8s-apps/
     ├── authentik/           ✅ deployed
     ├── reflector/           ✅ deployed
     ├── ceph-csi/            ✅ deployed
+    ├── headlamp/            ✅ deployed
     └── velero/              ✅ deployed
 ```
 
@@ -384,7 +386,7 @@ ArgoCD detects change → deploys to cluster
 ## Pending / TODO
 
 - [ ] Dedicated PostgreSQL VM on Proxmox for shared database
-- [ ] Authentik SSO integration: Grafana, ArgoCD, Portainer, Headlamp
+- [ ] Authentik SSO integration: Grafana, ArgoCD, Headlamp
 - [ ] Nextcloud (self-hosted cloud storage)
 - [ ] Move Vaultwarden database to dedicated PostgreSQL VM
 
