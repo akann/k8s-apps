@@ -33,3 +33,12 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  ignoreDifferences:
+    # hostUsers is defaulted to true by the kube-apiserver and never set by the
+    # chart, so it shows a permanent OutOfSync. Ignore the server-defaulted field.
+    - group: apps
+      kind: Deployment
+      name: headlamp
+      namespace: headlamp
+      jsonPointers:
+        - /spec/template/spec/hostUsers
