@@ -25,13 +25,14 @@ configs:
     scopes: '[groups]'
 server:
   ingress:
+    enabled: true
+    hostname: argocd.yanatech.co.uk
+    ingressClassName: nginx
     annotations:
       nginx.ingress.kubernetes.io/backend-protocol: HTTPS
       nginx.ingress.kubernetes.io/ssl-passthrough: false
-    enabled: true
     hosts:
       - argocd.yanatech.co.uk
-    ingressClassName: nginx
     tls:
       - hosts:
           - argocd.yanatech.co.uk
