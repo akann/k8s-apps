@@ -1,0 +1,38 @@
+configs:
+  params:
+    server.insecure: false
+  cm:
+    url: https://argocd.yanatech.co.uk
+    dex.config: |
+      connectors:
+        - type: oidc
+          id: authentik
+          name: Authentik
+          config:
+            issuer: https://auth.yanatech.co.uk/application/o/argo-cd/
+            clientID: PWfZkdoaHZvMaPuyUTD8oH4HFmnaC4dUBro9WOmZ
+            clientSecret: $dex.authentik.clientSecret
+            insecureEnableGroups: true
+            scopes:
+              - openid
+              - profile
+              - email
+  rbac:
+    policy.csv: |
+      g, authentik Admins, role:admin
+    policy.default: ""
+    policy.matchMode: glob
+    scopes: '[groups]'
+server:
+  ingress:
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+      nginx.ingress.kubernetes.io/ssl-passthrough: false
+    enabled: true
+    hosts:
+      - argocd.yanatech.co.uk
+    ingressClassName: nginx
+    tls:
+      - hosts:
+          - argocd.yanatech.co.uk
+        secretName: wildcard-yanatech-tls
