@@ -117,7 +117,6 @@ packages:
   - curl
   - apt-transport-https
 users:
-  - default
   - name: ubuntu
     lock_passwd: false
     sudo: ALL=(ALL) NOPASSWD:ALL
@@ -125,9 +124,9 @@ users:
     ssh_authorized_keys:
       - <pve1 root ssh key>
 chpasswd:
-  list: |
-    ubuntu:ubuntu
   expire: false
+  users:
+    - {name: ubuntu, password: ubuntu, type: text}
 ssh_pwauth: true
 preserve_hostname: false
 runcmd:
@@ -271,6 +270,80 @@ kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9093  # TLS
 
 ---
 
+## PostgreSQL (Shared Database VM)
+
+Dedicated Proxmox VM for app databases that must survive a Kubernetes cluster rebuild (Vaultwarden, Authentik) plus any future apps needing Postgres (e.g. Nextcloud). Lives outside k8s on purpose — a cluster teardown can't take the credential/identity data with it.
+
+### VM
+
+| VMID | Name | Host | IP | vCPU | RAM | Disk |
+|---|---|---|---|---|---|---|
+| 110 | postgres-1 | pve1 (HA-managed, can run on any node) | 192.168.22.40 | 2 | 4GB | 20GB on `rbd` |
+
+- Cloned full from template 9000; CPU type `host`; `vmbr0`, no VLAN tag
+- Cloud-init: `--cicustom "user=local:snippets/postgres-init.yaml"`
+- Disk is thin-provisioned on Ceph and grows online: `qm resize 110 scsi0 +Ng` → `growpart /dev/sda 1` → `resize2fs /dev/sda1`
+- HA enabled: `ha-manager add vm:110 --state started --max_restart 3`
+
+### Cloud-init Snippet (`/var/lib/vz/snippets/postgres-init.yaml`)
+Must be copied to all three nodes (node-local storage). Installs PostgreSQL 18 from the PGDG repo.
+```yaml
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - qemu-guest-agent
+  - curl
+  - ca-certificates
+  - gnupg
+users:
+  - name: ubuntu
+    lock_passwd: false
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - <pve1 root ssh key>
+chpasswd:
+  expire: false
+  users:
+    - {name: ubuntu, password: ubuntu, type: text}
+ssh_pwauth: true
+preserve_hostname: false
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+  - install -d /usr/share/postgresql-common/pgdg
+  - curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+  - sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+  - apt-get update
+  - apt-get install -y postgresql-18
+```
+
+### PostgreSQL Config
+
+- **Version:** 18.4 (PGDG repo, `noble-pgdg`)
+- Config dir: `/etc/postgresql/18/main/`
+- Tuning drop-in `conf.d/tuning.conf`: `listen_addresses = '*'`, `shared_buffers 1GB`, `effective_cache_size 3GB`, `maintenance_work_mem 256MB`, `work_mem 16MB`, `max_connections 200`, `wal_compression on`
+- LAN access via `pg_hba.conf`: `host all all 192.168.22.0/24 scram-sha-256`
+
+### Databases / Roles
+
+| Database | Owner role | Used by |
+|---|---|---|
+| vaultwarden | vaultwarden | Vaultwarden ✅ live (migrated from Authentik's PG 2026-05-31) |
+| authentik | authentik | Authentik (migration pending) |
+
+- Role passwords (scram-sha-256) stored in Vaultwarden
+- **`vaultwarden` role password must ALSO live outside Vaultwarden** (bootstrap secret manifest) — otherwise a cold rebuild is a circular-dependency lockout
+- Bump RAM to 8GB + `shared_buffers` to 2GB once Authentik (and more) land here
+
+### Backups
+
+- **Not covered by Velero** (that's k8s-namespace only). DB-level dumps are the safety net against logical corruption.
+- `/usr/local/bin/pg-backup.sh`: nightly `pg_dumpall | gzip` → Backblaze B2 (`b2:yanatech-pg/`) via rclone, 7-day local retention in `/var/backups/pg`
+- Cron: `/etc/cron.d/pg-backup`, daily 02:30
+
+---
+
 ## Velero Backups
 
 - **Backend:** Backblaze B2
@@ -367,7 +440,7 @@ bash bootstrap.sh
 | `cloudflare-api-token` | cert-manager | Cloudflare API token |
 | `grafana-authentik-secret` | monitoring | Authentik OAuth client_id + client_secret |
 | `authentik-secret` | authentik | DB creds, Redis host, secret key |
-| `vaultwarden-secret` | vaultwarden | DATABASE_URL, ADMIN_TOKEN, DOMAIN |
+| `vaultwarden-secret` | vaultwarden | DATABASE_URL (→ VM 110, `192.168.22.40`), ADMIN_TOKEN, DOMAIN |
 | `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey |
 
 ### yanatech CI/CD Pipeline
@@ -386,10 +459,11 @@ ArgoCD detects change → deploys to cluster
 
 ## Pending / TODO
 
-- [ ] Dedicated PostgreSQL VM on Proxmox for shared database
+- [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
 - [ ] Authentik SSO integration: Grafana, ArgoCD, Headlamp
 - [ ] Nextcloud (self-hosted cloud storage)
-- [ ] Move Vaultwarden database to dedicated PostgreSQL VM
+- [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB retained on Authentik's PG as rollback)
+- [ ] Move Authentik database to VM 110 (decouples Vaultwarden from Authentik's bundled Postgres)
 
 ---
 
@@ -404,10 +478,14 @@ ArgoCD detects change → deploys to cluster
 - Authentik requires PostgreSQL and Redis — both enabled via Helm values
 - ArgoCD v3.4 does not support app-of-apps via directory source for Application resources — use bootstrap.sh instead
 - MetalLB IP pool name is `k8s-pool` (not `default-pool`)
-- Vaultwarden database is on Authentik's PostgreSQL instance — migrate to dedicated VM when ready
+- Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB left on Authentik's PG as rollback — drop once confident
+- Vaultwarden Deployment must use `strategy: { type: Recreate }`. Its `/data` PVC is RWO on ceph-rbd, so the default RollingUpdate deadlocks on restart — the new pod can't mount the volume while the old pod holds it (Multi-Attach), leaving the rollout stuck. If it ever deadlocks, `scale --replicas=0` (wait for both pods gone) then `--replicas=1`
+- Migrating a Postgres DB between the in-cluster Bitnami instance and VM 110: the Bitnami pod stores passwords in files (`$POSTGRES_PASSWORD_FILE`, `$POSTGRES_POSTGRES_PASSWORD_FILE`), not env values, and the `postgres` superuser password in the file can be stale vs the running DB — the `authentik` role (cluster owner) works. Dump/load via `PGPASSWORD` + discrete `PG*` env vars, never a `postgresql://` URL, to avoid special-char parsing failures
 - Strimzi 1.0.0 only supports Kafka 4.x — do not use 3.x versions
 - kube-prometheus-stack Helm release name is `kube-prometheus-stack` (set via releaseName in ArgoCD app)
 - `bootstrap.sh` enumerates every ArgoCD Application explicitly (no globbing) — a new app needs BOTH its `argocd-app-<name>.yaml` committed AND a matching `kubectl apply` line in `bootstrap.sh`, or it won't deploy on a fresh cluster (this gap previously hit authentik, velero, uptime-kuma)
 - ArgoCD does NOT honor Helm's `crds.keep` / `helm.sh/resource-policy: keep` annotation when pruning — deleting a CRD-bearing Application (cert-manager, metallb, etc.) can cascade-delete its CRDs and all dependent resources. Don't delete those Applications directly; `crds.keep: true` only protects against `helm uninstall`
 - cert-manager operator is ArgoCD-managed via the jetstack chart (was a manual `helm install` until migrated) — the `cert-manager` app must apply before `cert-manager-config` so CRDs exist before the ClusterIssuer; bootstrap.sh orders them correctly, and the config app self-heals if it races ahead
 - ArgoCD can show a permanent `OutOfSync` (app still Healthy) when the kube-apiserver defaults a field the Helm chart doesn't template — e.g. `hostUsers: true` on Deployments (v1.32 user-namespace defaulting). It's cosmetic, not real drift; a sync won't fix it because the apiserver re-adds the field. Fix with an `ignoreDifferences` entry on that jsonPointer (see `infrastructure/headlamp/argocd-app-headlamp.yaml` → `/spec/template/spec/hostUsers` for the pattern)
+- Cloud-init `users:` list must NOT include `- default` alongside an explicit `- name: ubuntu` — on Ubuntu cloud images the default user is already `ubuntu`, so the two definitions collide and `lock_passwd` / `chpasswd` / `ssh_pwauth` silently fail to apply, locking you out of the VM (no password, sometimes no key). Define `ubuntu` explicitly with no `- default` entry. Applies to every cloud-init snippet (`k8s-init.yaml`, `postgres-init.yaml`, etc.)
+- Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
