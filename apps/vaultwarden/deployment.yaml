@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: vaultwarden
-          image: vaultwarden/server:latest
+          image: vaultwarden/server:1.36.0
           ports:
             - containerPort: 80
           envFrom:
@@ -26,7 +26,26 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: vaultwarden-data
+          readinessProbe:
+            httpGet:
+              path: /alive
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /alive
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
