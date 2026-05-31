@@ -31,9 +31,7 @@ server:
     annotations:
       nginx.ingress.kubernetes.io/backend-protocol: HTTPS
       nginx.ingress.kubernetes.io/ssl-passthrough: false
-    hosts:
-      - argocd.yanatech.co.uk
-    tls:
+    extraTls:
       - hosts:
           - argocd.yanatech.co.uk
         secretName: wildcard-yanatech-tls
