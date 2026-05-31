@@ -462,7 +462,7 @@ ArgoCD detects change → deploys to cluster
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
 - [ ] Authentik SSO integration: Grafana, ArgoCD, Headlamp
 - [ ] Nextcloud (self-hosted cloud storage)
-- [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB retained on Authentik's PG as rollback)
+- [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
 - [ ] Move Authentik database to VM 110 (decouples Vaultwarden from Authentik's bundled Postgres)
 
 ---
@@ -478,7 +478,7 @@ ArgoCD detects change → deploys to cluster
 - Authentik requires PostgreSQL and Redis — both enabled via Helm values
 - ArgoCD v3.4 does not support app-of-apps via directory source for Application resources — use bootstrap.sh instead
 - MetalLB IP pool name is `k8s-pool` (not `default-pool`)
-- Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB left on Authentik's PG as rollback — drop once confident
+- Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB dropped from Authentik's PG 2026-05-31 — final pre-drop dump retained on cp-1
 - Vaultwarden Deployment must use `strategy: { type: Recreate }`. Its `/data` PVC is RWO on ceph-rbd, so the default RollingUpdate deadlocks on restart — the new pod can't mount the volume while the old pod holds it (Multi-Attach), leaving the rollout stuck. If it ever deadlocks, `scale --replicas=0` (wait for both pods gone) then `--replicas=1`
 - Migrating a Postgres DB between the in-cluster Bitnami instance and VM 110: the Bitnami pod stores passwords in files (`$POSTGRES_PASSWORD_FILE`, `$POSTGRES_POSTGRES_PASSWORD_FILE`), not env values, and the `postgres` superuser password in the file can be stale vs the running DB — the `authentik` role (cluster owner) works. Dump/load via `PGPASSWORD` + discrete `PG*` env vars, never a `postgresql://` URL, to avoid special-char parsing failures
 - Strimzi 1.0.0 only supports Kafka 4.x — do not use 3.x versions
