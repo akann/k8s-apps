@@ -12,16 +12,6 @@ spec:
     helm:
       releaseName: headlamp
       values: |
-        config:
-          oidc:
-            clientID: dJN1D8qo4gka5QZLLUoWkxSQiYAfenM9jxOyUVRA
-            issuerURL: https://auth.yanatech.co.uk/application/o/headlamp/
-            scopes: "openid,profile,email,groups,offline_access"
-            useAccessToken: false
-            useCookie: false
-            usePKCE: true
-            secret:
-              create: false
         ingress:
           enabled: true
           ingressClassName: nginx
