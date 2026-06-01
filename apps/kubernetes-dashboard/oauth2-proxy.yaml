@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: kubernetes-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=https://auth.yanatech.co.uk/application/o/kubernetes-dashboard/
+            - --client-id=$(CLIENT_ID)
+            - --client-secret=$(CLIENT_SECRET)
+            - --cookie-secret=$(COOKIE_SECRET)
+            - --cookie-secure=true
+            - --upstream=http://kubernetes-dashboard-kong-proxy:80
+            - --http-address=0.0.0.0:4180
+            - --redirect-url=https://k8sdash.yanatech.co.uk/oauth2/callback
+            - --email-domain=*
+            - --pass-authorization-header=true
+            - --pass-access-token=true
+            - --set-authorization-header=true
+            - --scope=openid profile email
+          env:
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: kubernetes-dashboard-oauth2-proxy
+                  key: client-id
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kubernetes-dashboard-oauth2-proxy
+                  key: client-secret
+            - name: COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kubernetes-dashboard-oauth2-proxy
+                  key: cookie-secret
+          ports:
+            - containerPort: 4180
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: kubernetes-dashboard
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+    - port: 4180
+      targetPort: 4180
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: k8sdash.yanatech.co.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy
+                port:
+                  number: 4180
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - k8sdash.yanatech.co.uk
