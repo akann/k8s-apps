@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pgadmin
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.runix.net
+    chart: pgadmin4
+    targetRevision: 1.64.0
+    helm:
+      releaseName: pgadmin
+      values: |
+        env:
+          email: admin@yanatech.co.uk
+          password: pgadmin
+        extraConfigmapMounts:
+          - name: config-local
+            mountPath: /pgadmin4/config_local.py
+            subPath: config_local.py
+            configMap: pgadmin-config-local
+            readOnly: true
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - host: pgadmin.yanatech.co.uk
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: wildcard-yanatech-tls
+              hosts:
+                - pgadmin.yanatech.co.uk
+        persistentVolume:
+          enabled: true
+          storageClass: ceph-rbd
+          size: 1Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pgadmin
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
