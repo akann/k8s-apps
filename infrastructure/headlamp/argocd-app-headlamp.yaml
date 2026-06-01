@@ -14,7 +14,7 @@ spec:
       values: |
         config:
           oidc:
-            clientID: WA1BHNSS56Ebv2UQEzEtD7EFM0iW0IafHa9yMWhy
+            clientID: dJN1D8qo4gka5QZLLUoWkxSQiYAfenM9jxOyUVRA
             clientSecretName: headlamp-oidc-secret
             clientSecretKey: client-secret
             issuerURL: https://auth.yanatech.co.uk/application/o/headlamp/
