@@ -340,7 +340,9 @@ runcmd:
 
 - **Not covered by Velero** (that's k8s-namespace only). DB-level dumps are the safety net against logical corruption.
 - `/usr/local/bin/pg-backup.sh`: nightly `pg_dumpall | gzip` → Backblaze B2 (`b2:yanatech-pg/`) via rclone, 7-day local retention in `/var/backups/pg`
-- Cron: `/etc/cron.d/pg-backup`, daily 02:30
+- Cron: `/etc/cron.d/pg-backup`, daily 02:30 ✅ live (verified 2026-06-01)
+- rclone configured at `/root/.config/rclone/rclone.conf` (runs as root via cron) — B2 key scoped to `yanatech-pg` bucket, stored in Vaultwarden
+- Also copy config to ubuntu home if needed: `sudo cp /root/.config/rclone/rclone.conf ~/.config/rclone/rclone.conf`
 
 ---
 
