@@ -346,6 +346,36 @@ runcmd:
 
 ---
 
+## Proxmox Config Backups
+
+Nightly backup of Proxmox cluster config and node-local files to Backblaze B2 via rclone. Runs on pve1.
+
+- **Script:** `/usr/local/bin/proxmox-backup.sh` on pve1
+- **Cron:** `/etc/cron.d/proxmox-backup`, daily 03:30 ✅ live (verified 2026-06-01)
+- **Bucket:** `yanatech-proxmox`
+- **Retention:** 30 days
+- **B2 key:** `pg` key (keyID `003faa10a09691a0000000002`) — stored in Vaultwarden
+- **rclone config:** `/root/.config/rclone/rclone.conf` on pve1
+
+### What's backed up
+- `/etc/pve/` — cluster config, VM/CT definitions, storage, network (replicated cluster-wide)
+- `/etc/network/interfaces` — node network config
+- `/var/lib/vz/snippets/` — cloud-init snippets
+
+### Script
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+ts=$(date +%F)
+archive="/tmp/proxmox-backup-$ts.tar.gz"
+tar czf "$archive" /etc/pve/ /etc/network/interfaces /var/lib/vz/snippets/ 2>/dev/null || true
+rclone copy "$archive" b2:yanatech-proxmox/
+rm -f "$archive"
+rclone delete --min-age 30d b2:yanatech-proxmox/
+```
+
+---
+
 ## pgAdmin4
 
 Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, accessible at `https://pgadmin.yanatech.co.uk`.
@@ -409,20 +439,45 @@ EOF
 - **Backend:** Backblaze B2
 - **Bucket:** `yanatech-velero`
 - **Endpoint:** `s3.eu-central-003.backblazeb2.com`
-- **Schedule:** Daily at 2am UTC
+- **Schedule:** Daily at 2am UTC ✅ live (verified 2026-06-01)
 - **Retention:** 30 days
 - **Namespaces backed up:** vaultwarden, authentik, monitoring, kafka, ingress-nginx, cert-manager, argocd
 - **Credentials secret:** `velero-b2-credentials` in `velero` namespace (stored in Vaultwarden)
+- **B2 key:** `velero` key scoped to `yanatech-velero` bucket (keyID `003faa10a09691a0000000003`)
 
 ### Manual backup
 ```bash
-velero backup create manual-backup --include-namespaces vaultwarden,authentik
+kubectl create -f - <<'EOF'
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: manual-test-backup
+  namespace: velero
+spec:
+  includedNamespaces:
+    - vaultwarden
+    - authentik
+  ttl: 24h0m0s
+EOF
+kubectl get backup manual-test-backup -n velero -w
 ```
 
 ### Restore
 ```bash
-velero backup get
+kubectl get backups -n velero
 velero restore create --from-backup <backup-name>
+```
+
+### Troubleshooting
+- If `BackupStorageLocation` shows `Unavailable` with `no EC2 IMDS role found` — the `velero-b2-credentials` secret has malformed newlines. Recreate it:
+```bash
+kubectl delete secret velero-b2-credentials -n velero
+kubectl create secret generic velero-b2-credentials \
+  --namespace velero \
+  --from-literal=cloud="[default]
+aws_access_key_id=<keyID>
+aws_secret_access_key=<applicationKey>"
+kubectl rollout restart deployment/velero -n velero
 ```
 
 ---
