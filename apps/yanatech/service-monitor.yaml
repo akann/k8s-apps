@@ -1,0 +1,16 @@
+# apps/yanatech/service-monitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: yanatech
+  namespace: yanatech
+  labels:
+    release: kube-prometheus-stack   # must match kube-prometheus-stack's serviceMonitorSelector
+spec:
+  selector:
+    matchLabels:
+      app: yanatech
+  endpoints:
+    - port: http
+      path: /api/health
+      interval: 30s
