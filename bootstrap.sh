@@ -8,6 +8,8 @@
 #       monitoring:  grafana-authentik-secret (client_id, client_secret)
 #       authentik:   authentik-secret (DB creds, Redis host, secret key)
 #       vaultwarden: vaultwarden-secret (DATABASE_URL, ADMIN_TOKEN, DOMAIN)
+#       pgadmin:     pgadmin-oauth-secret (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
+#                    pgadmin-config-local ConfigMap with config_local.py
 #
 # NOTE: this script enumerates every ArgoCD Application explicitly.
 #       When you add a new app, add BOTH the manifest in the repo AND
@@ -41,5 +43,6 @@ kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
 kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
+kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
