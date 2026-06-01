@@ -1,11 +1,10 @@
-# apps/yanatech/service-monitor.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: yanatech
   namespace: yanatech
   labels:
-    release: kube-prometheus-stack   # must match kube-prometheus-stack's serviceMonitorSelector
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
