@@ -330,7 +330,7 @@ runcmd:
 | Database | Owner role | Used by |
 |---|---|---|
 | vaultwarden | vaultwarden | Vaultwarden ✅ live (migrated from Authentik's PG 2026-05-31) |
-| authentik | authentik | Authentik (migration pending) |
+| authentik | authentik | Authentik ✅ live (migrated 2026-05-31; bundled PG kept as rollback) |
 
 - Role passwords (scram-sha-256) stored in Vaultwarden
 - **`vaultwarden` role password must ALSO live outside Vaultwarden** (bootstrap secret manifest) — otherwise a cold rebuild is a circular-dependency lockout
@@ -341,6 +341,64 @@ runcmd:
 - **Not covered by Velero** (that's k8s-namespace only). DB-level dumps are the safety net against logical corruption.
 - `/usr/local/bin/pg-backup.sh`: nightly `pg_dumpall | gzip` → Backblaze B2 (`b2:yanatech-pg/`) via rclone, 7-day local retention in `/var/backups/pg`
 - Cron: `/etc/cron.d/pg-backup`, daily 02:30
+
+---
+
+## pgAdmin4
+
+Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, accessible at `https://pgadmin.yanatech.co.uk`.
+
+- **Namespace:** `pgadmin`
+- **Helm chart:** `pgadmin4` from `https://helm.runix.net`, version `1.64.0`
+- **Auth:** Authentik SSO (OAuth2) + internal fallback (`admin@yanatech.co.uk` / `pgadmin`)
+- **OAuth2 credentials:** `pgadmin-oauth-secret` in `pgadmin` namespace (stored in Vaultwarden)
+- **Config:** `config_local.py` mounted via ConfigMap `pgadmin-config-local` in `pgadmin` namespace
+- **Connected to:** pg1 (`192.168.22.40`) — `vaultwarden` and `authentik` databases
+
+### Bootstrap prerequisites (manually created, not in git)
+```bash
+kubectl create namespace pgadmin
+
+kubectl create secret generic pgadmin-oauth-secret \
+  --namespace pgadmin \
+  --from-literal=OAUTH2_CLIENT_ID=<client-id> \
+  --from-literal=OAUTH2_CLIENT_SECRET=<client-secret>
+
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-config-local
+  namespace: pgadmin
+data:
+  config_local.py: |
+    AUTHENTICATION_SOURCES = ['oauth2', 'internal']
+    OAUTH2_AUTO_CREATE_USER = True
+    OAUTH2_CONFIG = [
+      {
+        'OAUTH2_NAME': 'Authentik',
+        'OAUTH2_DISPLAY_NAME': 'Login with Authentik',
+        'OAUTH2_CLIENT_ID': '<client-id>',
+        'OAUTH2_CLIENT_SECRET': '<client-secret>',
+        'OAUTH2_TOKEN_URL': 'https://auth.yanatech.co.uk/application/o/token/',
+        'OAUTH2_AUTHORIZATION_URL': 'https://auth.yanatech.co.uk/application/o/authorize/',
+        'OAUTH2_API_BASE_URL': 'https://auth.yanatech.co.uk/application/o/pgadmin/',
+        'OAUTH2_SERVER_METADATA_URL': 'https://auth.yanatech.co.uk/application/o/pgadmin/.well-known/openid-configuration',
+        'OAUTH2_USERINFO_ENDPOINT': 'https://auth.yanatech.co.uk/application/o/userinfo/',
+        'OAUTH2_JWKS_URI': 'https://auth.yanatech.co.uk/application/o/pgadmin/jwks/',
+        'OAUTH2_SCOPE': 'openid email profile',
+        'OAUTH2_ICON': 'fa-openid',
+        'OAUTH2_BUTTON_COLOR': '#fd4b2d',
+      }
+    ]
+EOF
+```
+
+### Authentik provider settings
+- Slug: `pgadmin`
+- Redirect URI: `https://pgadmin.yanatech.co.uk/oauth2/authorize`
+- Signing Key: `authentik Self-signed Certificate`
+- Scopes: `openid`, `profile`, `email`
 
 ---
 
@@ -385,6 +443,7 @@ velero restore create --from-backup <backup-name>
 | Velero | velero | - | ArgoCD |
 | Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
+| pgAdmin4 | pgadmin | https://pgadmin.yanatech.co.uk | ArgoCD |
 | yanatech website | yanatech | https://www.yanatech.co.uk | ArgoCD |
 
 ---
@@ -406,6 +465,7 @@ k8s-apps/
 │   ├── vaultwarden/         ✅ deployed
 │   ├── kafka/               ✅ deployed
 │   ├── kafka-ui/            ✅ deployed
+│   ├── pgadmin/             ✅ deployed
 │   └── nextcloud/           📋 pending
 └── infrastructure/
     ├── metallb/             ✅ deployed
@@ -429,6 +489,8 @@ k8s-apps/
 #    - authentik-secret in authentik
 #    - vaultwarden-secret in vaultwarden
 #    - velero-b2-credentials in velero
+#    - pgadmin-oauth-secret in pgadmin (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
+#    - pgadmin-config-local ConfigMap in pgadmin (config_local.py with OAuth2 config)
 # 3. Run bootstrap script:
 bash bootstrap.sh
 ```
@@ -442,6 +504,7 @@ bash bootstrap.sh
 | `authentik-secret` | authentik | DB creds, Redis host, secret key |
 | `vaultwarden-secret` | vaultwarden | DATABASE_URL (→ VM 110, `192.168.22.40`), ADMIN_TOKEN, DOMAIN |
 | `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey |
+| `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 OAUTH2_CLIENT_ID + OAUTH2_CLIENT_SECRET |
 
 ### yanatech CI/CD Pipeline
 ```
@@ -460,10 +523,12 @@ ArgoCD detects change → deploys to cluster
 ## Pending / TODO
 
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
-- [ ] Authentik SSO integration: Grafana, ArgoCD, Headlamp
+- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-05-31), Headlamp ⏳ (blocked by upstream Headlamp bug — refresh token not issued), pgAdmin4 ✅ (done 2026-06-01)
+- [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to pg1 at 192.168.22.40)
 - [ ] Nextcloud (self-hosted cloud storage)
 - [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
-- [ ] Move Authentik database to VM 110 (decouples Vaultwarden from Authentik's bundled Postgres)
+- [x] Move Authentik database to VM 110 (done 2026-05-31 — `authentik-secret.__HOST` → `192.168.22.40`; bundled Bitnami PG still running as rollback)
+- [ ] Remove bundled Authentik Postgres: set `postgresql.enabled: false` + delete the `postgresql:` block in the ArgoCD app values (ArgoCD prunes the StatefulSet + PVC; also scrubs the plaintext PG password from git) — do once confident
 
 ---
 
@@ -481,6 +546,9 @@ ArgoCD detects change → deploys to cluster
 - Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB dropped from Authentik's PG 2026-05-31 — final pre-drop dump retained on cp-1
 - Vaultwarden Deployment must use `strategy: { type: Recreate }`. Its `/data` PVC is RWO on ceph-rbd, so the default RollingUpdate deadlocks on restart — the new pod can't mount the volume while the old pod holds it (Multi-Attach), leaving the rollout stuck. If it ever deadlocks, `scale --replicas=0` (wait for both pods gone) then `--replicas=1`
 - Migrating a Postgres DB between the in-cluster Bitnami instance and VM 110: the Bitnami pod stores passwords in files (`$POSTGRES_PASSWORD_FILE`, `$POSTGRES_POSTGRES_PASSWORD_FILE`), not env values, and the `postgres` superuser password in the file can be stale vs the running DB — the `authentik` role (cluster owner) works. Dump/load via `PGPASSWORD` + discrete `PG*` env vars, never a `postgresql://` URL, to avoid special-char parsing failures
+- Authentik DB connection lives entirely in the manual `authentik-secret` (`AUTHENTIK_POSTGRESQL__HOST/__NAME/__USER/__PASSWORD`); the chart sets `authentik.existingSecret` and does NOT put the host in values, so cutover = patch `__HOST` in the secret + restart `authentik-server`/`authentik-worker`. No git change needed for the repoint
+- Authentik's ArgoCD app has `automated.selfHeal: true` — pause it (`argocd app set authentik --sync-policy none`) before scaling deployments to 0 for a migration, or self-heal scales them straight back. Re-enable with `--sync-policy automated --self-heal --auto-prune` after
+- Loading an Authentik dump into a fresh DB needs a SUPERUSER (the dump has `CREATE EXTENSION` + materialized views a plain LOGIN role can't create, and `ON_ERROR_STOP` aborts the whole load on the first one). Temporarily `ALTER ROLE authentik SUPERUSER` on VM 110 for the load, then `NOSUPERUSER`
 - Strimzi 1.0.0 only supports Kafka 4.x — do not use 3.x versions
 - kube-prometheus-stack Helm release name is `kube-prometheus-stack` (set via releaseName in ArgoCD app)
 - `bootstrap.sh` enumerates every ArgoCD Application explicitly (no globbing) — a new app needs BOTH its `argocd-app-<name>.yaml` committed AND a matching `kubectl apply` line in `bootstrap.sh`, or it won't deploy on a fresh cluster (this gap previously hit authentik, velero, uptime-kuma)
@@ -489,3 +557,9 @@ ArgoCD detects change → deploys to cluster
 - ArgoCD can show a permanent `OutOfSync` (app still Healthy) when the kube-apiserver defaults a field the Helm chart doesn't template — e.g. `hostUsers: true` on Deployments (v1.32 user-namespace defaulting). It's cosmetic, not real drift; a sync won't fix it because the apiserver re-adds the field. Fix with an `ignoreDifferences` entry on that jsonPointer (see `infrastructure/headlamp/argocd-app-headlamp.yaml` → `/spec/template/spec/hostUsers` for the pattern)
 - Cloud-init `users:` list must NOT include `- default` alongside an explicit `- name: ubuntu` — on Ubuntu cloud images the default user is already `ubuntu`, so the two definitions collide and `lock_passwd` / `chpasswd` / `ssh_pwauth` silently fail to apply, locking you out of the VM (no password, sometimes no key). Define `ubuntu` explicitly with no `- default` entry. Applies to every cloud-init snippet (`k8s-init.yaml`, `postgres-init.yaml`, etc.)
 - Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
+- ArgoCD apps that pull a **remote Helm chart with inline `spec.source.helm.values`** (e.g. `monitoring`, `authentik`) render from the live Application CR, NOT from git — editing the `argocd-app-*.yaml` in git is a silent no-op until you `kubectl apply -f` the Application manifest (then ArgoCD re-renders + auto-syncs). Apps whose `source` is a git directory of plain manifests (e.g. `vaultwarden`) DO sync straight from git on push. Different mechanisms — don't assume a git push is enough
+- Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://auth.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
+- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID/secret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually, not in git). Dex config in `infrastructure/argocd/values.yaml` (`configs.cm.dex.config`): issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'` in `configs.rbac`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
+- argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
+- pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`
+- Headlamp SSO via Authentik is blocked by an upstream Headlamp bug (affects 0.42.0): `refreshing token: oauth2: token expired and refresh token is not set` — login succeeds but Headlamp immediately tries to refresh the token, finds no refresh token, and bounces back to the login page. Adding `offline_access` scope does not resolve it. Known issue affecting multiple OIDC providers (GitHub issues #3884, #4789, #4876, #5025). Workaround pending upstream fix
