@@ -200,6 +200,7 @@ pvesh get /cluster/resources --type vm
 | Ingress | ingress-nginx (2 replicas) |
 | TLS | cert-manager + Let's Encrypt (DNS-01 via Cloudflare) |
 | Monitoring | kube-prometheus-stack |
+| Log aggregation | Loki + Promtail |
 | SSO | Authentik |
 | GitOps | ArgoCD v3.4.2 |
 | Message broker | Apache Kafka 4.2.0 (Strimzi 1.0.0, KRaft mode) |
@@ -267,6 +268,47 @@ kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9093  # TLS
 
 ### UI
 - Kafka UI (Provectus): https://kafka.yanatech.co.uk
+
+---
+
+## Log Aggregation (Loki + Promtail)
+
+Cluster-wide log aggregation deployed into the `monitoring` namespace alongside kube-prometheus-stack. Promtail runs as a DaemonSet on all nodes (workers + control plane) and ships logs to Loki. Loki is wired into Grafana as an additional datasource.
+
+- **Loki:** Helm chart `grafana/loki` 6.30.1, `deploymentMode: SingleBinary`, 1 replica, 20Gi ceph-rbd PVC
+- **Promtail:** Helm chart `grafana/promtail` 6.16.6, DaemonSet with control-plane toleration
+- **Namespace:** `monitoring`
+- **Loki internal endpoint:** `http://loki.monitoring.svc.cluster.local:3100`
+- **Grafana datasource:** Loki, proxy mode, non-default
+
+### Manifests
+```
+infrastructure/loki/argocd-app-loki.yaml
+infrastructure/loki/argocd-app-promtail.yaml
+```
+
+### Useful LogQL queries
+```logql
+# All ingress traffic
+{namespace="ingress-nginx"}
+
+# Traffic to a specific site
+{namespace="ingress-nginx"} |= "yanatech.co.uk"
+
+# Specific namespace logs
+{namespace="vaultwarden"}
+{namespace="authentik"}
+{namespace="kafka"}
+
+# Errors across the cluster
+{namespace=~".+"} |= "error" | logfmt
+```
+
+### Notes
+- Loki 6.x chart requires `deploymentMode: SingleBinary` set explicitly plus `backend.replicas: 0`, `read.replicas: 0`, `write.replicas: 0` — without these the chart validator fires (`negative structured metadata bytes received` errors in Loki logs are cosmetic — ingestion still works)
+- Promtail requires a toleration for `node-role.kubernetes.io/control-plane: NoSchedule` to run on control plane nodes
+- Loki chart version must be specified as a valid published version — `kubectl apply` of the ArgoCD app will show `Unknown` sync status with a `ComparisonError` if the chart version doesn't exist
+- Grafana dashboard ID **15141** (Loki Kubernetes Logs) provides a namespace-dropdown overview of all pod logs
 
 ---
 
@@ -492,6 +534,8 @@ kubectl rollout restart deployment/velero -n velero
 | Reflector | kube-system | - | ArgoCD |
 | Ceph CSI RBD | ceph-csi-rbd | - | ArgoCD |
 | Prometheus+Grafana | monitoring | https://grafana.yanatech.co.uk | ArgoCD |
+| Loki | monitoring | - | ArgoCD |
+| Promtail | monitoring | - | ArgoCD |
 | ArgoCD | argocd | https://argocd.yanatech.co.uk | Helm |
 | Authentik | authentik | https://auth.yanatech.co.uk | ArgoCD |
 | Vaultwarden | vaultwarden | https://vault.yanatech.co.uk | ArgoCD |
@@ -533,7 +577,8 @@ k8s-apps/
     ├── reflector/           ✅ deployed
     ├── ceph-csi/            ✅ deployed
     ├── headlamp/            ✅ deployed
-    └── velero/              ✅ deployed
+    ├── velero/              ✅ deployed
+    └── loki/                ✅ deployed
 ```
 
 ### Fresh Cluster Bootstrap
@@ -574,14 +619,16 @@ ArgoCD detects change → deploys to cluster
 - Image registry: `ghcr.io/akann/yanatech` (private)
 - Pull secret: `ghcr-secret` in `yanatech` namespace
 - Health endpoint: `GET /api/health` → `{"status":"ok"}`
+- ServiceMonitor: `apps/yanatech/service-monitor.yaml` scrapes `/api/health` every 30s (label `release: kube-prometheus-stack` required)
 
 ---
 
 ## Pending / TODO
 
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
-- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-05-31), Headlamp ⏳ (blocked by upstream Headlamp bug — refresh token not issued), pgAdmin4 ✅ (done 2026-06-01)
+- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — refresh token not issued), pgAdmin4 ✅ (done 2026-06-01)
 - [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to pg1 at 192.168.22.40)
+- [x] Loki + Promtail log aggregation (done 2026-06-01 — `infrastructure/loki/`, wired into Grafana)
 - [ ] Nextcloud (self-hosted cloud storage)
 - [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
 - [x] Move Authentik database to VM 110 (done 2026-05-31 — `authentik-secret.__HOST` → `192.168.22.40`; bundled Bitnami PG still running as rollback)
@@ -594,7 +641,7 @@ ArgoCD detects change → deploys to cluster
 - `qm list` only shows local node VMs — use `pvesh get /cluster/resources --type vm` for all
 - `qm set` / `qm start` for VMs on remote nodes must be run via `ssh pve2/pve3`
 - CPU type must be `host` on all K8s VMs (x86-64-v2 requirement for ceph-csi)
-- ArgoCD ingress backend must use HTTP (insecure mode enabled on argocd-server)
+- ArgoCD ingress: `server.insecure: true` + `backend-protocol: HTTP` — nginx terminates TLS using `wildcard-yanatech-tls` via `extraTls`, argocd-server runs plain HTTP internally. Do NOT use `ssl-passthrough` or `backend-protocol: HTTPS`
 - Wildcard TLS secret must exist in each namespace — Reflector handles this automatically
 - pfSense web UI must not use port 443 on `62.3.101.138` (conflicts with K8s ingress)
 - Authentik requires PostgreSQL and Redis — both enabled via Helm values
@@ -616,7 +663,10 @@ ArgoCD detects change → deploys to cluster
 - Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
 - ArgoCD apps that pull a **remote Helm chart with inline `spec.source.helm.values`** (e.g. `monitoring`, `authentik`) render from the live Application CR, NOT from git — editing the `argocd-app-*.yaml` in git is a silent no-op until you `kubectl apply -f` the Application manifest (then ArgoCD re-renders + auto-syncs). Apps whose `source` is a git directory of plain manifests (e.g. `vaultwarden`) DO sync straight from git on push. Different mechanisms — don't assume a git push is enough
 - Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://auth.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
-- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID/secret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually, not in git). Dex config in `infrastructure/argocd/values.yaml` (`configs.cm.dex.config`): issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'` in `configs.rbac`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
+- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually, not in git). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
 - argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
+- argo-cd ArgoCD Application must be an `argocd-app-argocd.yaml` wrapping the Helm chart with `valuesObject` — a standalone `values.yaml` cannot be `kubectl apply`'d directly (it has no `apiVersion`/`kind`). Use `valuesObject:` not `values: |` to avoid YAML indentation issues with multiline strings like `dex.config`
 - pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`
 - Headlamp SSO via Authentik is blocked by an upstream Headlamp bug (affects 0.42.0): `refreshing token: oauth2: token expired and refresh token is not set` — login succeeds but Headlamp immediately tries to refresh the token, finds no refresh token, and bounces back to the login page. Adding `offline_access` scope does not resolve it. Known issue affecting multiple OIDC providers (GitHub issues #3884, #4789, #4876, #5025). Workaround pending upstream fix
+- Loki 6.x chart: `deploymentMode: SingleBinary` must be set explicitly, AND `backend.replicas: 0`, `read.replicas: 0`, `write.replicas: 0` must all be zeroed — otherwise the chart validator fires with "more than zero replicas configured for both single binary and simple scalable targets". The `negative structured metadata bytes received` errors in Loki logs are a cosmetic Promtail/Loki version skew issue — ingestion works correctly despite them
+- ServiceMonitor resources must have label `release: kube-prometheus-stack` to be picked up by the Prometheus operator (confirmed via `kubectl get prometheus -n monitoring -o jsonpath='{.items[0].spec.serviceMonitorSelector}'`)
