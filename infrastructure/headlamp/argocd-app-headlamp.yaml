@@ -8,10 +8,17 @@ spec:
   source:
     repoURL: https://kubernetes-sigs.github.io/headlamp/
     chart: headlamp
-    targetRevision: 0.42.0          # pin explicitly — floating risks a binary/flag mismatch CrashLoop
+    targetRevision: 0.42.0
     helm:
       releaseName: headlamp
       values: |
+        config:
+          oidc:
+            clientID: headlamp
+            clientSecretName: headlamp-oidc-secret
+            clientSecretKey: client-secret
+            issuerURL: https://auth.yanatech.co.uk/application/o/headlamp/
+            scopes: "openid,profile,email,groups"
         ingress:
           enabled: true
           ingressClassName: nginx
@@ -34,8 +41,6 @@ spec:
     syncOptions:
       - CreateNamespace=true
   ignoreDifferences:
-    # hostUsers is defaulted to true by the kube-apiserver and never set by the
-    # chart, so it shows a permanent OutOfSync. Ignore the server-defaulted field.
     - group: apps
       kind: Deployment
       name: headlamp
