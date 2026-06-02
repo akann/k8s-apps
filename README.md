@@ -207,6 +207,10 @@ pvesh get /cluster/resources --type vm
 | Password manager | Vaultwarden |
 | Backups | Velero → Backblaze B2 |
 | Secret replication | Reflector |
+| Config auto-reload | Stakater Reloader |
+| Node reboots | Kured 1.22.0 |
+| Push notifications | Gotify 2.6.3 |
+| Photo library | Immich v2.6.3 |
 
 ### kubectl Access
 ```bash
@@ -373,10 +377,13 @@ runcmd:
 |---|---|---|
 | vaultwarden | vaultwarden | Vaultwarden ✅ live (migrated from Authentik's PG 2026-05-31) |
 | authentik | authentik | Authentik ✅ live (migrated 2026-05-31; bundled PG kept as rollback) |
+| nextcloud | nextcloud | Nextcloud ✅ live (2026-06-02) |
+| immich | immich | Immich ✅ live (2026-06-02) |
 
 - Role passwords (scram-sha-256) stored in Vaultwarden
 - **`vaultwarden` role password must ALSO live outside Vaultwarden** (bootstrap secret manifest) — otherwise a cold rebuild is a circular-dependency lockout
 - Bump RAM to 8GB + `shared_buffers` to 2GB once Authentik (and more) land here
+- **pgvector + VectorChord installed** for Immich ML features: `postgresql-18-pgvector` (0.8.2) from PGDG APT, VectorChord 1.1.1 `.deb` from GitHub. `shared_preload_libraries = 'vchord.so'` set in postgresql.conf. Extensions `cube`, `earthdistance`, `vector`, `vchord` must be created in the `immich` database as superuser before Immich starts
 
 ### Backups
 
@@ -476,6 +483,186 @@ EOF
 
 ---
 
+## Nextcloud
+
+Self-hosted cloud storage, accessible at `https://cloud.yanatech.co.uk`. Database on pg1, files on ceph-rbd PVC.
+
+- **Namespace:** `nextcloud`
+- **Helm chart:** `nextcloud` from `https://nextcloud.github.io/helm/`, version `6.6.10`
+- **Image:** `nextcloud:30.0.10-fpm` + nginx sidecar
+- **Database:** pg1 (`192.168.22.40`), database `nextcloud`, role `nextcloud`
+- **Storage:** 100Gi ceph-rbd PVC (`nextcloud-nextcloud`)
+- **Auth:** Authentik SSO (user_oidc app) + local admin fallback (`admin`)
+- **Credentials secret:** `nextcloud-secret` in `nextcloud` namespace (stored in Vaultwarden)
+
+### Bootstrap prerequisites (manually created, not in git)
+```bash
+# On pg1
+sudo -u postgres psql <<SQL
+CREATE ROLE nextcloud WITH LOGIN PASSWORD '<db-password>';
+CREATE DATABASE nextcloud OWNER nextcloud;
+SQL
+
+# On k8s-cp-1
+kubectl create namespace nextcloud
+kubectl create secret generic nextcloud-secret \
+  --namespace nextcloud \
+  --from-literal=nextcloud-username='admin' \
+  --from-literal=nextcloud-password='<admin-password>' \
+  --from-literal=nextcloud-token='<random-32-char-hex>' \
+  --from-literal=db-username='nextcloud' \
+  --from-literal=db-password='<db-password>'
+```
+
+Generate passwords: `openssl rand -hex 16`
+
+### Notes
+- Deployment strategy must allow for init container (`extraInitContainers`) to `chown -R 33:33 /var/www/html` — without this the installer cannot write `config.php`
+- `trusted_domains` defaults to `localhost` only — set via `configs.proxy.config.php` in values or `php occ config:system:set trusted_domains 1 --value=cloud.yanatech.co.uk`
+- `nginx.ingress.kubernetes.io/server-snippet` is blocked by ingress-nginx — CalDAV/CardDAV redirects handled inside Nextcloud instead
+- `proxy-body-size: "0"` required for large file uploads
+- Authentik SSO via `user_oidc` app: install with `php occ app:install user_oidc`, configure with `php occ user_oidc:provider authentik --clientid=... --clientsecret=... --discoveryuri=https://auth.yanatech.co.uk/application/o/nextcloud/.well-known/openid-configuration --unique-uid=0 --mapping-uid=preferred_username`
+- `allow_local_remote_servers` must be set to `true` in config — Nextcloud blocks outbound requests to RFC1918 addresses by default, which breaks OIDC discovery when Authentik resolves to the MetalLB VIP (`192.168.22.200`). Set via `php occ config:system:set allow_local_remote_servers --value=true --type=boolean` or in `configs.proxy.config.php`
+
+---
+
+## Immich
+
+Self-hosted photo and video library with ML features (face recognition, semantic search, duplicate detection). Accessible at `https://photos.yanatech.co.uk`.
+
+- **Namespace:** `immich`
+- **Helm chart:** OCI `ghcr.io/immich-app/immich-charts/immich` version `0.12.0` (app v2.6.3)
+- **Components:** immich-server, immich-machine-learning, valkey (in-cluster cache)
+- **Database:** pg1 (`192.168.22.40`), database `immich`, role `immich`
+- **Storage:** 500Gi ceph-rbd PVC (`immich-library`) for photos/videos
+- **URL:** `https://photos.yanatech.co.uk`
+- **Credentials secret:** `immich-secret` in `immich` namespace (key: `db-url`)
+- **Manifest:** `apps/immich/argocd-app-immich.yaml`
+
+### pg1 prerequisites (must be done before deploying)
+```bash
+# Install extensions on pg1 (one-time setup, already done)
+sudo apt install -y postgresql-18-pgvector
+wget https://github.com/tensorchord/VectorChord/releases/download/1.1.1/postgresql-18-vchord_1.1.1-1_$(dpkg --print-architecture).deb
+sudo apt install -y ./postgresql-18-vchord_1.1.1-1_$(dpkg --print-architecture).deb
+sudo -u postgres psql -c "ALTER SYSTEM SET shared_preload_libraries = 'vchord.so';"
+sudo systemctl restart postgresql
+
+# Create role, database and extensions
+sudo -u postgres psql -c "CREATE ROLE immich WITH LOGIN PASSWORD '<password>';"
+sudo -u postgres psql -c "CREATE DATABASE immich OWNER immich;"
+sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS cube;"
+sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS earthdistance;"
+sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS vector;"
+sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS vchord;"
+```
+
+### K8s bootstrap prerequisites
+```bash
+kubectl create namespace immich
+
+# Pre-create library PVC before ArgoCD sync
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-library
+  namespace: immich
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-rbd
+  resources:
+    requests:
+      storage: 500Gi
+EOF
+
+kubectl create secret generic immich-secret \
+  --namespace immich \
+  --from-literal=db-url='postgresql://immich:<password>@192.168.22.40:5432/immich'
+```
+
+Generate password: `openssl rand -hex 16`
+
+### Notes
+- The immich Helm chart (0.10.0+) removed the bundled postgresql subchart — do not set `postgresql.enabled: false` in values, it will cause a template error. Simply omit the `postgresql:` key entirely
+- DB env vars go under `server.controllers.main.containers.main.env` — the top-level `env:` key and `server.env:` are silently ignored
+- `cube` and `earthdistance` extensions require superuser to create — must be done as postgres superuser before Immich starts, not by the `immich` role
+- VectorChord 1.1.1 is compatible with Immich (accepted range >= 0.3, < 2.0)
+- pgvector 0.8.2 is compatible (required range >= 0.7, < 0.9)
+
+---
+
+## Gotify
+
+Push notification server for cluster alerts. Alertmanager sends to a bridge (`alertmanager-gotify-bridge`) which translates to Gotify's API format.
+
+- **Namespace:** `gotify`
+- **Image:** `gotify/server:2.6.3`
+- **URL:** `https://gotify.yanatech.co.uk`
+- **Storage:** 1Gi ceph-rbd PVC
+- **Credentials secret:** `gotify-secret` in `gotify` namespace (stored in Vaultwarden)
+- **Manifests:** `apps/gotify/manifests/gotify.yaml`
+
+### Alertmanager integration
+- Bridge: `druggeri/alertmanager_gotify_bridge:latest` — translates Alertmanager webhook payload to Gotify API
+- Bridge endpoint: `http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook`
+- Alertmanager webhook URL points to the bridge; bridge forwards to `http://gotify.gotify.svc.cluster.local/message`
+- App token stored in Alertmanager config values and bridge env (`GOTIFY_TOKEN`)
+- Watchdog + InfoInhibitor alerts routed to null receiver — everything else goes to Gotify
+- Reboot window 04:00-06:00 to avoid overlap with pg1 backup (02:30) and Proxmox backup (03:30)
+
+### Notes
+- Alertmanager's generic webhook sends a different JSON structure than Gotify's API expects — the bridge is mandatory
+- `GOTIFY_ENDPOINT` must include `/message` (e.g. `http://gotify.gotify.svc.cluster.local/message`)
+- Bridge listens on `/gotify_webhook` not `/`
+- etcd, kube-proxy, kube-scheduler, kube-controller-manager alerts silenced for 1 year — these are false positives in kubeadm clusters where those components aren't scraped by Prometheus
+
+---
+
+## Stakater Reloader
+
+Watches ConfigMaps and Secrets and automatically rolls dependent Deployments/StatefulSets/DaemonSets when they change. Eliminates manual `kubectl rollout restart` after secret rotation.
+
+- **Namespace:** `reloader`
+- **Helm chart:** `stakater/reloader` 2.2.12
+- **Watches:** all namespaces
+- **Manifest:** `infrastructure/reloader/argocd-app-reloader.yaml`
+
+### Annotating workloads
+```yaml
+# Restart when any referenced secret/configmap changes (auto-detect)
+annotations:
+  reloader.stakater.com/auto: "true"
+
+# Restart only when a specific secret changes
+annotations:
+  secret.reloader.stakater.com/reload: "my-secret"
+
+# Restart only when a specific configmap changes
+annotations:
+  configmap.reloader.stakater.com/reload: "my-configmap"
+```
+
+Currently annotated: `vaultwarden` deployment (`secret.reloader.stakater.com/reload: "vaultwarden-secret"`)
+
+---
+
+## Kured
+
+Kubernetes Reboot Daemon — watches for `/var/run/reboot-required` on each node (created by Ubuntu's `unattended-upgrades` after kernel updates) and safely reboots nodes one at a time, draining pods first.
+
+- **Namespace:** `kured`
+- **Helm chart:** `kubereboot/kured` 5.12.0 (app version 1.22.0)
+- **Mode:** DaemonSet — one pod per node (6 total: 3 control plane + 3 workers)
+- **Reboot window:** 04:00–06:00 Europe/London (avoids pg1 backup at 02:30 and Proxmox backup at 03:30)
+- **Reboot delay:** 60s between nodes
+- **Notifications:** Gotify via `notifyUrl`
+- **Manifest:** `infrastructure/kured/argocd-app-kured.yaml`
+- Toleration for `node-role.kubernetes.io/control-plane: NoSchedule` — runs on all nodes
+
+---
+
 ## Velero Backups
 
 - **Backend:** Backblaze B2
@@ -483,7 +670,7 @@ EOF
 - **Endpoint:** `s3.eu-central-003.backblazeb2.com`
 - **Schedule:** Daily at 2am UTC ✅ live (verified 2026-06-01)
 - **Retention:** 30 days
-- **Namespaces backed up:** vaultwarden, authentik, monitoring, kafka, ingress-nginx, cert-manager, argocd
+- **Namespaces backed up:** vaultwarden, authentik, monitoring, kafka, ingress-nginx, cert-manager, argocd, nextcloud, pgadmin, immich
 - **Credentials secret:** `velero-b2-credentials` in `velero` namespace (stored in Vaultwarden)
 - **B2 key:** `velero` key scoped to `yanatech-velero` bucket (keyID `003faa10a09691a0000000003`)
 
@@ -545,6 +732,11 @@ kubectl rollout restart deployment/velero -n velero
 | Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
 | pgAdmin4 | pgadmin | https://pgadmin.yanatech.co.uk | ArgoCD |
+| Nextcloud | nextcloud | https://cloud.yanatech.co.uk | ArgoCD |
+| Immich | immich | https://photos.yanatech.co.uk | ArgoCD |
+| Gotify | gotify | https://gotify.yanatech.co.uk | ArgoCD |
+| Reloader | reloader | - | ArgoCD |
+| Kured | kured | - | ArgoCD |
 | yanatech website | yanatech | https://www.yanatech.co.uk | ArgoCD |
 
 ---
@@ -567,7 +759,9 @@ k8s-apps/
 │   ├── kafka/               ✅ deployed
 │   ├── kafka-ui/            ✅ deployed
 │   ├── pgadmin/             ✅ deployed
-│   └── nextcloud/           📋 pending
+│   ├── nextcloud/           ✅ deployed
+│   ├── gotify/              ✅ deployed
+│   └── immich/              ✅ deployed
 └── infrastructure/
     ├── metallb/             ✅ deployed
     ├── cert-manager/        ✅ deployed
@@ -578,7 +772,9 @@ k8s-apps/
     ├── ceph-csi/            ✅ deployed
     ├── headlamp/            ✅ deployed
     ├── velero/              ✅ deployed
-    └── loki/                ✅ deployed
+    ├── loki/                ✅ deployed
+    ├── reloader/            ✅ deployed
+    └── kured/               ✅ deployed
 ```
 
 ### Fresh Cluster Bootstrap
@@ -593,6 +789,9 @@ k8s-apps/
 #    - velero-b2-credentials in velero
 #    - pgadmin-oauth-secret in pgadmin (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
 #    - pgadmin-config-local ConfigMap in pgadmin (config_local.py with OAuth2 config)
+#    - nextcloud-secret in nextcloud (nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password)
+#    - immich-secret in immich (db-url as postgresql://immich:<password>@192.168.22.40:5432/immich)
+#    - immich-library PVC (500Gi ceph-rbd) must be created before ArgoCD syncs immich
 # 3. Run bootstrap script:
 bash bootstrap.sh
 ```
@@ -607,6 +806,8 @@ bash bootstrap.sh
 | `vaultwarden-secret` | vaultwarden | DATABASE_URL (→ VM 110, `192.168.22.40`), ADMIN_TOKEN, DOMAIN |
 | `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey |
 | `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 OAUTH2_CLIENT_ID + OAUTH2_CLIENT_SECRET |
+| `nextcloud-secret` | nextcloud | nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password |
+| `immich-secret` | immich | db-url (`postgresql://immich:<password>@192.168.22.40:5432/immich`) |
 
 ### yanatech CI/CD Pipeline
 ```
@@ -626,13 +827,17 @@ ArgoCD detects change → deploys to cluster
 ## Pending / TODO
 
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
-- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — refresh token not issued), pgAdmin4 ✅ (done 2026-06-01)
+- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — OIDC refresh token not stored, running with token auth), pgAdmin4 ✅ (done 2026-06-01), Nextcloud ✅ (done 2026-06-02)
 - [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to pg1 at 192.168.22.40)
 - [x] Loki + Promtail log aggregation (done 2026-06-01 — `infrastructure/loki/`, wired into Grafana)
-- [ ] Nextcloud (self-hosted cloud storage)
+- [x] Nextcloud (done 2026-06-02 — `apps/nextcloud/`, on pg1 + ceph-rbd, accessible at `https://cloud.yanatech.co.uk`)
+- [x] Gotify push notifications + Alertmanager integration (done 2026-06-02 — `apps/gotify/`, bridge at `alertmanager-gotify-bridge`)
+- [x] Stakater Reloader (done 2026-06-02 — `infrastructure/reloader/`, watching all namespaces)
+- [x] Kured automatic node reboots (done 2026-06-02 — `infrastructure/kured/`, window 04:00-06:00 Europe/London)
 - [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
-- [x] Move Authentik database to VM 110 (done 2026-05-31 — `authentik-secret.__HOST` → `192.168.22.40`; bundled Bitnami PG still running as rollback)
-- [ ] Remove bundled Authentik Postgres: set `postgresql.enabled: false` + delete the `postgresql:` block in the ArgoCD app values (ArgoCD prunes the StatefulSet + PVC; also scrubs the plaintext PG password from git) — do once confident
+- [x] Move Authentik database to VM 110 (done 2026-05-31 — bundled Bitnami PG disabled 2026-06-02, plaintext password removed from git)
+- [ ] Headlamp SSO — revisit when Headlamp 0.43.0+ ships with OIDC refresh token fix
+- [x] Immich self-hosted photo library (done 2026-06-02 — `apps/immich/`, on pg1 + ceph-rbd, accessible at `https://photos.yanatech.co.uk`)
 
 ---
 
@@ -667,6 +872,15 @@ ArgoCD detects change → deploys to cluster
 - argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
 - argo-cd ArgoCD Application must be an `argocd-app-argocd.yaml` wrapping the Helm chart with `valuesObject` — a standalone `values.yaml` cannot be `kubectl apply`'d directly (it has no `apiVersion`/`kind`). Use `valuesObject:` not `values: |` to avoid YAML indentation issues with multiline strings like `dex.config`
 - pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`
-- Headlamp SSO via Authentik is blocked by an upstream Headlamp bug (affects 0.42.0): `refreshing token: oauth2: token expired and refresh token is not set` — login succeeds but Headlamp immediately tries to refresh the token, finds no refresh token, and bounces back to the login page. Adding `offline_access` scope does not resolve it. Known issue affecting multiple OIDC providers (GitHub issues #3884, #4789, #4876, #5025). Workaround pending upstream fix
+- Headlamp SSO via Authentik is blocked by an upstream Headlamp bug (affects 0.42.0, latest as of 2026-06-02): `refreshing token: getting refresh token: key not found` — login succeeds but Headlamp immediately tries to refresh the token, finds no refresh token in its cache, and bounces back to the login page. Confirmed in pod logs. `offline_access` scope + PKCE (public client) does not resolve it — the refresh token is issued by Authentik but not stored by Headlamp. Workaround: running with service account token auth (`kubectl create token headlamp -n headlamp --duration=8760h`). Fix pending upstream (GitHub issues #3884, #4789, #4876, #5025). Revisit on 0.43.0+
+- kube-prometheus-stack CRDs exceed the 262144-byte annotation limit on sync — fixed by adding `ServerSideApply=true` to the monitoring app's `syncOptions`. Required whenever the chart version is bumped
+- Grafana env config in kube-prometheus-stack: `GF_AUTH_GENERIC_OAUTH_CLIENT_ID` and `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET` must both go in `grafana.envValueFrom` (not `grafana.env`) — putting either in `env` with a `valueFrom` block causes a Deployment validation error (`may not be specified when value is not empty`)
+- Nextcloud chart (6.6.10) auto-installer silently fails if `config/` directory is not writable by `www-data` (uid 33) — fix with `extraInitContainers` running `chown -R 33:33 /var/www/html` on the `nextcloud-main` volume before startup. `trusted_domains` defaults to `localhost` only — must add the actual hostname via `occ config:system:set trusted_domains 1 --value=<host>` or via `configs.proxy.config.php`. `nginx.ingress.kubernetes.io/server-snippet` annotation is blocked by ingress-nginx by default — use plain annotations instead. The `installed: false` from `occ status` is misleading if `config.php` exists but `trusted_domains` is wrong; run `php occ maintenance:install` manually to confirm the real error
+- Nextcloud bootstrap secret: generate passwords with `openssl rand -hex 16`; db-password must be set on pg1 first (`CREATE ROLE nextcloud WITH LOGIN PASSWORD '...'`), then referenced in the k8s secret
 - Loki 6.x chart: `deploymentMode: SingleBinary` must be set explicitly, AND `backend.replicas: 0`, `read.replicas: 0`, `write.replicas: 0` must all be zeroed — otherwise the chart validator fires with "more than zero replicas configured for both single binary and simple scalable targets". The `negative structured metadata bytes received` errors in Loki logs are a cosmetic Promtail/Loki version skew issue — ingestion works correctly despite them
 - ServiceMonitor resources must have label `release: kube-prometheus-stack` to be picked up by the Prometheus operator (confirmed via `kubectl get prometheus -n monitoring -o jsonpath='{.items[0].spec.serviceMonitorSelector}'`)
+- Nextcloud OIDC SSO via `user_oidc` app: Nextcloud blocks outbound HTTP requests to RFC1918 addresses by default (`allow_local_address: false` in Guzzle) — `allow_local_remote_servers: true` must be set in config, otherwise the OIDC discovery URL fails with `Host "192.168.22.200" violates local access rules` when Authentik resolves to the MetalLB ingress VIP
+- Gotify Alertmanager integration requires a bridge (`druggeri/alertmanager_gotify_bridge`) — Alertmanager's webhook payload is a JSON object with an `alerts` array, not Gotify's `{title, message, priority}` format. Pointing Alertmanager directly at `/message?token=...` returns `400: Field 'message' is required`
+- argocd CLI `--grpc-web` warning: add `alias argocd='argocd --grpc-web'` to `~/.bashrc` to suppress it permanently. The `argocd config set-context` subcommand does not exist in this version
+- Stakater Reloader: annotate deployments with `secret.reloader.stakater.com/reload: "<secret-name>"` to trigger rolling restarts on secret changes. `reloader.stakater.com/auto: "true"` triggers on any referenced secret/configmap change
+- Immich chart (0.10.0+): postgresql subchart removed — omit `postgresql:` key entirely from values (setting `enabled: false` triggers a template error). DB connection via `DB_URL` env var under `server.controllers.main.containers.main.env`. Extensions `cube` and `earthdistance` require superuser — must be pre-created in the immich database before first start or migrations fail with `permission denied to create extension`
