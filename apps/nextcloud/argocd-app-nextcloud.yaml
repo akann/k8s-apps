@@ -38,7 +38,19 @@ spec:
                 ),
                 'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
                 'overwriteprotocol' => 'https',
+                'overwrite.cli.url' => 'https://cloud.yanatech.co.uk',
+                'trusted_domains' => array(
+                  0 => 'localhost',
+                  1 => 'cloud.yanatech.co.uk',
+                ),
               );
+          extraInitContainers:
+            - name: fix-permissions
+              image: busybox
+              command: ["sh", "-c", "chown -R 33:33 /var/www/html"]
+              volumeMounts:
+                - name: nextcloud-main
+                  mountPath: /var/www/html
 
         internalDatabase:
           enabled: false
@@ -63,15 +75,6 @@ spec:
 
         cronjob:
           enabled: true
-
-        # Fix permissions on the data volume
-        initContainers:
-          - name: fix-permissions
-            image: busybox
-            command: ["sh", "-c", "chown -R 33:33 /var/www/html"]
-            volumeMounts:
-              - name: nextcloud-main
-                mountPath: /var/www/html
 
         ingress:
           enabled: true
