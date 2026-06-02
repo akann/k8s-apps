@@ -71,11 +71,31 @@ spec:
               group_interval: 5m
               repeat_interval: 12h
               receiver: gotify
+              routes:
+                - matchers:
+                    - alertname =~ "Watchdog|InfoInhibitor"
+                  receiver: "null"
             receivers:
+              - name: "null"
               - name: gotify
                 webhook_configs:
                   - url: 'http://gotify.gotify.svc.cluster.local/message?token=AvMQK99JPxH2tYh'
                     send_resolved: true
+            inhibit_rules:
+              - source_matchers:
+                  - severity = critical
+                target_matchers:
+                  - severity =~ warning|info
+                equal:
+                  - namespace
+                  - alertname
+              - source_matchers:
+                  - severity = warning
+                target_matchers:
+                  - severity = info
+                equal:
+                  - namespace
+                  - alertname
           alertmanagerSpec:
             storage:
               volumeClaimTemplate:
