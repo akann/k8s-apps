@@ -38,6 +38,7 @@ kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml
 kubectl apply -f infrastructure/velero/argocd-app-velero.yaml
 kubectl apply -f infrastructure/loki/argocd-app-loki.yaml
 kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
+kubectl apply -f infrastructure/reloader/argocd-app-reloader.yaml
 
 echo "Applying apps..."
 kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
