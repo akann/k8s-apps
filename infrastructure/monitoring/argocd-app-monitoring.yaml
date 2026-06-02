@@ -18,11 +18,6 @@ spec:
           env:
             GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
             GF_AUTH_GENERIC_OAUTH_NAME: Authentik
-            GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
-              valueFrom:
-                secretKeyRef:
-                  name: grafana-authentik-secret
-                  key: client_id
             GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email groups
             GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://auth.yanatech.co.uk/application/o/authorize/
             GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://auth.yanatech.co.uk/application/o/token/
@@ -30,11 +25,14 @@ spec:
             GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'"
             GF_SERVER_ROOT_URL: https://grafana.yanatech.co.uk
           envValueFrom:
+            GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
+              secretKeyRef:
+                name: grafana-authentik-secret
+                key: client_id
             GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
               secretKeyRef:
                 name: grafana-authentik-secret
                 key: client_secret
-          # --- Loki datasource ---
           additionalDataSources:
             - name: Loki
               type: loki
@@ -82,3 +80,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
