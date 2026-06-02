@@ -71,14 +71,6 @@ spec:
             nginx.ingress.kubernetes.io/proxy-body-size: "0"
             nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
             nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-            nginx.ingress.kubernetes.io/server-snippet: |-
-              server_tokens off;
-              location ^~ /.well-known {
-                location = /.well-known/carddav { return 301 /remote.php/dav/; }
-                location = /.well-known/caldav  { return 301 /remote.php/dav/; }
-                location ^~ /.well-known         { return 301 /index.php$uri; }
-                try_files $uri $uri/ =404;
-              }
           hosts:
             - host: cloud.yanatech.co.uk
               paths:
