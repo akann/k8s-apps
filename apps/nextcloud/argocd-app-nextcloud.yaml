@@ -1,0 +1,114 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nextcloud
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://nextcloud.github.io/helm/
+    chart: nextcloud
+    targetRevision: 6.6.10
+    helm:
+      releaseName: nextcloud
+      valuesObject:
+        image:
+          flavor: fpm
+
+        nginx:
+          enabled: true
+
+        nextcloud:
+          host: cloud.yanatech.co.uk
+          existingSecret:
+            enabled: true
+            secretName: nextcloud-secret
+            usernameKey: nextcloud-username
+            passwordKey: nextcloud-password
+            tokenKey: nextcloud-token
+            smtpUsernameKey: ""
+            smtpPasswordKey: ""
+          configs:
+            proxy.config.php: |-
+              <?php
+              $CONFIG = array (
+                'trusted_proxies' => array(
+                  0 => '127.0.0.1',
+                  1 => '10.0.0.0/8',
+                ),
+                'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
+                'overwriteprotocol' => 'https',
+              );
+
+        internalDatabase:
+          enabled: false
+
+        externalDatabase:
+          enabled: true
+          type: postgresql
+          host: 192.168.22.40
+          database: nextcloud
+          user: nextcloud
+          existingSecret:
+            enabled: true
+            secretName: nextcloud-secret
+            usernameKey: db-username
+            passwordKey: db-password
+
+        persistence:
+          enabled: true
+          storageClass: ceph-rbd
+          accessMode: ReadWriteOnce
+          size: 100Gi
+
+        cronjob:
+          enabled: true
+
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: "0"
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+            nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+            nginx.ingress.kubernetes.io/server-snippet: |-
+              server_tokens off;
+              location ^~ /.well-known {
+                location = /.well-known/carddav { return 301 /remote.php/dav/; }
+                location = /.well-known/caldav  { return 301 /remote.php/dav/; }
+                location ^~ /.well-known         { return 301 /index.php$uri; }
+                try_files $uri $uri/ =404;
+              }
+          hosts:
+            - host: cloud.yanatech.co.uk
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: wildcard-yanatech-tls
+              hosts:
+                - cloud.yanatech.co.uk
+
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+
+        postgresql:
+          enabled: false
+
+        redis:
+          enabled: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nextcloud
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
