@@ -22,11 +22,6 @@ spec:
             name: immich
             username: immich
             password: ""
-          valkey:
-            host: ""
-
-        postgresql:
-          enabled: false
 
         valkey:
           enabled: true
