@@ -15,14 +15,7 @@ spec:
           existingSecret:
             secretName: authentik-secret
         postgresql:
-          enabled: true
-          auth:
-            username: authentik
-            password: 6a0acab6da6b20fe008fb653c7d4dcb29cbd5e6d
-            database: authentik
-          primary:
-            persistence:
-              storageClass: ceph-rbd
+          enabled: false
         redis:
           enabled: true
           master:

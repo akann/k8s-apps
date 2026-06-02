@@ -1,37 +1,57 @@
-configs:
-  cm:
-    admin.enabled: true
-    url: https://argocd.yanatech.co.uk
-    dex.config: |
-      connectors:
-        - type: oidc
-          id: authentik
-          name: Authentik
-          config:
-            issuer: https://auth.yanatech.co.uk/application/o/argo-cd/
-            clientID: PWfZkdoaHZvMaPuyUTD8oH4HFmnaC4dUBro9WOmZ
-            clientSecret: $dex.authentik.clientSecret
-            insecureEnableGroups: true
-            scopes:
-              - openid
-              - profile
-              - email
-  params:
-    server.insecure: false
-  rbac:
-    policy.csv: |
-      g, authentik Admins, role:admin
-    scopes: '[groups]'
-
-server:
-  ingress:
-    enabled: true
-    ingressClassName: nginx
-    hostname: argocd.yanatech.co.uk
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
-      nginx.ingress.kubernetes.io/ssl-passthrough: false
-    extraTls:
-      - hosts:
-          - argocd.yanatech.co.uk
-        secretName: wildcard-yanatech-tls
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-cd
+    targetRevision: 9.5.15
+    helm:
+      releaseName: argocd
+      valuesObject:
+        configs:
+          cm:
+            admin.enabled: true
+            url: https://argocd.yanatech.co.uk
+            dex.config: |
+              connectors:
+                - type: oidc
+                  id: authentik
+                  name: Authentik
+                  config:
+                    issuer: https://auth.yanatech.co.uk/application/o/argo-cd/
+                    clientID: PWfZkdoaHZvMaPuyUTD8oH4HFmnaC4dUBro9WOmZ
+                    clientSecret: $dex.authentik.clientSecret
+                    insecureEnableGroups: true
+                    scopes:
+                      - openid
+                      - profile
+                      - email
+                      - groups
+          params:
+            server.insecure: true
+          rbac:
+            policy.csv: |
+              g, authentik Admins, role:admin
+            scopes: '[groups]'
+        server:
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hostname: argocd.yanatech.co.uk
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: HTTP
+            extraTls:
+              - hosts:
+                  - argocd.yanatech.co.uk
+                secretName: wildcard-yanatech-tls
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kured
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubereboot.github.io/charts
+    chart: kured
+    targetRevision: 5.12.0
+    helm:
+      releaseName: kured
+      valuesObject:
+        configuration:
+          # Only reboot between 02:00-05:00 to avoid disruption
+          startTime: "04:00"
+          endTime: "06:00"
+          timeZone: "Europe/London"
+          # Wait for pods to reschedule before rebooting next node
+          rebootDelay: 60s
+          # Notify Gotify when a node reboots
+          notifyUrl: "http://gotify.gotify.svc.cluster.local/message?token=AvMQK99JPxH2tYh"
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kured
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

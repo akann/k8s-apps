@@ -1,0 +1,154 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gotify-data
+  namespace: gotify
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-rbd
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gotify
+  namespace: gotify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gotify
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: gotify
+    spec:
+      containers:
+        - name: gotify
+          image: gotify/server:2.6.3
+          ports:
+            - containerPort: 80
+          env:
+            - name: GOTIFY_DEFAULTUSER_NAME
+              value: admin
+            - name: GOTIFY_DEFAULTUSER_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: gotify-secret
+                  key: admin-password
+            - name: GOTIFY_SERVER_PORT
+              value: "80"
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gotify-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gotify
+  namespace: gotify
+spec:
+  selector:
+    app: gotify
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gotify
+  namespace: gotify
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: gotify.yanatech.co.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gotify
+                port:
+                  number: 80
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - gotify.yanatech.co.uk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-gotify-bridge
+  namespace: gotify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-gotify-bridge
+  template:
+    metadata:
+      labels:
+        app: alertmanager-gotify-bridge
+    spec:
+      containers:
+        - name: bridge
+          image: druggeri/alertmanager_gotify_bridge:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GOTIFY_ENDPOINT
+              value: http://gotify.gotify.svc.cluster.local/message
+            - name: GOTIFY_TOKEN
+              value: AvMQK99JPxH2tYh
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-gotify-bridge
+  namespace: gotify
+spec:
+  selector:
+    app: alertmanager-gotify-bridge
+  ports:
+    - port: 80
+      targetPort: 8080

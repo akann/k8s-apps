@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/immich-app/immich-charts
+    chart: immich
+    targetRevision: 0.12.0
+    helm:
+      releaseName: immich
+      valuesObject:
+        immich:
+          persistence:
+            library:
+              existingClaim: immich-library
+
+        valkey:
+          enabled: true
+
+        server:
+          controllers:
+            main:
+              containers:
+                main:
+                  env:
+                    DB_URL:
+                      valueFrom:
+                        secretKeyRef:
+                          name: immich-secret
+                          key: db-url
+          ingress:
+            main:
+              enabled: true
+              annotations:
+                nginx.ingress.kubernetes.io/proxy-body-size: "0"
+              className: nginx
+              hosts:
+                - host: photos.yanatech.co.uk
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      service:
+                        identifier: main
+              tls:
+                - secretName: wildcard-yanatech-tls
+                  hosts:
+                    - photos.yanatech.co.uk
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: immich
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

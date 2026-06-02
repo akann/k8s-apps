@@ -36,6 +36,10 @@ kubectl apply -f infrastructure/monitoring/argocd-app-monitoring.yaml
 kubectl apply -f infrastructure/headlamp/argocd-app-headlamp.yaml
 kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml
 kubectl apply -f infrastructure/velero/argocd-app-velero.yaml
+kubectl apply -f infrastructure/loki/argocd-app-loki.yaml
+kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
+kubectl apply -f infrastructure/reloader/argocd-app-reloader.yaml
+kubectl apply -f infrastructure/kured/argocd-app-kured.yaml
 
 echo "Applying apps..."
 kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
@@ -44,5 +48,7 @@ kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
+kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
+kubectl apply -f apps/gotify/argocd-app-gotify.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
