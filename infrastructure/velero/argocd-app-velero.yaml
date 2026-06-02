@@ -47,6 +47,8 @@ spec:
                 - ingress-nginx
                 - cert-manager
                 - argocd
+                - nextcloud
+                - pgadmin
         snapshotsEnabled: false
   destination:
     server: https://kubernetes.default.svc
