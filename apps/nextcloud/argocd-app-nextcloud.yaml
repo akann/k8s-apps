@@ -39,6 +39,7 @@ spec:
                 'forwarded_for_headers' => array('HTTP_X_FORWARDED_FOR'),
                 'overwriteprotocol' => 'https',
                 'overwrite.cli.url' => 'https://cloud.yanatech.co.uk',
+                'allow_local_remote_servers' => true,
                 'trusted_domains' => array(
                   0 => 'localhost',
                   1 => 'cloud.yanatech.co.uk',
@@ -116,3 +117,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+# already in file, just need to add to configs block
