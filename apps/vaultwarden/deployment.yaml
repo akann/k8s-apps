@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: vaultwarden
   namespace: vaultwarden
+  annotations:
+    secret.reloader.stakater.com/reload: "vaultwarden-secret" 
 spec:
   strategy:
     type: Recreate
@@ -53,3 +55,4 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: vaultwarden-data
+
