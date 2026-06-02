@@ -46,5 +46,6 @@ kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
+kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
