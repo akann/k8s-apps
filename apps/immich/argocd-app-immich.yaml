@@ -16,17 +16,17 @@ spec:
           persistence:
             library:
               existingClaim: immich-library
-          database:
-            host: 192.168.22.40
-            port: 5432
-            name: immich
-            username: immich
-            password: ""
 
         valkey:
           enabled: true
 
         server:
+          env:
+            DB_URL:
+              valueFrom:
+                secretKeyRef:
+                  name: immich-secret
+                  key: db-url
           ingress:
             main:
               enabled: true
@@ -40,13 +40,6 @@ spec:
                 - secretName: wildcard-yanatech-tls
                   hosts:
                     - photos.yanatech.co.uk
-
-        env:
-          DB_PASSWORD:
-            valueFrom:
-              secretKeyRef:
-                name: immich-secret
-                key: db-password
 
   destination:
     server: https://kubernetes.default.svc
