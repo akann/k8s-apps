@@ -62,6 +62,20 @@ spec:
                     requests:
                       storage: 50Gi
         alertmanager:
+          config:
+            global:
+              resolve_timeout: 5m
+            route:
+              group_by: ['alertname', 'namespace']
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 12h
+              receiver: gotify
+            receivers:
+              - name: gotify
+                webhook_configs:
+                  - url: 'http://gotify.gotify.svc.cluster.local/message?token=AvMQK99JPxH2tYh'
+                    send_resolved: true
           alertmanagerSpec:
             storage:
               volumeClaimTemplate:
