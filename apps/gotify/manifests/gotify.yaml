@@ -107,3 +107,48 @@ spec:
     - secretName: wildcard-yanatech-tls
       hosts:
         - gotify.yanatech.co.uk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-gotify-bridge
+  namespace: gotify
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-gotify-bridge
+  template:
+    metadata:
+      labels:
+        app: alertmanager-gotify-bridge
+    spec:
+      containers:
+        - name: bridge
+          image: ndragon/alertmanager-gotify-bridge:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GOTIFY_ENDPOINT
+              value: http://gotify.gotify.svc.cluster.local
+            - name: GOTIFY_TOKEN
+              value: AvMQK99JPxH2tYh
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-gotify-bridge
+  namespace: gotify
+spec:
+  selector:
+    app: alertmanager-gotify-bridge
+  ports:
+    - port: 80
+      targetPort: 8080

@@ -79,7 +79,7 @@ spec:
               - name: "null"
               - name: gotify
                 webhook_configs:
-                  - url: 'http://gotify.gotify.svc.cluster.local/message?token=AvMQK99JPxH2tYh'
+                  - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local'
                     send_resolved: true
             inhibit_rules:
               - source_matchers:
