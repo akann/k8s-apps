@@ -324,7 +324,7 @@ Dedicated Proxmox VM for app databases that must survive a Kubernetes cluster re
 
 | VMID | Name | Host | IP | vCPU | RAM | Disk |
 |---|---|---|---|---|---|---|
-| 110 | postgres-1 | pve1 (HA-managed, can run on any node) | 192.168.22.40 | 2 | 4GB | 20GB on `rbd` |
+| 110 | postgres-1 | pve1 (HA-managed, can run on any node) | 192.168.22.40 | 2 | 8GB | 20GB on `rbd` |
 
 - Cloned full from template 9000; CPU type `host`; `vmbr0`, no VLAN tag
 - Cloud-init: `--cicustom "user=local:snippets/postgres-init.yaml"`
@@ -368,7 +368,7 @@ runcmd:
 
 - **Version:** 18.4 (PGDG repo, `noble-pgdg`)
 - Config dir: `/etc/postgresql/18/main/`
-- Tuning drop-in `conf.d/tuning.conf`: `listen_addresses = '*'`, `shared_buffers 1GB`, `effective_cache_size 3GB`, `maintenance_work_mem 256MB`, `work_mem 16MB`, `max_connections 200`, `wal_compression on`
+- Tuning drop-in `conf.d/tuning.conf`: `listen_addresses = '*'`, `shared_buffers 2GB`, `effective_cache_size 6GB`, `maintenance_work_mem 512MB`, `work_mem 16MB`, `max_connections 200`, `wal_compression on`
 - LAN access via `pg_hba.conf`: `host all all 192.168.22.0/24 scram-sha-256`
 
 ### Databases / Roles
@@ -382,7 +382,6 @@ runcmd:
 
 - Role passwords (scram-sha-256) stored in Vaultwarden
 - **`vaultwarden` role password must ALSO live outside Vaultwarden** (bootstrap secret manifest) — otherwise a cold rebuild is a circular-dependency lockout
-- Bump RAM to 8GB + `shared_buffers` to 2GB once Authentik (and more) land here
 - **pgvector + VectorChord installed** for Immich ML features: `postgresql-18-pgvector` (0.8.2) from PGDG APT, VectorChord 1.1.1 `.deb` from GitHub. `shared_preload_libraries = 'vchord.so'` set in postgresql.conf. Extensions `cube`, `earthdistance`, `vector`, `vchord` must be created in the `immich` database as superuser before Immich starts
 
 ### Backups
@@ -535,6 +534,7 @@ Self-hosted photo and video library with ML features (face recognition, semantic
 - **Components:** immich-server, immich-machine-learning, valkey (in-cluster cache)
 - **Database:** pg1 (`192.168.22.40`), database `immich`, role `immich`
 - **Storage:** 500Gi ceph-rbd PVC (`immich-library`) for photos/videos
+- **Auth:** Authentik SSO (OAuth2) + local admin fallback
 - **URL:** `https://photos.yanatech.co.uk`
 - **Credentials secret:** `immich-secret` in `immich` namespace (key: `db-url`)
 - **Manifest:** `apps/immich/argocd-app-immich.yaml`
@@ -590,6 +590,7 @@ Generate password: `openssl rand -hex 16`
 - `cube` and `earthdistance` extensions require superuser to create — must be done as postgres superuser before Immich starts, not by the `immich` role
 - VectorChord 1.1.1 is compatible with Immich (accepted range >= 0.3, < 2.0)
 - pgvector 0.8.2 is compatible (required range >= 0.7, < 0.9)
+- Authentik SSO via OAuth2: configure in Immich admin UI → Authentication → OAuth. Redirect URIs (all required): `https://photos.yanatech.co.uk/auth/login`, `https://photos.yanatech.co.uk/user-settings`, `app.immich:///oauth-callback`. Issuer URL: `https://auth.yanatech.co.uk/application/o/immich/`
 
 ---
 
@@ -807,6 +808,7 @@ bash bootstrap.sh
 | `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey |
 | `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 OAUTH2_CLIENT_ID + OAUTH2_CLIENT_SECRET |
 | `nextcloud-secret` | nextcloud | nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password |
+| `gotify-secret` | gotify | admin-password |
 | `immich-secret` | immich | db-url (`postgresql://immich:<password>@192.168.22.40:5432/immich`) |
 
 ### yanatech CI/CD Pipeline
@@ -827,7 +829,7 @@ ArgoCD detects change → deploys to cluster
 ## Pending / TODO
 
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
-- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — OIDC refresh token not stored, running with token auth), pgAdmin4 ✅ (done 2026-06-01), Nextcloud ✅ (done 2026-06-02)
+- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — OIDC refresh token not stored, running with token auth), pgAdmin4 ✅ (done 2026-06-01), Nextcloud ✅ (done 2026-06-02), Immich ✅ (done 2026-06-02)
 - [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to pg1 at 192.168.22.40)
 - [x] Loki + Promtail log aggregation (done 2026-06-01 — `infrastructure/loki/`, wired into Grafana)
 - [x] Nextcloud (done 2026-06-02 — `apps/nextcloud/`, on pg1 + ceph-rbd, accessible at `https://cloud.yanatech.co.uk`)
