@@ -21,7 +21,7 @@ spec:
         ingress:
           enabled: true
           ingressClassName: nginx
-          host: kafka.yanatech.co.uk
+          host: kafka-ui.yanatech.co.uk
           tls:
             enabled: true
             secretName: wildcard-yanatech-tls
