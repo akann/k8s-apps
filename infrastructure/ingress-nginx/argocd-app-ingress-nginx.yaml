@@ -13,6 +13,7 @@ spec:
       values: |
         controller:
           replicaCount: 2
+          allowSnippetAnnotations: true
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
