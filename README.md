@@ -273,7 +273,7 @@ kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9093  # TLS
 ```
 
 ### UI
-- Kafka UI (Provectus): https://kafka.yanatech.co.uk
+- Kafka UI (Provectus): https://kafka-ui.yanatech.co.uk (Authentik SSO via forward auth)
 
 ---
 
@@ -730,7 +730,7 @@ kubectl rollout restart deployment/velero -n velero
 | Authentik | authentik | https://auth.yanatech.co.uk | ArgoCD |
 | Vaultwarden | vaultwarden | https://vault.yanatech.co.uk | ArgoCD |
 | Kafka | kafka | - | ArgoCD |
-| Kafka UI | kafka | https://kafka.yanatech.co.uk | ArgoCD |
+| Kafka UI | kafka | https://kafka-ui.yanatech.co.uk | ArgoCD |
 | Velero | velero | - | ArgoCD |
 | Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
@@ -858,6 +858,7 @@ Resource recommendation dashboard — uses VPA in recommendation mode to suggest
 - **Namespace:** `goldilocks`
 - **Helm chart:** `fairwinds-stable/goldilocks` 10.3.0 (app v4.14.1)
 - **URL:** `https://goldilocks.yanatech.co.uk`
+- **Auth:** Authentik forward auth (proxy outpost `ak-outpost-goldilocks`)
 - **Manifest:** `infrastructure/goldilocks/argocd-app-goldilocks.yaml`
 - VPA installed as subchart in recommendation mode only — no automatic resource changes
 
@@ -928,3 +929,5 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - argocd CLI `--grpc-web` warning: add `alias argocd='argocd --grpc-web'` to `~/.bashrc` to suppress it permanently. The `argocd config set-context` subcommand does not exist in this version
 - Stakater Reloader: annotate deployments with `secret.reloader.stakater.com/reload: "<secret-name>"` to trigger rolling restarts on secret changes. `reloader.stakater.com/auto: "true"` triggers on any referenced secret/configmap change
 - Immich chart (0.10.0+): postgresql subchart removed — omit `postgresql:` key entirely from values (setting `enabled: false` triggers a template error). DB connection via `DB_URL` env var under `server.controllers.main.containers.main.env`. Extensions `cube` and `earthdistance` require superuser — must be pre-created in the immich database before first start or migrations fail with `permission denied to create extension`
+- Authentik forward auth pattern for nginx ingress: requires a **standalone outpost deployment** (not the embedded outpost) — the embedded outpost does not serve `/outpost.goauthentik.io/auth/nginx`. Create a new Proxy Provider (Forward auth, single application) + Application + dedicated Outpost (Local Kubernetes Cluster) in Authentik UI; Authentik auto-deploys the outpost pod and service (`ak-outpost-<name>`) in the `authentik` namespace. Then: (1) add `auth-url`, `auth-signin`, `auth-response-headers`, `auth-snippet` (with `proxy_set_header X-Original-URL`) annotations to the app ingress; (2) create an ExternalName Service in the app namespace pointing to the outpost; (3) create a second ingress routing `/outpost.goauthentik.io` to the outpost ExternalName service. `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` must be set in ingress-nginx values
+- ingress-nginx snippet annotations: `allowSnippetAnnotations: true` enables `nginx.ingress.kubernetes.io/auth-snippet` and `configuration-snippet`. `annotations-risk-level: Critical` is required when combining `auth-snippet` with `auth-url` — without it the admission webhook blocks the ingress with "risky annotation" error
