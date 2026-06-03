@@ -211,6 +211,8 @@ pvesh get /cluster/resources --type vm
 | Node reboots | Kured 1.22.0 |
 | Push notifications | Gotify 2.6.3 |
 | Photo library | Immich v2.6.3 |
+| Resource recommendations | Goldilocks v4.14.1 |
+| Pod rebalancing | Descheduler 0.36.0 |
 
 ### kubectl Access
 ```bash
@@ -738,6 +740,8 @@ kubectl rollout restart deployment/velero -n velero
 | Gotify | gotify | https://gotify.yanatech.co.uk | ArgoCD |
 | Reloader | reloader | - | ArgoCD |
 | Kured | kured | - | ArgoCD |
+| Goldilocks | goldilocks | https://goldilocks.yanatech.co.uk | ArgoCD |
+| Descheduler | kube-system | - | ArgoCD |
 | yanatech website | yanatech | https://www.yanatech.co.uk | ArgoCD |
 
 ---
@@ -775,7 +779,9 @@ k8s-apps/
     ├── velero/              ✅ deployed
     ├── loki/                ✅ deployed
     ├── reloader/            ✅ deployed
-    └── kured/               ✅ deployed
+    ├── kured/               ✅ deployed
+    ├── goldilocks/          ✅ deployed
+    └── descheduler/         ✅ deployed
 ```
 
 ### Fresh Cluster Bootstrap
@@ -836,10 +842,46 @@ ArgoCD detects change → deploys to cluster
 - [x] Gotify push notifications + Alertmanager integration (done 2026-06-02 — `apps/gotify/`, bridge at `alertmanager-gotify-bridge`)
 - [x] Stakater Reloader (done 2026-06-02 — `infrastructure/reloader/`, watching all namespaces)
 - [x] Kured automatic node reboots (done 2026-06-02 — `infrastructure/kured/`, window 04:00-06:00 Europe/London)
+- [x] Goldilocks resource recommendations (done 2026-06-03 — `infrastructure/goldilocks/`, dashboard at `https://goldilocks.yanatech.co.uk`)
+- [x] Descheduler pod rebalancing (done 2026-06-03 — `infrastructure/descheduler/`, runs every 5 minutes)
 - [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
 - [x] Move Authentik database to VM 110 (done 2026-05-31 — bundled Bitnami PG disabled 2026-06-02, plaintext password removed from git)
 - [ ] Headlamp SSO — revisit when Headlamp 0.43.0+ ships with OIDC refresh token fix
 - [x] Immich self-hosted photo library (done 2026-06-02 — `apps/immich/`, on pg1 + ceph-rbd, accessible at `https://photos.yanatech.co.uk`)
+
+---
+
+## Goldilocks
+
+Resource recommendation dashboard — uses VPA in recommendation mode to suggest right-sized CPU/memory requests and limits for all deployments. Does not apply changes automatically.
+
+- **Namespace:** `goldilocks`
+- **Helm chart:** `fairwinds-stable/goldilocks` 10.3.0 (app v4.14.1)
+- **URL:** `https://goldilocks.yanatech.co.uk`
+- **Manifest:** `infrastructure/goldilocks/argocd-app-goldilocks.yaml`
+- VPA installed as subchart in recommendation mode only — no automatic resource changes
+
+### Enabling namespaces
+Goldilocks only analyses namespaces with the label applied:
+```bash
+kubectl label namespace <namespace> goldilocks.fairwinds.com/enabled=true
+
+# Currently enabled:
+# vaultwarden, authentik, nextcloud, immich, gotify, monitoring, kafka, pgadmin
+```
+
+---
+
+## Descheduler
+
+Rebalances pods across nodes after rescheduling events (node reboots, drains, new nodes). Runs as a CronJob every 5 minutes. Evicts pods that can be scheduled on better-utilised nodes; the default scheduler handles rescheduling.
+
+- **Namespace:** `kube-system`
+- **Helm chart:** `descheduler/descheduler` 0.36.0
+- **Schedule:** every 5 minutes (`*/5 * * * *`)
+- **Manifest:** `infrastructure/descheduler/argocd-app-descheduler.yaml`
+- Plugins enabled: `LowNodeUtilization`, `RemovePodsViolatingTopologySpreadConstraints`, `RemovePodsViolatingNodeAffinity`, `RemovePodsViolatingInterPodAntiAffinity`
+- PVC pods and local storage pods are not evicted (`ignorePvcPods: true`)
 
 ---
 
