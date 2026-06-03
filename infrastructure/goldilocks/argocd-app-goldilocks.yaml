@@ -19,8 +19,6 @@ spec:
           ingress:
             enabled: true
             ingressClassName: nginx
-            annotations:
-              nginx.ingress.kubernetes.io/auth-type: basic
             hosts:
               - host: goldilocks.yanatech.co.uk
                 paths:
