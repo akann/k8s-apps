@@ -23,7 +23,7 @@ spec:
               nginx.ingress.kubernetes.io/auth-url: "http://authentik-server.authentik.svc.cluster.local/outpost.goauthentik.io/auth/nginx"
               nginx.ingress.kubernetes.io/auth-signin: "https://auth.yanatech.co.uk/outpost.goauthentik.io/start?rd=$escaped_request_uri"
               nginx.ingress.kubernetes.io/auth-response-headers: "Set-Cookie,X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
-              nginx.ingress.kubernetes.io/configuration-snippet: |
+              nginx.ingress.kubernetes.io/auth-snippet: |
                 proxy_set_header Host auth.yanatech.co.uk;
             hosts:
               - host: goldilocks.yanatech.co.uk
