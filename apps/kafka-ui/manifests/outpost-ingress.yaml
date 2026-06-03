@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kafka-ui-outpost
+  namespace: kafka
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: kafka-ui.yanatech.co.uk
+      http:
+        paths:
+          - path: /outpost.goauthentik.io
+            pathType: Prefix
+            backend:
+              service:
+                name: ak-outpost-kafka-ui
+                port:
+                  number: 9000
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - kafka-ui.yanatech.co.uk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ak-outpost-kafka-ui
+  namespace: kafka
+spec:
+  type: ExternalName
+  externalName: ak-outpost-kafka-ui.authentik.svc.cluster.local
+  ports:
+    - port: 9000

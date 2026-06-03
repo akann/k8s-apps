@@ -13,6 +13,10 @@ spec:
       values: |
         controller:
           replicaCount: 2
+          allowSnippetAnnotations: true
+          config:
+            allow-snippet-annotations: "true"
+            annotations-risk-level: Critical
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
