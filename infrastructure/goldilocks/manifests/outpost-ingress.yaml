@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: goldilocks-outpost
+  namespace: goldilocks
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: goldilocks.yanatech.co.uk
+      http:
+        paths:
+          - path: /outpost.goauthentik.io
+            pathType: Prefix
+            backend:
+              service:
+                name: ak-outpost-authentik-embedded-outpost
+                port:
+                  number: 9000
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - goldilocks.yanatech.co.uk
