@@ -20,3 +20,14 @@ spec:
     - secretName: wildcard-yanatech-tls
       hosts:
         - goldilocks.yanatech.co.uk
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ak-outpost-authentik-embedded-outpost
+  namespace: goldilocks
+spec:
+  type: ExternalName
+  externalName: ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local
+  ports:
+    - port: 9000
