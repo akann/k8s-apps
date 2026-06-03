@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: goldilocks
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.fairwinds.com/stable
+    chart: goldilocks
+    targetRevision: 10.3.0
+    helm:
+      releaseName: goldilocks
+      valuesObject:
+        vpa:
+          enabled: true
+        dashboard:
+          enabled: true
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/auth-type: basic
+            hosts:
+              - host: goldilocks.yanatech.co.uk
+                paths:
+                  - path: /
+                    type: Prefix
+            tls:
+              - secretName: wildcard-yanatech-tls
+                hosts:
+                  - goldilocks.yanatech.co.uk
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: goldilocks
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
