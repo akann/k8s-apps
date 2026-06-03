@@ -13,7 +13,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ak-outpost-authentik-embedded-outpost
+                name: ak-outpost-goldilocks
                 port:
                   number: 9000
   tls:
@@ -24,10 +24,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ak-outpost-authentik-embedded-outpost
+  name: ak-outpost-goldilocks
   namespace: goldilocks
 spec:
   type: ExternalName
-  externalName: ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local
+  externalName: ak-outpost-goldilocks.authentik.svc.cluster.local
   ports:
     - port: 9000
