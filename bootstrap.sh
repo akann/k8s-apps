@@ -88,6 +88,7 @@ kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
 kubectl apply -f infrastructure/reloader/argocd-app-reloader.yaml
 kubectl apply -f infrastructure/kured/argocd-app-kured.yaml
 kubectl apply -f infrastructure/goldilocks/argocd-app-goldilocks.yaml
+kubectl apply -f infrastructure/descheduler/argocd-app-descheduler.yaml
 
 echo "Applying apps..."
 kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
