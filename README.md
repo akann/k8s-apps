@@ -95,7 +95,6 @@ Each host: 16 vCPUs, 64GB RAM, 8GB Swap
 | VMID | Name | Notes |
 |---|---|---|
 | 9000 | ubuntu-2404-template | Main template — disks on rbd, cloudinit on rbd |
-| 901 | ubuntu-24-template | Older template |
 
 ### Template Configuration (9000)
 - OS: Ubuntu 24.04
