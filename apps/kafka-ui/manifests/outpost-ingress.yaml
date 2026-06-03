@@ -13,7 +13,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: ak-outpost-goldilocks
+                name: ak-outpost-kafka-ui
                 port:
                   number: 9000
   tls:
@@ -24,10 +24,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: ak-outpost-goldilocks
+  name: ak-outpost-kafka-ui
   namespace: kafka
 spec:
   type: ExternalName
-  externalName: ak-outpost-goldilocks.authentik.svc.cluster.local
+  externalName: ak-outpost-kafka-ui.authentik.svc.cluster.local
   ports:
     - port: 9000
