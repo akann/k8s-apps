@@ -3,13 +3,60 @@
 # Prerequisites:
 #   - kubectl configured against the target cluster
 #   - helm installed
-#   - Manual secrets created BEFORE running this script (see each app's README):
-#       argocd:      kubectl -n argocd patch secret argocd-secret with dex.authentik.clientSecret
-#       monitoring:  grafana-authentik-secret (client_id, client_secret)
-#       authentik:   authentik-secret (DB creds, Redis host, secret key)
-#       vaultwarden: vaultwarden-secret (DATABASE_URL, ADMIN_TOKEN, DOMAIN)
-#       pgadmin:     pgadmin-oauth-secret (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
-#                    pgadmin-config-local ConfigMap with config_local.py
+#   - Manual secrets created BEFORE running this script (all stored in Vaultwarden):
+#
+#   ceph-csi-rbd namespace:
+#     csi-rbd-secret (Ceph client.kubernetes key)
+#
+#   cert-manager namespace:
+#     cloudflare-api-token (Cloudflare API token)
+#
+#   monitoring namespace:
+#     grafana-authentik-secret (client_id, client_secret)
+#
+#   authentik namespace:
+#     authentik-secret (DB host/name/user/password, secret key)
+#
+#   argocd namespace:
+#     kubectl -n argocd patch secret argocd-secret -p '{"stringData":{"dex.authentik.clientSecret":"<secret>"}}'
+#
+#   vaultwarden namespace:
+#     vaultwarden-secret (DATABASE_URL, ADMIN_TOKEN, DOMAIN)
+#
+#   velero namespace:
+#     velero-b2-credentials (Backblaze B2 keyID + applicationKey)
+#
+#   pgadmin namespace:
+#     pgadmin-oauth-secret (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
+#     pgadmin-config-local ConfigMap with config_local.py
+#
+#   nextcloud namespace:
+#     nextcloud-secret (nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password)
+#
+#   gotify namespace:
+#     gotify-secret (admin-password)
+#
+#   immich namespace:
+#     immich-secret (db-url: postgresql://immich:<password>@192.168.22.40:5432/immich)
+#     immich-library PVC (500Gi ceph-rbd) — must exist before ArgoCD syncs immich:
+#       kubectl apply -f - <<PVCEOF
+#       apiVersion: v1
+#       kind: PersistentVolumeClaim
+#       metadata:
+#         name: immich-library
+#         namespace: immich
+#       spec:
+#         accessModes: [ReadWriteOnce]
+#         storageClassName: ceph-rbd
+#         resources:
+#           requests:
+#             storage: 500Gi
+#       PVCEOF
+#
+# pg1 prerequisites (192.168.22.40) — must be done before deploying immich:
+#   - postgresql-18-pgvector and VectorChord 1.1.1 installed
+#   - shared_preload_libraries = 'vchord.so' in postgresql.conf
+#   - Extensions cube, earthdistance, vector, vchord created in immich DB as superuser
 #
 # NOTE: this script enumerates every ArgoCD Application explicitly.
 #       When you add a new app, add BOTH the manifest in the repo AND
@@ -50,5 +97,6 @@ kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
 kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
 kubectl apply -f apps/gotify/argocd-app-gotify.yaml
+kubectl apply -f apps/immich/argocd-app-immich.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
