@@ -30,6 +30,9 @@ spec:
                 hosts:
                   - infisical.yanatech.co.uk
 
+        ingress-nginx:
+          enabled: false
+
         postgresql:
           enabled: false
 
