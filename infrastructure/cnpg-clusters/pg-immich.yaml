@@ -1,0 +1,49 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-immich
+  namespace: cnpg-clusters
+spec:
+  instances: 3
+  imageName: harbor.yanatech.co.uk/infra/cnpg-postgresql:18-vchord1.1.1
+  imagePullSecrets:
+    - name: harbor-pull-secret
+
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      shared_preload_libraries: "vchord.so"
+
+  storage:
+    size: 50Gi
+    storageClass: ceph-rbd
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://yanatech-cnpg/pg-immich
+      endpointURL: https://s3.eu-central-003.backblazeb2.com
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-b2-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-b2-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: "7d"
+
+  monitoring:
+    enablePodMonitor: false
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
