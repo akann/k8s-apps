@@ -1,0 +1,34 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: yana-ecommerce-runner
+  namespace: actions-runner
+spec:
+  template:
+    spec:
+      repository: akann/yana-ecommerce
+      labels:
+        - yana-ecommerce
+      image: summerwind/actions-runner:latest
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+---
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: yana-ecommerce-runner-hra
+  namespace: actions-runner
+spec:
+  scaleTargetRef:
+    name: yana-ecommerce-runner
+  minReplicas: 0
+  maxReplicas: 4
+  metrics:
+    - type: TotalNumberOfQueuedAndInProgressWorkflowRuns
+      repositoryNames:
+        - akann/yana-ecommerce
