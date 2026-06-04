@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://actions-runner-controller.github.io/actions-runner-controller
+    repoURL: ghcr.io/actions/actions-runner-controller-charts
     chart: gha-runner-scale-set
-    targetRevision: "*"
+    targetRevision: "0.9.3"
     helm:
       valuesObject:
         githubConfigUrl: https://github.com/akann/yana-ecommerce
