@@ -10,11 +10,12 @@ spec:
     - name: harbor-pull-secret
 
   postgresql:
+    shared_preload_libraries:
+      - vchord.so
     parameters:
       max_connections: "200"
       shared_buffers: "256MB"
       effective_cache_size: "1GB"
-      shared_preload_libraries: "vchord.so"
 
   storage:
     size: 50Gi
