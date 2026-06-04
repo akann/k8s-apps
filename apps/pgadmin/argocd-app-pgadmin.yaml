@@ -2,6 +2,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: pgadmin
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
