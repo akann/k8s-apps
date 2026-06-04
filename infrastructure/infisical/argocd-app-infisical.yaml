@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infisical
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    chart: infisical-standalone
+    targetRevision: "*"
+    helm:
+      valuesObject:
+        infisical:
+          enabled: true
+          replicaCount: 2
+          image:
+            tag: latest-postgres
+          autoDatabaseSchemaMigration: true
+          existingSecret: infisical-secrets
+          kubeSecretRef: infisical-secrets
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hostname: infisical.yanatech.co.uk
+            tls:
+              - secretName: wildcard-yanatech-tls
+                hosts:
+                  - infisical.yanatech.co.uk
+
+        postgresql:
+          enabled: false
+
+        redis:
+          enabled: true
+          architecture: standalone
+          auth:
+            enabled: false
+          master:
+            persistence:
+              storageClass: ceph-rbd
+              size: 5Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: infisical
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
