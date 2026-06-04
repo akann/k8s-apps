@@ -4,17 +4,18 @@ _Last updated: 2026-06-04_
 ## Context
 
 3-node Proxmox cluster, 6-node Kubernetes, 48 vCPUs / 192GB RAM / 8.4TiB Ceph.
-Current stable services: Vaultwarden, Authentik, Grafana/Loki, ArgoCD, Kafka, Nextcloud, Immich, pgAdmin4, Gotify, Headlamp, Uptime Kuma, Velero, Goldilocks, Descheduler, Kured, Reloader.
-All databases on pg1 (VM 110, 192.168.22.40).
+Current stable services: Vaultwarden, Authentik, Grafana/Loki, ArgoCD, Kafka, Nextcloud, pgAdmin4, Gotify, Headlamp, Uptime Kuma, Velero, Goldilocks, Descheduler, Kured, Reloader, Harbor, Infisical.
+All databases on CNPG pg-main (3-instance PG18 cluster). pg1 (VM 110) decommissioned 2026-06-04.
+Immich removed — pending fresh deploy once CNPG vchord/GLIBC issue resolved.
 
 ## Goals
 
-- Replace pg1 with CloudNativePG (in-cluster, GitOps-managed, proper replication + PITR)
+- ✅ Replace pg1 with CloudNativePG
 - Build a private platform for multiple production apps (forex trading, e-commerce, etc.)
 - Each product in its own monorepo (e.g. `yana-forex`, `yana-ecommerce`); k8s manifests in `k8s-apps`
-- CI/CD fully on-LAN: source repo → Actions Runner → Harbor → ArgoCD → cluster
-- Replace Flannel with Cilium (native routing over existing OSPF mesh)
-- Replace `bootstrap.sh` manual enumeration with ApplicationSet + sync waves
+- ✅ CI/CD fully on-LAN: source repo → Actions Runner → Harbor → ArgoCD → cluster
+- ✅ Replace Flannel with Cilium (native routing over existing OSPF mesh)
+- ✅ Sync waves added to bootstrap.sh (ApplicationSet migration deferred)
 - Canary / blue-green deployments via Argo Rollouts before first production app goes live
 - "Doing it right" is the priority over speed
 
@@ -78,168 +79,68 @@ git push → github.com/akann/yana-forex
 
 ---
 
-## Outstanding item from current state
+## Outstanding items / Blockers
 
 - **Headlamp SSO** — blocked by upstream bug (Headlamp 0.42.0, GitHub issues #3884, #4789, #4876, #5025).
   Currently running with service account token (`8760h`). **Revisit on Headlamp 0.43.0+.**
-  Token will expire — set a calendar reminder or automate renewal via CronJob before that happens.
+  Token will expire — set a calendar reminder or automate renewal via CronJob.
 
-- **Velero namespace list** — currently hardcoded `--include-namespaces`. Switch to
-  `--exclude-namespaces` pattern so new apps are covered automatically without manual updates.
+- **Immich** — removed 2026-06-04. Blocked by: vchord 1.1.1 requires GLIBC_2.33, CNPG bootstrap uses GLIBC_2.31 (Bullseye). Resolution: CNPG 1.29 Image Catalog or bookworm-based custom image. Fresh deploy when resolved.
 
----
+- **Velero namespace list** — currently hardcoded `--include-namespaces`. Switch to `--exclude-namespaces` so new apps are covered automatically.
 
-## Phase 0 — Foundation
-_Nothing new is added until this phase is complete. Cluster must be quiet (weekend, Velero backup taken immediately before each step)._
-
-### 0.1 — Cilium (replace Flannel)
-**Why first:** CNI replacement is the most disruptive single operation. Must happen before any production workloads land.
-**Mode:** Native routing (not overlay) — leverages existing OSPF mesh (25GbE, MTU 9000) for zero encapsulation overhead. Critical for forex latency requirements.
-
-Steps:
-- Take full Velero backup
-- Deploy Cilium in parallel mode alongside Flannel (`cilium install --helm-set tunnel=disabled`)
-- Cordon + drain one node at a time
-- Remove Flannel CNI config and `cni0`/`flannel.1` interfaces per node after migration
-- Verify pod-to-pod connectivity across nodes after each node
-- Remove Flannel DaemonSet once all nodes migrated
-- Enable Hubble (Cilium's traffic visibility) — `hubble.yanatech.co.uk`
-
-Notes:
-- kube-vip is CNI-independent — untouched
-- MetalLB L2 advertisement continues to work with Cilium native routing
-- Cilium replaces the need for Canal (NetworkPolicy enforcement is built in)
-
-### 0.2 — Expand MetalLB pool
-**Why now:** Quick config change. Current pool `192.168.22.200-220` (21 IPs) will be consumed by Harbor, CNPG read replicas, Kong, etc.
-- Expand to `192.168.22.200-192.168.22.249` (50 IPs) — update pfSense NAT range accordingly
-- Update `infrastructure/metallb/` manifests + apply
-
-### 0.3 — ApplicationSet + sync waves (replace bootstrap.sh)
-**Why now:** Fix the bootstrap mechanism before adding more apps to it.
-
-Sync wave assignments:
-
-| Wave | Apps |
-|---|---|
-| 0 | metallb, ceph-csi |
-| 1 | cert-manager operator, cilium, ingress-nginx |
-| 2 | cert-manager-config (ClusterIssuer) |
-| 3 | reflector, reloader, kured, descheduler |
-| 4 | authentik, monitoring (kube-prometheus-stack), velero |
-| 5 | loki, promtail, uptime-kuma, headlamp, goldilocks |
-| 6 | vaultwarden, kafka, argocd (self-managed) |
-| 7 | All apps (nextcloud, immich, pgadmin, gotify, kafka-ui, yanatech) |
-| 8 | New infrastructure (harbor, cnpg, eso, infisical, tempo, otel, keda, kong, argo-rollouts) |
-| 9 | New apps (yana-forex, yana-ecommerce, etc.) |
-
-Steps:
-- Add `argocd.argoproj.io/sync-wave` annotation to every existing `argocd-app-*.yaml`
-- Create `bootstrap/applicationset-infrastructure.yaml` and `bootstrap/applicationset-apps.yaml`
-- Test ApplicationSet on live cluster (additive — won't fight existing apps if names match)
-- Replace `bootstrap.sh` body with:
-  ```bash
-  kubectl apply -f bootstrap/applicationset-infrastructure.yaml
-  kubectl apply -f bootstrap/applicationset-apps.yaml
-  ```
-- Update Velero schedule to use `--exclude-namespaces` instead of `--include-namespaces`
+- **ESO secret migration** — ESO + Infisical deployed and connected. Next step: populate Infisical with all 14 bootstrap secrets and create ExternalSecret CRDs for each namespace.
 
 ---
 
-## Phase 1 — Platform Infrastructure
-_Unblocks everything else. pg1 decommissioned by end of this phase._
+## Phase 0 — Foundation ✅ COMPLETE
 
-### 1.1 — Harbor (private container registry)
-**Why first:** Every subsequent step needs a private registry (CNPG custom image, CI pipeline, app images).
+### 0.1 — Cilium (replace Flannel) ✅ DONE 2026-06-04
+Native routing mode, kube-proxy replaced, Hubble enabled at `hubble.yanatech.co.uk`.
+One node at a time migration. Kafka + ingress-nginx PDBs deleted before each drain.
 
-- **Namespace:** `harbor`
-- **URL:** `harbor.yanatech.co.uk`
-- **Helm chart:** `harbor/harbor`
-- **Storage:** ceph-rbd PVCs for registry, chartmuseum, jobservice, database, redis, trivy
-- **Database:** pg1 initially → migrate to CNPG in step 1.4
-- **Auth:** Authentik OIDC
-- **Manifest:** `infrastructure/harbor/argocd-app-harbor.yaml`
+### 0.2 — Expand MetalLB pool ✅ DONE 2026-06-04
+Pool expanded to `192.168.22.200-249` (50 IPs). pfSense NAT already covered full range.
 
-### 1.2 — Actions Runner Controller (CI on-LAN)
-**Why here:** CI pipeline needed before CNPG custom image can be built and pushed.
+### 0.3 — Sync waves + bootstrap.sh ✅ DONE 2026-06-04
+All 29 ArgoCD apps annotated with sync-wave (0-7). bootstrap.sh rewritten with wave-grouped ordering.
+ApplicationSet migration deferred to dedicated session — hybrid Helm/git-directory apps need more design.
 
-- **Namespace:** `actions-runner`
-- **Helm chart:** `actions-runner-controller/actions-runner-controller`
-- **Runners:** one runner set per product repo (`yana-forex`, `yana-ecommerce`, `k8s-apps`)
-- **Pushes to:** `harbor.yanatech.co.uk`
-- **Manifest:** `infrastructure/actions-runner/argocd-app-actions-runner.yaml`
+---
 
-Pipeline pattern per product repo:
-```yaml
-# .github/workflows/build.yaml
-- build image
-- push to harbor.yanatech.co.uk/<repo>/<service>:<sha>
-- update image tag in k8s-apps via git commit
-- ArgoCD auto-syncs
-```
+## Phase 1 — Platform Infrastructure ✅ COMPLETE (1.5 in progress)
 
-### 1.3 — CloudNativePG operator + custom image
-**Why here:** pg1 replacement. Harbor must exist first (custom image build).
+### 1.1 — Harbor ✅ DONE 2026-06-04
+`harbor.yanatech.co.uk` — Authentik OIDC, projects: infra/yana-forex/yana-ecommerce.
+Harbor admin login fallback: `https://harbor.yanatech.co.uk/account/sign-in?redirect_url=/harbor/projects`
 
-**Custom CNPG image** (built in Harbor CI, stored at `harbor.yanatech.co.uk/infra/cnpg-custom:18`):
-```dockerfile
-FROM ghcr.io/cloudnative-pg/postgresql:18
-USER root
-RUN apt-get update && apt-get install -y postgresql-18-pgvector
-COPY postgresql-18-vchord_1.1.1-1_amd64.deb /tmp/
-RUN apt-get install -y /tmp/postgresql-18-vchord_1.1.1-1_amd64.deb
-# Timescale for forex OHLCV/tick data
-RUN apt-get install -y timescaledb-2-postgresql-18
-USER postgres
-```
+### 1.2 — Actions Runner Controller ✅ DONE 2026-06-04
+New ARC (gha-runner-scale-set 0.9.3) via OCI registry. Runner sets: k8s-apps/yana-forex/yana-ecommerce, scale 0→4.
+Docker-in-Docker not available in Kubernetes container mode — image builds use buildah on a node or kaniko.
 
-**CNPG operator:**
-- **Namespace:** `cnpg-system`
-- **Helm chart:** `cnpg/cloudnative-pg`
-- **Manifest:** `infrastructure/cnpg/argocd-app-cnpg.yaml`
+### 1.3 — CloudNativePG + migrations ✅ DONE 2026-06-04
+pg-main: 3-instance PG18, Barman WAL → B2 `yanatech-cnpg`. Migrations complete:
+- ✅ Vaultwarden → pg-main-rw.cnpg-clusters
+- ✅ Authentik → pg-main-rw.cnpg-clusters
+- ✅ Nextcloud → pg-main-rw.cnpg-clusters (config.php must also be patched, not just k8s secret)
+- ❌ Immich — blocked by vchord GLIBC issue, removed, pending fresh deploy
+- pg1 (VM 110) decommissioned 2026-06-04
 
-**CNPG cluster** (`infrastructure/cnpg-clusters/`):
-- 1 primary + 2 standbys (synchronous replication for payment/order critical DBs)
-- Barman WAL archiving → Backblaze B2 `yanatech-cnpg` bucket (PITR)
-- PgBouncer connection pooler enabled
-- `infrastructure/cnpg-clusters/argocd-app-cnpg-clusters.yaml`
+### 1.4 — (merged into 1.3)
 
-### 1.4 — Migrate all databases from pg1 to CNPG, decommission pg1
+### 1.5 — ESO + Infisical 🔄 IN PROGRESS
+- ✅ Infisical at `infisical.yanatech.co.uk` (standalone chart, CNPG pg-main, Redis, email/password auth)
+- ✅ ESO deployed in `external-secrets` namespace
+- ✅ ClusterSecretStore `infisical` connected (Valid, ReadOnly)
+- 🔄 Populating Infisical with bootstrap secrets + writing ExternalSecret CRDs
 
-Migration order (lowest risk first):
-1. pgAdmin4 (low risk, easy to verify)
-2. Nextcloud
-3. Immich (needs VectorChord — verify custom image first)
-4. Authentik (pause selfHeal during migration)
-5. Vaultwarden (last — highest criticality)
-
-For each database:
-- Pause ArgoCD selfHeal on the app
-- `pg_dump` from pg1
-- Restore to CNPG cluster
-- Update secret pointing to CNPG service endpoint
-- Verify app healthy
-- Re-enable ArgoCD selfHeal
-
-After all databases confirmed healthy on CNPG:
-- Remove pg-backup.sh cron on pg1
-- `ha-manager remove vm:110`
-- `qm stop 110 && qm destroy 110`
-- Remove pg1 section from `homelab-infrastructure.md`
-
-Notes:
-- Immich: `cube` and `earthdistance` extensions still require superuser pre-creation on CNPG cluster
-- Vaultwarden: DATABASE_URL in `vaultwarden-secret` must be updated to CNPG service FQDN
-- pgAdmin4: server connection in pgAdmin UI must be updated post-migration
-
-### 1.5 — ESO (External Secrets Operator) + Infisical
-**Why here:** Before apps multiply. Eliminates manual `kubectl create secret` on every rebuild.
-
-- **ESO:** `infrastructure/eso/argocd-app-eso.yaml`
-- **Infisical:** self-hosted, `infrastructure/infisical/argocd-app-infisical.yaml`, own CNPG database
-- **Pattern:** all existing manual secrets become `ExternalSecret` CRDs in git; ESO pulls values from Infisical on sync
-- **Bootstrap:** only manual step on fresh cluster = unlock Infisical (correct — unavoidable security boundary)
-- Migrate existing secrets one namespace at a time after Infisical is stable
+Key config notes:
+- Infisical OIDC SSO requires paid license — email/password auth only
+- `hostAPI: https://infisical.yanatech.co.uk/api` must be set in ClusterSecretStore
+- ESO API version: `external-secrets.io/v1`, field: `environmentSlug` (not `envSlug`)
+- Infisical project slug: `k8s-homelab`, environment: `prod`
+- Machine identity `eso-k8s` must be added to project members in Infisical UI
+- Bundled ingress-nginx disabled via `infisical.ingress.nginx.enabled: false` + `ignoreDifferences`
 
 ---
 
@@ -387,23 +288,22 @@ Payment namespace: hardened NetworkPolicy, blue-green Rollout strategy only
 
 | Component | Namespace | Helm Chart | Phase | Status |
 |---|---|---|---|---|
-| Cilium | kube-system | cilium/cilium | 0.1 | Planned |
-| MetalLB | metallb-system | metallb/metallb | existing | Live |
-| ingress-nginx | ingress-nginx | ingress-nginx | existing | Live |
-| cert-manager | cert-manager | jetstack/cert-manager | existing | Live |
-| Reflector | kube-system | emberstack/reflector | existing | Live |
-| Reloader | reloader | stakater/reloader | existing | Live |
-| Kured | kured | kubereboot/kured | existing | Live |
-| Descheduler | kube-system | descheduler/descheduler | existing | Live |
-| Goldilocks | goldilocks | fairwinds-stable/goldilocks | existing | Live |
-| ceph-csi-rbd | ceph-csi-rbd | ceph/ceph-csi-rbd | existing | Live |
-| ApplicationSet | argocd | (built-in) | 0.3 | Planned |
-| Harbor | harbor | harbor/harbor | 1.1 | Planned |
-| Actions Runner | actions-runner | arc/actions-runner-controller | 1.2 | Planned |
-| CNPG operator | cnpg-system | cnpg/cloudnative-pg | 1.3 | Planned |
-| CNPG clusters | cnpg-clusters | (CRDs) | 1.3 | Planned |
-| ESO | external-secrets | external-secrets/external-secrets | 1.5 | Planned |
-| Infisical | infisical | infisical/infisical | 1.5 | Planned |
+| Cilium | kube-system | cilium/cilium | 0.1 | ✅ Live |
+| MetalLB | metallb-system | metallb/metallb | existing | ✅ Live |
+| ingress-nginx | ingress-nginx | ingress-nginx | existing | ✅ Live |
+| cert-manager | cert-manager | jetstack/cert-manager | existing | ✅ Live |
+| Reflector | kube-system | emberstack/reflector | existing | ✅ Live |
+| Reloader | reloader | stakater/reloader | existing | ✅ Live |
+| Kured | kured | kubereboot/kured | existing | ✅ Live |
+| Descheduler | kube-system | descheduler/descheduler | existing | ✅ Live |
+| Goldilocks | goldilocks | fairwinds-stable/goldilocks | existing | ✅ Live |
+| ceph-csi-rbd | ceph-csi-rbd | ceph/ceph-csi-rbd | existing | ✅ Live |
+| Harbor | harbor | harbor/harbor | 1.1 | ✅ Live |
+| Actions Runner | actions-runner | gha-runner-scale-set-controller | 1.2 | ✅ Live |
+| CNPG operator | cnpg-system | cnpg/cloudnative-pg | 1.3 | ✅ Live |
+| CNPG clusters | cnpg-clusters | (CRDs) | 1.3 | ✅ Live |
+| ESO | external-secrets | external-secrets/external-secrets | 1.5 | ✅ Live |
+| Infisical | infisical | infisical-standalone | 1.5 | ✅ Live |
 | Tempo | monitoring | grafana/tempo | 2.1 | Planned |
 | OTel Collector | monitoring | open-telemetry/opentelemetry-collector | 2.2 | Planned |
 | Apicurio Registry | apicurio | apicurio/apicurio-registry | 2.3 | Planned |
@@ -416,23 +316,24 @@ Payment namespace: hardened NetworkPolicy, blue-green Rollout strategy only
 
 | Service | Namespace | URL | Phase | Status |
 |---|---|---|---|---|
-| Vaultwarden | vaultwarden | vault.yanatech.co.uk | existing | Live |
-| Authentik | authentik | auth.yanatech.co.uk | existing | Live |
-| Grafana | monitoring | grafana.yanatech.co.uk | existing | Live |
-| ArgoCD | argocd | argocd.yanatech.co.uk | existing | Live |
-| Kafka + UI | kafka | kafka-ui.yanatech.co.uk | existing | Live |
-| Nextcloud | nextcloud | cloud.yanatech.co.uk | existing | Live |
-| Immich | immich | photos.yanatech.co.uk | existing | Live |
-| pgAdmin4 | pgadmin | pgadmin.yanatech.co.uk | existing | Live |
-| Gotify | gotify | gotify.yanatech.co.uk | existing | Live |
-| Headlamp | headlamp | headlamp.yanatech.co.uk | existing | Live (token auth) |
-| Uptime Kuma | uptime-kuma | status.yanatech.co.uk | existing | Live |
-| yanatech site | yanatech | www.yanatech.co.uk | existing | Live |
-| Hubble UI | kube-system | hubble.yanatech.co.uk | 3.5 | Planned |
+| Vaultwarden | vaultwarden | vault.yanatech.co.uk | existing | ✅ Live (CNPG) |
+| Authentik | authentik | auth.yanatech.co.uk | existing | ✅ Live (CNPG) |
+| Grafana | monitoring | grafana.yanatech.co.uk | existing | ✅ Live |
+| ArgoCD | argocd | argocd.yanatech.co.uk | existing | ✅ Live |
+| Kafka + UI | kafka | kafka-ui.yanatech.co.uk | existing | ✅ Live |
+| Nextcloud | nextcloud | cloud.yanatech.co.uk | existing | ✅ Live (CNPG) |
+| Immich | immich | photos.yanatech.co.uk | existing | ❌ Removed — pending fresh deploy |
+| pgAdmin4 | pgadmin | pgadmin.yanatech.co.uk | existing | ✅ Live |
+| Gotify | gotify | gotify.yanatech.co.uk | existing | ✅ Live |
+| Headlamp | headlamp | headlamp.yanatech.co.uk | existing | ✅ Live (token auth) |
+| Uptime Kuma | uptime-kuma | status.yanatech.co.uk | existing | ✅ Live |
+| yanatech site | yanatech | www.yanatech.co.uk | existing | ✅ Live |
+| Harbor | harbor | harbor.yanatech.co.uk | 1.1 | ✅ Live |
+| Infisical | infisical | infisical.yanatech.co.uk | 1.5 | ✅ Live |
+| Hubble UI | kube-system | hubble.yanatech.co.uk | 0.1 | ✅ Live |
 | Argo Rollouts UI | argo-rollouts | rollouts.yanatech.co.uk | 3.2 | Planned |
 | Kong API Gateway | kong | api.yanatech.co.uk | 3.3 | Planned |
 | Apicurio | apicurio | apicurio.yanatech.co.uk | 2.3 | Planned |
-| Harbor | harbor | harbor.yanatech.co.uk | 1.1 | Planned |
 | yana-forex | yana-forex | forex.yanatech.co.uk | 4.1 | Planned |
 | yana-ecommerce | yana-ecommerce | store.yanatech.co.uk | 4.2 | Planned |
 
@@ -459,10 +360,11 @@ Payment namespace: hardened NetworkPolicy, blue-green Rollout strategy only
 
 | Risk | Mitigation |
 |---|---|
-| Cilium migration loses pod connectivity | One node at a time, verify after each; Velero backup before start |
-| CNPG VectorChord image breaks Immich | Test custom image against Immich locally before cutover; pg1 stays live until confirmed |
-| pg1 decommission before all apps verified | Hard rule: pg1 not destroyed until every app green on CNPG for 48h |
+| Cilium migration loses pod connectivity | ✅ Resolved — one node at a time, verified after each |
+| CNPG vchord/GLIBC issue blocks Immich | Immich removed. CNPG Bullseye uses GLIBC 2.31, vchord 1.1.1 needs 2.33. Fix: CNPG 1.29 Image Catalog or bookworm base image |
+| pg1 decommission before all apps verified | ✅ Resolved — pg1 decommissioned after 3/4 migrations confirmed healthy |
 | Headlamp token expiry | Set calendar reminder; automate renewal CronJob before 8760h expires |
-| MetalLB IP exhaustion | Expand pool in Phase 0.2 before it becomes a problem |
+| MetalLB IP exhaustion | ✅ Resolved — expanded to 50 IPs |
 | Payment service data leak via pod-to-pod | Strict NetworkPolicy from day one (Phase 3.4); Cilium enforces, Hubble verifies |
 | Schema incompatibility on Kafka topics | Apicurio compatibility mode `BACKWARD` enforced; producers must register schema before publishing |
+| Infisical bundled ingress-nginx consuming MetalLB IP | ✅ Resolved — disabled via `ignoreDifferences` + manual deletion |
