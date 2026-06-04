@@ -57,6 +57,23 @@ spec:
         - /spec/ingressClassName
         - /spec/rules
         - /spec/tls
+    - group: apps
+      kind: Deployment
+      name: infisical-ingress-nginx-controller
+      namespace: infisical
+    - group: ""
+      kind: Service
+      name: infisical-ingress-nginx-controller
+      namespace: infisical
+    - group: networking.k8s.io
+      kind: IngressClass
+      name: infisical-nginx
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: infisical-ingress-nginx
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+      name: infisical-ingress-nginx
 
   destination:
     server: https://kubernetes.default.svc
