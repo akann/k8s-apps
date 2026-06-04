@@ -5,9 +5,7 @@ metadata:
   namespace: cnpg-clusters
 spec:
   instances: 3
-  imageName: harbor.yanatech.co.uk/infra/cnpg-postgresql:18-vchord1.1.1
-  imagePullSecrets:
-    - name: harbor-pull-secret
+  imageName: ghcr.io/tensorchord/vchord-postgres:pg18-v1.1.1
 
   postgresql:
     shared_preload_libraries:
