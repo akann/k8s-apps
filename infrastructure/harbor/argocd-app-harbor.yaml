@@ -1,0 +1,86 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://helm.goharbor.io
+    chart: harbor
+    targetRevision: "*"
+    helm:
+      valuesObject:
+        externalURL: https://harbor.yanatech.co.uk
+
+        expose:
+          type: ingress
+          ingress:
+            hosts:
+              core: harbor.yanatech.co.uk
+            className: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/proxy-body-size: "0"
+              nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+          tls:
+            enabled: true
+            certSource: secret
+            secret:
+              secretName: wildcard-yanatech-tls
+
+        persistence:
+          enabled: true
+          resourcePolicy: keep
+          persistentVolumeClaim:
+            registry:
+              storageClass: ceph-rbd
+              size: 100Gi
+            jobservice:
+              jobLog:
+                storageClass: ceph-rbd
+                size: 10Gi
+            database:
+              storageClass: ceph-rbd
+              size: 10Gi
+            redis:
+              storageClass: ceph-rbd
+              size: 5Gi
+            trivy:
+              storageClass: ceph-rbd
+              size: 10Gi
+
+        existingSecretAdminPassword: harbor-secret
+        existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+        secretKey: ""
+        existingSecretSecretKey: harbor-secret
+        existingSecretSecretKeyKey: HARBOR_SECRET_KEY
+
+        database:
+          type: internal
+
+        redis:
+          type: internal
+
+        trivy:
+          enabled: true
+
+        notary:
+          enabled: false
+
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+            additionalLabels:
+              release: kube-prometheus-stack
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
