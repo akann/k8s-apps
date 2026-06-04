@@ -25,6 +25,8 @@ spec:
             enabled: true
             ingressClassName: nginx
             hostname: infisical.yanatech.co.uk
+            nginx:
+              enabled: false
             tls:
               - secretName: wildcard-yanatech-tls
                 hosts:
