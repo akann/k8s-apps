@@ -18,7 +18,8 @@
 #     authentik-secret (DB host/name/user/password, secret key)
 #
 #   argocd namespace:
-#     kubectl -n argocd patch secret argocd-secret -p '{"stringData":{"dex.authentik.clientSecret":"<secret>"}}'
+#     kubectl -n argocd patch secret argocd-secret \
+#       -p '{"stringData":{"dex.authentik.clientSecret":"<secret>"}}'
 #
 #   vaultwarden namespace:
 #     vaultwarden-secret (DATABASE_URL, ADMIN_TOKEN, DOMAIN)
@@ -58,7 +59,7 @@
 #   - shared_preload_libraries = 'vchord.so' in postgresql.conf
 #   - Extensions cube, earthdistance, vector, vchord created in immich DB as superuser
 #
-# NOTE: this script enumerates every ArgoCD Application explicitly.
+# NOTE: sync-wave annotations on each argocd-app-*.yaml control ordering.
 #       When you add a new app, add BOTH the manifest in the repo AND
 #       a matching kubectl apply line here, or it won't deploy on a fresh cluster.
 set -e
@@ -71,34 +72,48 @@ helm upgrade --install argocd argo/argo-cd \
   -f infrastructure/argocd/values.yaml
 kubectl -n argocd wait deploy/argocd-server --for=condition=available --timeout=300s
 
-echo "Applying infrastructure apps..."
+echo "Applying infrastructure apps (wave 0 — storage/network foundation)..."
 kubectl apply -f infrastructure/metallb/argocd-app-metallb.yaml
-kubectl apply -f infrastructure/metallb/argocd-app-metallb-config.yaml
-kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager.yaml
-kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager-config.yaml
-kubectl apply -f infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
-kubectl apply -f infrastructure/reflector/argocd-app-reflector.yaml
 kubectl apply -f infrastructure/ceph-csi/argocd-app-ceph-csi.yaml
-kubectl apply -f infrastructure/monitoring/argocd-app-monitoring.yaml
-kubectl apply -f infrastructure/headlamp/argocd-app-headlamp.yaml
-kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml
-kubectl apply -f infrastructure/velero/argocd-app-velero.yaml
-kubectl apply -f infrastructure/loki/argocd-app-loki.yaml
-kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
+
+echo "Applying infrastructure apps (wave 1 — CNI, ingress, TLS)..."
+kubectl apply -f infrastructure/cilium/argocd-app-cilium.yaml
+kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager.yaml
+kubectl apply -f infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
+
+echo "Applying infrastructure apps (wave 2 — config that depends on wave 1 CRDs)..."
+kubectl apply -f infrastructure/metallb/argocd-app-metallb-config.yaml
+kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager-config.yaml
+
+echo "Applying infrastructure apps (wave 3 — cluster operations)..."
+kubectl apply -f infrastructure/reflector/argocd-app-reflector.yaml
 kubectl apply -f infrastructure/reloader/argocd-app-reloader.yaml
 kubectl apply -f infrastructure/kured/argocd-app-kured.yaml
-kubectl apply -f infrastructure/goldilocks/argocd-app-goldilocks.yaml
 kubectl apply -f infrastructure/descheduler/argocd-app-descheduler.yaml
 
-echo "Applying apps..."
-kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
+echo "Applying infrastructure apps (wave 4 — platform services)..."
+kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml
+kubectl apply -f infrastructure/monitoring/argocd-app-monitoring.yaml
+kubectl apply -f infrastructure/velero/argocd-app-velero.yaml
+
+echo "Applying infrastructure apps (wave 5 — observability and cluster UI)..."
+kubectl apply -f infrastructure/loki/argocd-app-loki.yaml
+kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
+kubectl apply -f infrastructure/headlamp/argocd-app-headlamp.yaml
+kubectl apply -f infrastructure/goldilocks/argocd-app-goldilocks.yaml
+
+echo "Applying apps (wave 6 — foundational apps)..."
 kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
 kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
+
+echo "Applying apps (wave 7 — all other apps)..."
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
+kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
 kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
 kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
 kubectl apply -f apps/gotify/argocd-app-gotify.yaml
 kubectl apply -f apps/immich/argocd-app-immich.yaml
+kubectl apply -f apps/kubernetes-dashboard/argocd-app-kubernetes-dashboard.yaml
 
 echo "Done. ArgoCD will sync everything automatically."
