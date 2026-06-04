@@ -16,10 +16,10 @@ spec:
         githubConfigUrl: https://github.com/akann/k8s-apps
         githubConfigSecret: github-pat
         minRunners: 0
-        maxRunners: 3
-        runnerGroup: default
-        containerMode:
-          type: kubernetes
+        maxRunners: 4
+        controllerServiceAccount:
+          namespace: actions-runner
+          name: actions-runner-controller-gha-rs-controller
         template:
           spec:
             containers:

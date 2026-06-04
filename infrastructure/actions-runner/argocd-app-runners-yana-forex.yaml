@@ -17,9 +17,9 @@ spec:
         githubConfigSecret: github-pat
         minRunners: 0
         maxRunners: 4
-        runnerGroup: default
-        containerMode:
-          type: kubernetes
+        controllerServiceAccount:
+          namespace: actions-runner
+          name: actions-runner-controller-gha-rs-controller
         template:
           spec:
             containers:
