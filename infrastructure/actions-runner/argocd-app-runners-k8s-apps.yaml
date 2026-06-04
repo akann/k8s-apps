@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: runners-k8s-apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "9"
+spec:
+  project: default
+  source:
+    repoURL: https://actions-runner-controller.github.io/actions-runner-controller
+    chart: gha-runner-scale-set
+    targetRevision: "*"
+    helm:
+      valuesObject:
+        githubConfigUrl: https://github.com/akann/k8s-apps
+        githubConfigSecret: github-pat
+        minRunners: 0
+        maxRunners: 3
+        runnerGroup: default
+        containerMode:
+          type: kubernetes
+        template:
+          spec:
+            containers:
+              - name: runner
+                image: ghcr.io/actions/actions-runner:latest
+                resources:
+                  requests:
+                    cpu: "1"
+                    memory: 2Gi
+                  limits:
+                    cpu: "2"
+                    memory: 4Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: actions-runner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
