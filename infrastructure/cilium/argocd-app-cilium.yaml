@@ -13,27 +13,18 @@ spec:
     targetRevision: 1.17.3
     helm:
       valuesObject:
-        # Native routing — all k8s nodes on same L2 (192.168.22.0/24 via vmbr0)
         routingMode: native
         autoDirectNodeRoutes: true
         ipv4NativeRoutingCIDR: 10.244.0.0/16
-
-        # Interface on k8s nodes
         devices: eth0
-
-        # Replace kube-proxy entirely
         kubeProxyReplacement: true
         k8sServiceHost: 192.168.22.21
         k8sServicePort: 6443
-
-        # Pod and service CIDRs from kubeadm config
         ipam:
           mode: cluster-pool
           operator:
             clusterPoolIPv4PodCIDRList:
               - 10.244.0.0/16
-
-        # Hubble observability
         hubble:
           enabled: true
           relay:
@@ -49,16 +40,10 @@ spec:
                 - secretName: wildcard-yanatech-tls
                   hosts:
                     - hubble.yanatech.co.uk
-
-        # Operator
         operator:
           replicas: 2
-
-        # Required for Kubernetes 1.32
         bpf:
           masquerade: true
-
-        # Metrics for Prometheus scraping
         prometheus:
           enabled: true
           serviceMonitor:
