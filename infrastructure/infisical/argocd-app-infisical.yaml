@@ -45,6 +45,17 @@ spec:
             persistence:
               storageClass: ceph-rbd
               size: 5Gi
+
+  ignoreDifferences:
+    - group: networking.k8s.io
+      kind: Ingress
+      name: infisical-ingress
+      namespace: infisical
+      jsonPointers:
+        - /spec/ingressClassName
+        - /spec/rules
+        - /spec/tls
+
   destination:
     server: https://kubernetes.default.svc
     namespace: infisical
