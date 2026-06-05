@@ -31,13 +31,10 @@ spec:
               - secretName: wildcard-yanatech-tls
                 hosts:
                   - infisical.yanatech.co.uk
-
         ingress-nginx:
           enabled: false
-
         postgresql:
           enabled: false
-
         redis:
           enabled: true
           architecture: standalone
@@ -47,7 +44,6 @@ spec:
             persistence:
               storageClass: ceph-rbd
               size: 5Gi
-
   ignoreDifferences:
     - group: networking.k8s.io
       kind: Ingress
@@ -65,6 +61,13 @@ spec:
       kind: Service
       name: infisical-ingress-nginx-controller
       namespace: infisical
+    - group: ""
+      kind: Service
+      name: infisical-ingress-nginx-controller-admission
+      namespace: infisical
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: infisical-ingress-nginx-admission
     - group: networking.k8s.io
       kind: IngressClass
       name: infisical-nginx
@@ -74,7 +77,6 @@ spec:
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
       name: infisical-ingress-nginx
-
   destination:
     server: https://kubernetes.default.svc
     namespace: infisical
