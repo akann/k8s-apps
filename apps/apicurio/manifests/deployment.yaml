@@ -30,6 +30,29 @@ spec:
                 secretKeyRef:
                   name: apicurio-secret
                   key: db-password
+            - name: REGISTRY_AUTH_ENABLED
+              value: "true"
+            - name: REGISTRY_AUTH_URL
+              value: https://auth.yanatech.co.uk/application/o/apicurio/
+            - name: REGISTRY_AUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: oidc-client-id
+            - name: REGISTRY_AUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: oidc-client-secret
+            - name: REGISTRY_AUTH_ROLE_SOURCE
+              value: token
+            - name: REGISTRY_UI_AUTH_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: oidc-client-id
+            - name: REGISTRY_UI_AUTH_OIDC_URL
+              value: https://auth.yanatech.co.uk/application/o/apicurio/
           readinessProbe:
             httpGet:
               path: /health/ready
