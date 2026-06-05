@@ -23,10 +23,32 @@ spec:
     - Egress
   ingress:
     - ports:
-        - port: 8080  # metrics
-        - port: 9443  # webhook
+        - port: 8080
+        - port: 9443
   egress:
-    - {} # operator manages CNPG clusters across namespaces
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-clusters
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -56,6 +78,42 @@ spec:
   policyTypes:
     - Ingress
     - Egress
+---
+# Allow CNPG operator to manage cluster instances
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cnpg-operator
+  namespace: cnpg-clusters
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+---
+# CNPG pods need kube-apiserver egress to self-manage
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: cnpg-clusters
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
 ---
 # PostgreSQL — accept connections from all app namespaces
 apiVersion: networking.k8s.io/v1
@@ -161,7 +219,7 @@ spec:
     - Egress
   egress:
     - ports:
-        - port: 443  # Backblaze B2 S3 endpoint
+        - port: 443
     - ports:
         - port: 53
           protocol: UDP
