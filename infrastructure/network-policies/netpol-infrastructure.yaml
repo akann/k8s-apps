@@ -397,6 +397,12 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: authentik
+      ports:
+        - port: 3100  # outpost forward auth
+    - from:
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 8090
