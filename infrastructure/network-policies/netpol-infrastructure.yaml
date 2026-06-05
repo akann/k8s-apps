@@ -347,6 +347,24 @@ spec:
   egress:
     - {} # KEDA reads ScaledObjects across all namespaces + connects to scalers (Kafka, Prometheus)
 ---
+# keda metrics apiserver — kube-apiserver calls in to serve HPA external metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-apiserver-ingress
+  namespace: keda
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keda-operator-metrics-apiserver
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 443
+        - port: 6443
+        - port: 8080
+---
 # argo-rollouts
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
