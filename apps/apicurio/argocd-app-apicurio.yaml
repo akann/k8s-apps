@@ -24,16 +24,13 @@ spec:
             username: apicurio
             password: placeholder
           extraEnv:
-            - name: REGISTRY_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: apicurio-secret
-                  key: db-password
             - name: QUARKUS_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: apicurio-secret
                   key: db-password
+            - name: REGISTRY_DATASOURCE_PASSWORD
+              value: ""
           ingress:
             enabled: true
             ingressClassName: nginx
