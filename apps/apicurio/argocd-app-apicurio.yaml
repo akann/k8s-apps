@@ -17,9 +17,14 @@ spec:
           sql:
             url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
             username: apicurio
-            password: ""
+            password: placeholder
           extraEnv:
             - name: REGISTRY_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: db-password
+            - name: QUARKUS_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: apicurio-secret
