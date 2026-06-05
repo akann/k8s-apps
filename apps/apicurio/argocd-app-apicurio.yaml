@@ -13,22 +13,24 @@ spec:
     targetRevision: "*"
     helm:
       valuesObject:
-        storage:
+        registry:
           sql:
             url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
             username: apicurio
-            passwordSecretRef:
-              name: apicurio-secret
-              key: db-password
-
-        ingress:
-          enabled: true
-          ingressClassName: nginx
-          host: apicurio.yanatech.co.uk
-          tls:
-            - hosts:
-                - apicurio.yanatech.co.uk
-              secretName: wildcard-yanatech-tls
+            password: ""
+          extraEnv:
+            - name: REGISTRY_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: db-password
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            host: apicurio.yanatech.co.uk
+            tls: true
+            annotations:
+              nginx.ingress.kubernetes.io/ssl-redirect: "true"
   destination:
     server: https://kubernetes.default.svc
     namespace: apicurio
