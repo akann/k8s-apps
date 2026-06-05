@@ -40,6 +40,32 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: rollouts.argoproj.io
+      jsonPointers:
+        - /status
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: analysisruns.argoproj.io
+      jsonPointers:
+        - /status
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: analysistemplates.argoproj.io
+      jsonPointers:
+        - /status
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: clusteranalysistemplates.argoproj.io
+      jsonPointers:
+        - /status
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: experiments.argoproj.io
+      jsonPointers:
+        - /status
   destination:
     server: https://kubernetes.default.svc
     namespace: argo-rollouts
