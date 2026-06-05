@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ak-outpost-hubble
+  namespace: kube-system
+spec:
+  type: ExternalName
+  externalName: ak-outpost-hubble.authentik.svc.cluster.local
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-ui-outpost
+  namespace: kube-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: hubble.yanatech.co.uk
+      http:
+        paths:
+          - path: /outpost.goauthentik.io
+            pathType: Prefix
+            backend:
+              service:
+                name: ak-outpost-hubble
+                port:
+                  number: 9000
+  tls:
+    - hosts:
+        - hubble.yanatech.co.uk
+      secretName: wildcard-yanatech-tls
