@@ -830,6 +830,112 @@ jobs:
 
 ---
 
+## Infisical (Secrets Manager)
+
+Self-hosted secrets manager. All Kubernetes bootstrap secrets stored here. ESO pulls secrets from Infisical into k8s native Secrets automatically.
+
+- **Namespace:** `infisical`
+- **URL:** `https://infisical.yanatech.co.uk`
+- **Helm chart:** `infisical-standalone` from `https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/`
+- **Auth:** Email/password (OIDC SSO requires paid license)
+- **Database:** CNPG pg-main (`infisical` database)
+- **Cache:** Redis (bundled, ceph-rbd 5Gi PVC)
+- **Manifest:** `infrastructure/infisical/argocd-app-infisical.yaml`
+- **Admin credentials:** stored in Vaultwarden as `infisical-admin`
+- **Organisation:** `yanatech`
+- **Project:** `k8s-homelab` (slug: `k8s-homelab`, ID: `69b39965-b778-47a7-ba52-2cd66a7aad0a`)
+- **Environment:** `prod`
+
+### Secret folder structure (`prod` environment)
+
+| Folder | Secrets |
+|---|---|
+| `/ceph-csi-rbd` | userID, userKey |
+| `/cert-manager` | api-token |
+| `/monitoring` | client_id, client_secret (Grafana Authentik OIDC) |
+| `/authentik` | AUTHENTIK_POSTGRESQL__HOST/NAME/PASSWORD/USER, AUTHENTIK_REDIS__HOST, AUTHENTIK_SECRET_KEY |
+| `/argocd` | dex.authentik.clientSecret |
+| `/vaultwarden` | DATABASE_URL, ADMIN_TOKEN, DOMAIN, SIGNUPS_ALLOWED |
+| `/velero` | aws_access_key_id, aws_secret_access_key |
+| `/pgadmin` | OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET |
+| `/nextcloud` | db-host, db-password, db-username, nextcloud-password, nextcloud-token, nextcloud-username |
+| `/gotify` | admin-password |
+| `/cnpg-clusters` | ACCESS_KEY_ID, ACCESS_SECRET_KEY, harbor-robot-username, harbor-robot-password |
+| `/harbor` | HARBOR_ADMIN_PASSWORD, secretKey |
+| `/actions-runner` | github_token |
+| `/infisical` | ENCRYPTION_KEY, AUTH_SECRET, DB_CONNECTION_URI |
+| `/immich` | (reserved for future Immich redeploy) |
+
+### SMTP configuration
+- Host: `smtppro.zoho.eu`, Port: `465`, From: `akan@yanatech.org`
+- Credentials in Vaultwarden as `infisical-smtp`
+- Passed via `infisical-secrets` k8s secret (all env vars via `envFrom: secretRef`)
+
+### Bootstrap prerequisites
+```bash
+kubectl create namespace infisical
+
+# Create role + database on pg-main first
+kubectl exec -it -n cnpg-clusters pg-main-1 -- psql -U postgres -c \
+  "CREATE ROLE infisical WITH LOGIN PASSWORD '<password>'; CREATE DATABASE infisical OWNER infisical;"
+
+kubectl create secret generic infisical-secrets \
+  --namespace infisical \
+  --from-literal=ENCRYPTION_KEY='<from Vaultwarden infisical-secrets>' \
+  --from-literal=AUTH_SECRET='<from Vaultwarden infisical-secrets>' \
+  --from-literal=DB_CONNECTION_URI='postgresql://infisical:<password>@pg-main-rw.cnpg-clusters.svc.cluster.local:5432/infisical' \
+  --from-literal=SMTP_HOST='smtppro.zoho.eu' \
+  --from-literal=SMTP_USERNAME='akan' \
+  --from-literal=SMTP_PASSWORD='<from Vaultwarden infisical-smtp>' \
+  --from-literal=SMTP_PORT='465' \
+  --from-literal=SMTP_FROM_ADDRESS='akan@yanatech.org' \
+  --from-literal=SMTP_FROM_NAME='Infisical'
+```
+
+---
+
+## ESO (External Secrets Operator)
+
+Pulls secrets from Infisical into Kubernetes native Secrets automatically.
+
+- **Namespace:** `external-secrets`
+- **Helm chart:** `external-secrets/external-secrets`
+- **Manifest:** `infrastructure/eso/argocd-app-eso.yaml`
+- **ClusterSecretStore:** `infisical` (Valid, ReadOnly) — `infrastructure/eso/cluster-secret-store.yaml`
+- **API version:** `external-secrets.io/v1` (not v1beta1)
+- **Machine identity:** `eso-k8s` (Universal Auth) — credentials in `infisical-eso-credentials` secret in `external-secrets` namespace, stored in Vaultwarden as `infisical-eso-machine-identity`
+
+### Bootstrap prerequisites
+```bash
+kubectl create secret generic infisical-eso-credentials \
+  --namespace external-secrets \
+  --from-literal=clientId='<from Vaultwarden infisical-eso-machine-identity>' \
+  --from-literal=clientSecret='<from Vaultwarden infisical-eso-machine-identity>'
+```
+
+### ExternalSecret pattern
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: <secret-name>
+  namespace: <namespace>
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: infisical
+    kind: ClusterSecretStore
+  target:
+    name: <secret-name>
+    creationPolicy: Owner
+  data:
+    - secretKey: <k8s-key>
+      remoteRef:
+        key: /<folder>/<INFISICAL_KEY>
+```
+
+---
+
 ## Installed Services
 
 | Service | Namespace | URL | Managed by |
@@ -840,6 +946,8 @@ jobs:
 | Actions Runner Controller | actions-runner | - | ArgoCD |
 | CloudNativePG | cnpg-system | - | ArgoCD |
 | CNPG pg-main cluster | cnpg-clusters | - | ArgoCD |
+| ESO | external-secrets | - | ArgoCD |
+| Infisical | infisical | https://infisical.yanatech.co.uk | ArgoCD |
 | ingress-nginx | ingress-nginx | - | ArgoCD |
 | MetalLB | metallb-system | - | ArgoCD |
 | cert-manager | cert-manager | - | ArgoCD |
@@ -925,20 +1033,28 @@ bash bootstrap.sh
 ```
 
 ### Manual Secrets Reference
-| Secret | Namespace | Contents |
-|---|---|---|
-| `csi-rbd-secret` | ceph-csi-rbd | Ceph client.kubernetes key |
-| `cloudflare-api-token` | cert-manager | Cloudflare API token |
-| `grafana-authentik-secret` | monitoring | Authentik OAuth client_id + client_secret |
-| `authentik-secret` | authentik | DB creds, Redis host, secret key |
-| `vaultwarden-secret` | vaultwarden | DATABASE_URL (→ VM 110, `192.168.22.40`), ADMIN_TOKEN, DOMAIN |
-| `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey |
-| `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 OAUTH2_CLIENT_ID + OAUTH2_CLIENT_SECRET |
-| `nextcloud-secret` | nextcloud | nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password |
-| `gotify-secret` | gotify | admin-password |
-| `immich-secret` | immich | db-url (`postgresql://immich:<password>@pg-main-rw.cnpg-clusters.svc.cluster.local:5432/immich`) — for when Immich is redeployed |
-| `cnpg-b2-credentials` | cnpg-clusters | ACCESS_KEY_ID, ACCESS_SECRET_KEY (Backblaze B2 bucket yanatech-cnpg) |
-| `harbor-pull-secret` | cnpg-clusters | docker-registry secret for harbor.yanatech.co.uk (robot$cnpg-pull) |
+
+**Note: All secrets below are now stored in Infisical and will be replaced by ExternalSecret CRDs (in progress). On a fresh cluster, ESO + Infisical must be bootstrapped first, then ExternalSecrets will create these automatically.**
+
+| Secret | Namespace | Contents | Infisical path |
+|---|---|---|---|
+| `csi-rbd-secret` | ceph-csi-rbd | Ceph userID + userKey | `/ceph-csi-rbd` |
+| `cloudflare-api-token` | cert-manager | Cloudflare API token | `/cert-manager` |
+| `grafana-authentik-secret` | monitoring | Authentik OAuth client_id + client_secret | `/monitoring` |
+| `authentik-secret` | authentik | DB creds, Redis host, secret key | `/authentik` |
+| `vaultwarden-secret` | vaultwarden | DATABASE_URL, ADMIN_TOKEN, DOMAIN, SIGNUPS_ALLOWED | `/vaultwarden` |
+| `velero-b2-credentials` | velero | Backblaze B2 keyID + applicationKey | `/velero` |
+| `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 client ID + secret | `/pgadmin` |
+| `nextcloud-secret` | nextcloud | nextcloud-username/password/token, db-username/password/host | `/nextcloud` |
+| `gotify-secret` | gotify | admin-password | `/gotify` |
+| `immich-secret` | immich | db-url (for future redeploy) | `/immich` |
+| `cnpg-b2-credentials` | cnpg-clusters | ACCESS_KEY_ID, ACCESS_SECRET_KEY | `/cnpg-clusters` |
+| `harbor-pull-secret` | cnpg-clusters | docker-registry (robot$cnpg-pull) | `/cnpg-clusters` |
+| `harbor-secret` | harbor | HARBOR_ADMIN_PASSWORD, secretKey | `/harbor` |
+| `github-pat` | actions-runner | github_token | `/actions-runner` |
+| `argocd-secret` (patch) | argocd | dex.authentik.clientSecret | `/argocd` |
+| `infisical-secrets` | infisical | ENCRYPTION_KEY, AUTH_SECRET, DB_CONNECTION_URI, SMTP_* | `/infisical` |
+| `infisical-eso-credentials` | external-secrets | clientId, clientSecret (machine identity) | Vaultwarden only |
 
 ### yanatech CI/CD Pipeline
 ```
@@ -979,6 +1095,8 @@ ArgoCD detects change → deploys to cluster
 - [x] Harbor private container registry (done 2026-06-04 — `infrastructure/harbor/`, Authentik OIDC, projects: infra/yana-forex/yana-ecommerce)
 - [x] Actions Runner Controller (done 2026-06-04 — `infrastructure/actions-runner/`, runner sets for k8s-apps/yana-forex/yana-ecommerce, scale 0→4)
 - [x] CloudNativePG operator + pg-main cluster (done 2026-06-04 — `infrastructure/cnpg/`, 3-instance PG18, Barman B2 backups)
+- [x] ESO + Infisical (done 2026-06-05 — `infrastructure/eso/` + `infrastructure/infisical/`, all 42 bootstrap secrets imported, ClusterSecretStore Valid)
+- [ ] Write ExternalSecret CRDs for all namespaces (in progress — vaultwarden template created, remaining namespaces pending)
 
 ---
 
@@ -1078,3 +1196,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - CNPG + vchord 1.1.1 GLIBC issue: vchord 1.1.1 requires GLIBC_2.33 but the CNPG bootstrap-controller init container runs on Debian Bullseye (GLIBC 2.31). Neither the tensorchord/vchord-scratch approach nor tensorchord/vchord-postgres image resolves this — the init container itself is Bullseye-based. Fix requires either: (1) CNPG 1.29 Image Catalog feature, or (2) a vchord build targeting GLIBC 2.31, or (3) waiting for CNPG to ship a Bookworm-based bootstrap image.
 - Nextcloud stores the DB host in `config.php` on the PVC in addition to env vars — patching the k8s secret and ArgoCD app values is insufficient. Must also `sed` the `dbhost` value in `/var/www/html/config/config.php` directly, then delete the pod to pick it up cleanly.
 - CNPG Barman Cloud deprecation: native Barman Cloud backup support is deprecated in CNPG 1.29 and will be removed in 1.30. Plan to migrate to the Barman Cloud Plugin before upgrading to 1.30.
+- Infisical standalone Helm chart bundles its own ingress-nginx which consumes a MetalLB IP — disable via `infisical.ingress.nginx.enabled: false` in values AND add `ignoreDifferences` for the nginx Deployment/Service/IngressClass/ClusterRole/ClusterRoleBinding in the ArgoCD Application. Without both, ArgoCD will recreate the bundled nginx on every sync.
+- Infisical CLI: the `infisical-core` package is the server Omnibus package, NOT the CLI. Install the CLI from `https://artifacts-cli.infisical.com/setup.deb.sh`. The `folders` command is a subcommand of `secrets` (`infisical secrets folders create`). Folders must be created before secrets can be added to them via CLI.
+- ESO ClusterSecretStore for Infisical must set `hostAPI: https://infisical.yanatech.co.uk/api` — defaults to cloud API (`app.infisical.com`) which will give 401. Use `external-secrets.io/v1` (not `v1beta1`) and `environmentSlug` field (not `envSlug`). Machine identity must be added to the project members in Infisical UI, not just the org.
+- ESO `remoteRef.key` for Infisical uses full path including folder: `/folder/SECRET_NAME` (e.g. `/vaultwarden/DATABASE_URL`).
