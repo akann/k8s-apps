@@ -31,7 +31,6 @@ spec:
                   enabled:
                     - RemovePodsViolatingNodeAffinity
                     - RemovePodsViolatingInterPodAntiAffinity
-                    - RemovePodsViolatingTopologySpreadConstraints
         resources:
           requests:
             cpu: 50m
