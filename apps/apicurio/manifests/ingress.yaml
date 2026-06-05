@@ -28,3 +28,28 @@ spec:
     - hosts:
         - apicurio.yanatech.co.uk
       secretName: wildcard-yanatech-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apicurio-outpost
+  namespace: authentik
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: apicurio.yanatech.co.uk
+      http:
+        paths:
+          - path: /outpost.goauthentik.io
+            pathType: Prefix
+            backend:
+              service:
+                name: ak-outpost-apicurio
+                port:
+                  number: 9000
+  tls:
+    - hosts:
+        - apicurio.yanatech.co.uk
+      secretName: wildcard-yanatech-tls
