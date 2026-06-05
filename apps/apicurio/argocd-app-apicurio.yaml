@@ -8,37 +8,27 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.apicur.io
+    repoURL: ghcr.io/eshepelyuk/helm
     chart: apicurio-registry
     targetRevision: "*"
     helm:
       valuesObject:
-        image:
-          tag: latest-release
-
-        registryApplication:
-          persistence:
-            sql:
-              enabled: true
-              dialect: postgresql
-              datasourceUrl: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
-              datasourceUsername: apicurio
-              datasourcePassword:
-                secretName: apicurio-secret
-                secretKey: db-password
+        storage:
+          sql:
+            url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
+            username: apicurio
+            passwordSecretRef:
+              name: apicurio-secret
+              key: db-password
 
         ingress:
           enabled: true
-          className: nginx
+          ingressClassName: nginx
           host: apicurio.yanatech.co.uk
           tls:
-            enabled: true
-            secretName: wildcard-yanatech-tls
-
-        podMonitor:
-          enabled: true
-          labels:
-            release: kube-prometheus-stack
+            - hosts:
+                - apicurio.yanatech.co.uk
+              secretName: wildcard-yanatech-tls
   destination:
     server: https://kubernetes.default.svc
     namespace: apicurio
@@ -48,3 +38,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
