@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ak-outpost-uptime-kuma
+  namespace: uptime-kuma
+spec:
+  type: ExternalName
+  externalName: ak-outpost-uptime-kuma.authentik.svc.cluster.local
+  ports:
+    - port: 9000
+      targetPort: 9000
