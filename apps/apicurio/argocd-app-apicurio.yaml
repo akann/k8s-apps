@@ -22,7 +22,7 @@ spec:
           sql:
             url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
             username: apicurio
-            password: eAZ5btVb7c833m
+            password: mV5aWWlmZ5OFZv
           ingress:
             enabled: true
             ingressClassName: nginx
