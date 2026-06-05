@@ -8,35 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: ghcr.io/eshepelyuk/helm
-    chart: apicurio-registry
-    targetRevision: "3.8.0"
-    helm:
-      valuesObject:
-        registry:
-          image:
-            registry: quay.io
-            repository: apicurio/apicurio-registry-sql
-            tag: "2.5.8.Final"
-            persistenceSuffix: false
-          sql:
-            url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
-            username: apicurio
-            password: mV5aWWlmZ5OFZv
-          ingress:
-            enabled: true
-            ingressClassName: nginx
-            host: apicurio.yanatech.co.uk
-            tls: true
-
-  ignoreDifferences:
-    - group: networking.k8s.io
-      kind: Ingress
-      name: apicurio-apicurio-registry
-      namespace: apicurio
-      jsonPointers:
-        - /spec/tls
-
+    repoURL: https://github.com/akann/k8s-apps
+    targetRevision: HEAD
+    path: apps/apicurio/manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: apicurio

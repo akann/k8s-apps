@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apicurio-registry
+  namespace: apicurio
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: apicurio.yanatech.co.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: apicurio-registry
+                port:
+                  number: 8080
+  tls:
+    - hosts:
+        - apicurio.yanatech.co.uk
+      secretName: wildcard-yanatech-tls
