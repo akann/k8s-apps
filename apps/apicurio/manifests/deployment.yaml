@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apicurio-registry
+  namespace: apicurio
+  labels:
+    app: apicurio-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apicurio-registry
+  template:
+    metadata:
+      labels:
+        app: apicurio-registry
+    spec:
+      containers:
+        - name: apicurio-registry
+          image: quay.io/apicurio/apicurio-registry-sql:2.5.8.Final
+          ports:
+            - containerPort: 8080
+          env:
+            - name: REGISTRY_DATASOURCE_URL
+              value: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
+            - name: REGISTRY_DATASOURCE_USERNAME
+              value: apicurio
+            - name: REGISTRY_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: apicurio-secret
+                  key: db-password
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

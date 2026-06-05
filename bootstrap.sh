@@ -90,6 +90,7 @@ kubectl apply -f infrastructure/reflector/argocd-app-reflector.yaml
 kubectl apply -f infrastructure/reloader/argocd-app-reloader.yaml
 kubectl apply -f infrastructure/kured/argocd-app-kured.yaml
 kubectl apply -f infrastructure/descheduler/argocd-app-descheduler.yaml
+kubectl apply -f infrastructure/keda/argocd-app-keda.yaml
 
 echo "Applying infrastructure apps (wave 4 — platform services)..."
 kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml

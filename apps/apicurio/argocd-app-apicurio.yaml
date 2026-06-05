@@ -8,37 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.apicur.io
-    chart: apicurio-registry
-    targetRevision: "*"
-    helm:
-      valuesObject:
-        image:
-          tag: latest-release
-
-        registryApplication:
-          persistence:
-            sql:
-              enabled: true
-              dialect: postgresql
-              datasourceUrl: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
-              datasourceUsername: apicurio
-              datasourcePassword:
-                secretName: apicurio-secret
-                secretKey: db-password
-
-        ingress:
-          enabled: true
-          className: nginx
-          host: apicurio.yanatech.co.uk
-          tls:
-            enabled: true
-            secretName: wildcard-yanatech-tls
-
-        podMonitor:
-          enabled: true
-          labels:
-            release: kube-prometheus-stack
+    repoURL: https://github.com/akann/k8s-apps
+    targetRevision: HEAD
+    path: apps/apicurio/manifests
   destination:
     server: https://kubernetes.default.svc
     namespace: apicurio
