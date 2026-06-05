@@ -215,7 +215,10 @@ pvesh get /cluster/resources --type vm
 | Database | CloudNativePG 1.29.1 (pg-main: 3-instance PG18 cluster) |
 | CI runners | Actions Runner Controller (gha-runner-scale-set 0.9.3) |
 | Container registry | Harbor v2.15.1 |
-| Pod rebalancing | Descheduler 0.36.0 |
+| Pod rebalancing | Descheduler 0.36.0 (hourly) |
+| Event-driven autoscaling | KEDA 2.16.1 |
+| Progressive delivery | Argo Rollouts 2.39.2 |
+| Network isolation | NetworkPolicies (baseline deny-all per namespace, Cilium enforced) |
 
 ### kubectl Access
 ```bash
@@ -687,9 +690,9 @@ Kubernetes Reboot Daemon — watches for `/var/run/reboot-required` on each node
 - **Backend:** Backblaze B2
 - **Bucket:** `yanatech-velero`
 - **Endpoint:** `s3.eu-central-003.backblazeb2.com`
-- **Schedule:** Daily at 2am UTC ✅ live (verified 2026-06-01)
+- **Schedule:** Weekly, Sunday at 2am UTC (changed from daily 2026-06-05 to reduce B2 API calls)
 - **Retention:** 30 days
-- **Namespaces backed up:** vaultwarden, authentik, monitoring, kafka, ingress-nginx, cert-manager, argocd, nextcloud, pgadmin, immich
+- **Coverage:** All namespaces except infrastructure-only (excludedNamespaces — new app namespaces auto-covered). Excluded: kube-system, kube-public, kube-node-lease, default, cilium-secrets, metallb-system, ceph-csi-rbd, cnpg-system, external-secrets, reloader, kured, goldilocks, keda, argo-rollouts, immich
 - **Credentials secret:** `velero-b2-credentials` in `velero` namespace (stored in Vaultwarden)
 - **B2 key:** `velero` key scoped to `yanatech-velero` bucket (keyID `003faa10a09691a0000000003`)
 
@@ -936,6 +939,176 @@ spec:
 
 ---
 
+## KEDA (Event-Driven Autoscaling)
+
+Scales workloads based on external event sources — Kafka topic lag, Prometheus metrics, cron schedules. Scale-to-zero supported.
+
+- **Namespace:** `keda`
+- **Version:** 2.16.1
+- **Helm chart:** `kedacore/keda`
+- **Manifest:** `infrastructure/keda/argocd-app-keda.yaml`
+- **Sync wave:** 3
+
+### Primary scalers planned
+- `kafka` — scale consumers on topic lag (forex workers, order processors)
+- `prometheus` — scale on custom metrics (websocket connection count)
+- `cron` — scale to zero overnight for non-critical services
+
+### ScaledObject pattern
+```yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: forex-worker-scaler
+  namespace: yana-forex
+spec:
+  scaleTargetRef:
+    name: forex-worker
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
+        consumerGroup: forex-worker-group
+        topic: forex.tick
+        lagThreshold: "100"
+```
+
+---
+
+## Argo Rollouts (Progressive Delivery)
+
+Replaces standard Deployments for production microservices. Supports canary and blue-green strategies with automated analysis.
+
+- **Namespace:** `argo-rollouts`
+- **Version:** 2.39.2 (kubectl plugin v1.8.1)
+- **Helm chart:** `argo/argo-rollouts`
+- **Manifest:** `infrastructure/argo-rollouts/argocd-app-argo-rollouts.yaml`
+- **Dashboard:** `https://rollouts.yanatech.co.uk` (read-only, no auth — internal only)
+- **Sync wave:** 3
+
+### Strategy per service type
+| Service type | Strategy | Rationale |
+|---|---|---|
+| Forex real-time feed / order execution | Canary (5%→20%→50%→100%) | Automated on Prometheus success rate |
+| E-commerce frontend | Blue-green | Instant cutover, instant rollback |
+| Background workers | Canary | Safe to run mixed versions briefly |
+| Payment service | Blue-green | No mixed versions ever |
+
+### Notes
+- All production microservices use `Rollout` resource from day one — never plain `Deployment`
+- Dashboard shows spinning "Loading" when no Rollout resources exist — expected behaviour
+- `argo-rollouts` namespace has no Authentik forward auth — dashboard is read-only and LAN-only
+
+---
+
+## NetworkPolicies
+
+Baseline default-deny-all + allowlist per namespace. Enforced by Cilium eBPF natively.
+
+- **Manifest:** `infrastructure/network-policies/` (one file per namespace group)
+- **ArgoCD app:** `infrastructure/network-policies/argocd-app-network-policies.yaml`
+- **Sync wave:** 2
+
+### Files
+| File | Namespaces covered |
+|---|---|
+| `netpol-apps.yaml` | nextcloud, gotify, pgadmin, uptime-kuma, headlamp, velero |
+| `netpol-authentik.yaml` | authentik |
+| `netpol-cert-manager.yaml` | cert-manager |
+| `netpol-cnpg.yaml` | cnpg-system, cnpg-clusters |
+| `netpol-infrastructure.yaml` | metallb-system, ceph-csi-rbd, external-secrets, infisical, harbor, actions-runner, keda, argo-rollouts, goldilocks, reloader, kured, apicurio, yanatech, immich |
+| `netpol-kafka.yaml` | kafka |
+| `netpol-monitoring.yaml` | monitoring |
+| `netpol-vaultwarden.yaml` | vaultwarden |
+| `netpol-apiserver-egress.yaml` | All controller namespaces (see below) |
+
+### Namespaces WITHOUT default-deny (intentionally excluded)
+- `kube-system` — Cilium agents, CoreDNS; any policy activates full enforcement and breaks DNS
+- `ingress-nginx` — must reach all backend namespaces; default-deny breaks routing
+- `argocd` — must reach GitHub, Helm repos, and all cluster namespaces
+
+### Critical: kube-apiserver egress
+Any namespace whose pods talk to the kube-apiserver needs `allow-kube-apiserver-egress` (ports 443+6443+53). Without it, default-deny blocks apiserver calls and pods crash. Applied to: `cert-manager`, `external-secrets`, `goldilocks`, `keda`, `argo-rollouts`, `reloader`, `velero`, `metallb-system`, `ceph-csi-rbd`, `cnpg-system`, `cnpg-clusters`, `kafka`, `actions-runner`, `monitoring`.
+
+CNPG instance pods additionally need this because they self-manage via the apiserver (not just the operator).
+
+### Adding a new app namespace
+1. Add default-deny + allow rules to the appropriate netpol file
+2. Add a client rule to `netpol-cnpg.yaml` `allow-postgres-clients` if it needs DB access
+3. If it's a controller/operator, add `allow-kube-apiserver-egress` to `netpol-apiserver-egress.yaml`
+4. Commit and push — ArgoCD syncs automatically
+
+---
+
+## Tempo (Distributed Tracing)
+
+Single-binary Tempo instance for distributed tracing. Receives traces via OTLP directly (no OTel Collector needed at current scale).
+
+- **Namespace:** `monitoring` (alongside Prometheus/Loki)
+- **Helm chart:** `grafana/tempo`
+- **Storage:** ceph-rbd PVC, 20Gi, 14-day retention
+- **OTLP gRPC:** `tempo.monitoring.svc.cluster.local:4317`
+- **OTLP HTTP:** `tempo.monitoring.svc.cluster.local:4318`
+- **Manifest:** `infrastructure/tempo/argocd-app-tempo.yaml`
+- **Grafana datasource:** wired as `Tempo` with correlation to Loki (traceId) and Prometheus (exemplars)
+
+Services instrument with OpenTelemetry SDK pointing at `tempo.monitoring.svc.cluster.local:4317`. OTel Collector will be added in Phase 4 when microservices multiply.
+
+---
+
+## Apicurio Registry (Schema Registry)
+
+Kafka schema registry for Avro/Protobuf/JSON schemas. Defines schemas for forex ticks, order events etc. before any Kafka producer is written.
+
+- **Namespace:** `apicurio`
+- **Version:** 2.5.8.Final
+- **URL:** `https://apicurio.yanatech.co.uk`
+- **Image:** `quay.io/apicurio/apicurio-registry-sql:2.5.8.Final`
+- **Database:** CNPG pg-main (`apicurio` database, `apicurio` role)
+- **Auth:** Authentik forward auth proxy (`ak-outpost-apicurio`)
+- **Manifests:** `apps/apicurio/manifests/` (plain k8s manifests — no Helm, no password in git)
+  - `deployment.yaml` — secretKeyRef for db-password
+  - `service.yaml` — ClusterIP on 8080
+  - `ingress.yaml` — forward auth annotations pointing to `ak-outpost-apicurio.authentik.svc.cluster.local:9000`
+  - `outpost-ingress.yaml` — ExternalName service + ingress for `/outpost.goauthentik.io` path
+- **ExternalSecret:** `apps/apicurio/external-secret.yaml` — pulls `db-password`, `oidc-client-id`, `oidc-client-secret` from Infisical `/apicurio/`
+- **API:** `https://apicurio.yanatech.co.uk/apis/registry/v2/`
+- **UI:** `https://apicurio.yanatech.co.uk/ui/`
+
+### Authentik setup
+- Provider: `apicurio-proxy` (Proxy, Forward auth single application)
+- Application slug: `apicurio`
+- Outpost: `ak-outpost-apicurio` (dedicated outpost)
+- External host: `https://apicurio.yanatech.co.uk`
+
+### Forward auth pattern (same as kafka-ui, goldilocks)
+```
+ingress auth-url → http://ak-outpost-apicurio.authentik.svc.cluster.local:9000/outpost.goauthentik.io/auth/nginx
+ExternalName svc in apicurio ns → ak-outpost-apicurio.authentik.svc.cluster.local
+outpost-ingress in apicurio ns → routes /outpost.goauthentik.io to ExternalName svc port 9000
+```
+
+### Bootstrap prerequisites
+```bash
+kubectl create namespace apicurio
+
+# Create role + database on pg-main
+kubectl exec -it -n cnpg-clusters pg-main-1 -- psql -U postgres -c \
+  "CREATE ROLE apicurio WITH LOGIN PASSWORD '<from Vaultwarden>'; CREATE DATABASE apicurio OWNER apicurio;"
+
+# ExternalSecret pulls db-password from Infisical
+kubectl apply -f apps/apicurio/external-secret.yaml
+```
+
+### Known issues
+- Apicurio 2.5.x UI config.js has OIDC URL hardcoded at build time (`localhost:8090`) — native OIDC env vars (`REGISTRY_AUTH_URL`, `QUARKUS_OIDC_AUTH_SERVER_URL`) are ignored for the UI. Use Authentik forward auth proxy instead.
+- The eshepelyuk/apicurio-registry Helm chart (3.8.0) generates `REGISTRY_DATASOURCE_PASSWORD` internally — adding it via `extraEnv` with `ServerSideApply=true` causes a duplicate env var error. Use plain k8s manifests.
+- Outpost ingress must be in the same namespace as the app (not `authentik` namespace) using an ExternalName service — same pattern as kafka-ui and goldilocks.
+
+---
+
 ## Installed Services
 
 | Service | Namespace | URL | Managed by |
@@ -948,6 +1121,10 @@ spec:
 | CNPG pg-main cluster | cnpg-clusters | - | ArgoCD |
 | ESO | external-secrets | - | ArgoCD |
 | Infisical | infisical | https://infisical.yanatech.co.uk | ArgoCD |
+| KEDA | keda | - | ArgoCD |
+| Argo Rollouts | argo-rollouts | https://rollouts.yanatech.co.uk | ArgoCD |
+| Tempo | monitoring | - | ArgoCD |
+| Apicurio Registry | apicurio | https://apicurio.yanatech.co.uk | ArgoCD |
 | ingress-nginx | ingress-nginx | - | ArgoCD |
 | MetalLB | metallb-system | - | ArgoCD |
 | cert-manager | cert-manager | - | ArgoCD |
@@ -1096,7 +1273,13 @@ ArgoCD detects change → deploys to cluster
 - [x] Actions Runner Controller (done 2026-06-04 — `infrastructure/actions-runner/`, runner sets for k8s-apps/yana-forex/yana-ecommerce, scale 0→4)
 - [x] CloudNativePG operator + pg-main cluster (done 2026-06-04 — `infrastructure/cnpg/`, 3-instance PG18, Barman B2 backups)
 - [x] ESO + Infisical (done 2026-06-05 — `infrastructure/eso/` + `infrastructure/infisical/`, all 42 bootstrap secrets imported, ClusterSecretStore Valid)
-- [ ] Write ExternalSecret CRDs for all namespaces (in progress — vaultwarden template created, remaining namespaces pending)
+- [x] Write ExternalSecret CRDs for all namespaces (done 2026-06-05 — 13 ExternalSecrets deployed, all syncing)
+- [x] Tempo distributed tracing (done 2026-06-05 — `infrastructure/tempo/`, single binary, 20Gi ceph-rbd, wired into Grafana)
+- [x] KEDA event-driven autoscaling (done 2026-06-05 — `infrastructure/keda/`, wave 3, CRDs: scaledobjects/scaledjobs/triggerauthentications)
+- [x] Argo Rollouts progressive delivery (done 2026-06-05 — `infrastructure/argo-rollouts/`, dashboard at `https://rollouts.yanatech.co.uk`)
+- [x] NetworkPolicies baseline (done 2026-06-05 — `infrastructure/network-policies/`, default-deny-all per namespace except kube-system/ingress-nginx/argocd)
+- [x] Descheduler fix — `RemovePodsViolatingTopologySpreadConstraints` moved to correct extension point, schedule reduced to hourly (done 2026-06-05)
+- [x] Velero weekly schedule + exclude-namespaces (done 2026-06-05 — reduced B2 API calls, new namespaces covered automatically)
 
 ---
 
@@ -1124,11 +1307,11 @@ kubectl label namespace <namespace> goldilocks.fairwinds.com/enabled=true
 
 ## Descheduler
 
-Rebalances pods across nodes after rescheduling events (node reboots, drains, new nodes). Runs as a CronJob every 5 minutes. Evicts pods that can be scheduled on better-utilised nodes; the default scheduler handles rescheduling.
+Rebalances pods across nodes after rescheduling events (node reboots, drains, new nodes). Runs as a CronJob every hour. Evicts pods that can be scheduled on better-utilised nodes; the default scheduler handles rescheduling.
 
 - **Namespace:** `kube-system`
 - **Helm chart:** `descheduler/descheduler` 0.36.0
-- **Schedule:** every 5 minutes (`*/5 * * * *`)
+- **Schedule:** every hour (`0 * * * *`)
 - **Manifest:** `infrastructure/descheduler/argocd-app-descheduler.yaml`
 - Plugins enabled: `LowNodeUtilization`, `RemovePodsViolatingTopologySpreadConstraints`, `RemovePodsViolatingNodeAffinity`, `RemovePodsViolatingInterPodAntiAffinity`
 - PVC pods and local storage pods are not evicted (`ignorePvcPods: true`)
@@ -1199,4 +1382,11 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Infisical standalone Helm chart bundles its own ingress-nginx which consumes a MetalLB IP — disable via `infisical.ingress.nginx.enabled: false` in values AND add `ignoreDifferences` for the nginx Deployment/Service/IngressClass/ClusterRole/ClusterRoleBinding in the ArgoCD Application. Without both, ArgoCD will recreate the bundled nginx on every sync.
 - Infisical CLI: the `infisical-core` package is the server Omnibus package, NOT the CLI. Install the CLI from `https://artifacts-cli.infisical.com/setup.deb.sh`. The `folders` command is a subcommand of `secrets` (`infisical secrets folders create`). Folders must be created before secrets can be added to them via CLI.
 - ESO ClusterSecretStore for Infisical must set `hostAPI: https://infisical.yanatech.co.uk/api` — defaults to cloud API (`app.infisical.com`) which will give 401. Use `external-secrets.io/v1` (not `v1beta1`) and `environmentSlug` field (not `envSlug`). Machine identity must be added to the project members in Infisical UI, not just the org.
-- ESO `remoteRef.key` for Infisical uses full path including folder: `/folder/SECRET_NAME` (e.g. `/vaultwarden/DATABASE_URL`).
+- ESO `remoteRef.key` for Infisical uses full path including folder: `/folder/SECRET_NAME` (e.g. `/vaultwarden/DATABASE_URL`)
+- Apicurio Registry Helm chart (eshepelyuk/apicurio-registry 3.8.0) generates `REGISTRY_DATASOURCE_PASSWORD` env var internally from `sql.password` — adding the same var via `extraEnv` causes a duplicate env var error that prevents deployment when using ServerSideApply. Solution: use plain k8s manifests instead of the Helm chart, use `secretKeyRef` directly in the Deployment.
+- Apicurio Helm chart TLS: `tls: true` uses the ingress host as the secret name — must use `ignoreDifferences` to preserve the manually patched `wildcard-yanatech-tls` secret name.
+- Descheduler 0.36.0 on k8s 1.32: `RemovePodsViolatingTopologySpreadConstraints` moved from `balance` to `deschedule` extension point — placing it in `balance` causes `profile configures balance extension point of non-existing plugins` error and CrashLoopBackOff on every CronJob run. Corrected in `infrastructure/descheduler/argocd-app-descheduler.yaml`. Schedule reduced from `*/5 * * * *` to `0 * * * *` (hourly) — every 5 minutes was excessive.
+- Velero schedule changed from daily to weekly (`0 2 * * 0`, Sunday 2am) to reduce Backblaze B2 API calls (free tier limit). Switched from `includedNamespaces` to `excludedNamespaces` — infrastructure-only namespaces excluded, all app namespaces covered automatically without enumeration. Schedule renamed from `daily-backup` to `weekly-backup` — ArgoCD prune removes the old Schedule on next sync.
+- NetworkPolicy + Cilium: any NetworkPolicy applied to a pod (even just an ingress allow with broad `podSelector: {}`) activates full Cilium enforcement for ALL pods in that namespace — both ingress AND egress become restricted. `kube-system` policies broke CoreDNS within seconds of apply. `argocd` policies blocked port-forward connections. `ingress-nginx` policies would break backend routing. Keep these three namespaces policy-free.
+- NetworkPolicy + Cilium: `Operation not permitted` on egress means Cilium is enforcing an egress policy that doesn't have an explicit allow for that destination. Multiple egress NetworkPolicies on the same pod union correctly — but every policy on a pod activates enforcement, so a pod with any egress policy needs ALL its required egress explicitly allowed.
+- CNPG instance pods need kube-apiserver egress (`allow-kube-apiserver-egress`) in addition to the operator — they call `https://10.96.0.1:443` directly to self-manage cluster state. Without it they crash with `dial tcp 10.96.0.1:443: i/o timeout` even when the CNPG operator namespace has no deny-all.
