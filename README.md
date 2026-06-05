@@ -1114,7 +1114,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Service | Namespace | URL | Managed by |
 |---|---|---|---|
 | Cilium | kube-system | - | ArgoCD |
-| Hubble UI | kube-system | https://hubble.yanatech.co.uk | ArgoCD |
+| Hubble UI | kube-system | https://hubble.yanatech.co.uk | ArgoCD (Authentik forward auth) |
 | Harbor | harbor | https://harbor.yanatech.co.uk | ArgoCD |
 | Actions Runner Controller | actions-runner | - | ArgoCD |
 | CloudNativePG | cnpg-system | - | ArgoCD |
@@ -1122,7 +1122,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | ESO | external-secrets | - | ArgoCD |
 | Infisical | infisical | https://infisical.yanatech.co.uk | ArgoCD |
 | KEDA | keda | - | ArgoCD |
-| Argo Rollouts | argo-rollouts | https://rollouts.yanatech.co.uk | ArgoCD |
+| Argo Rollouts | argo-rollouts | https://rollouts.yanatech.co.uk | ArgoCD (Authentik forward auth) |
 | Tempo | monitoring | - | ArgoCD |
 | Apicurio Registry | apicurio | https://apicurio.yanatech.co.uk | ArgoCD |
 | ingress-nginx | ingress-nginx | - | ArgoCD |
@@ -1139,7 +1139,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Kafka | kafka | - | ArgoCD |
 | Kafka UI | kafka | https://kafka-ui.yanatech.co.uk | ArgoCD |
 | Velero | velero | - | ArgoCD |
-| Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
+| Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD (Authentik forward auth) |
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
 | pgAdmin4 | pgadmin | https://pgadmin.yanatech.co.uk | ArgoCD |
 | Nextcloud | nextcloud | https://cloud.yanatech.co.uk | ArgoCD |
@@ -1276,10 +1276,11 @@ ArgoCD detects change → deploys to cluster
 - [x] Write ExternalSecret CRDs for all namespaces (done 2026-06-05 — 13 ExternalSecrets deployed, all syncing)
 - [x] Tempo distributed tracing (done 2026-06-05 — `infrastructure/tempo/`, single binary, 20Gi ceph-rbd, wired into Grafana)
 - [x] KEDA event-driven autoscaling (done 2026-06-05 — `infrastructure/keda/`, wave 3, CRDs: scaledobjects/scaledjobs/triggerauthentications)
-- [x] Argo Rollouts progressive delivery (done 2026-06-05 — `infrastructure/argo-rollouts/`, dashboard at `https://rollouts.yanatech.co.uk`)
+- [x] Argo Rollouts progressive delivery (done 2026-06-05 — `infrastructure/argo-rollouts/`, dashboard at `https://rollouts.yanatech.co.uk`, Authentik forward auth)
 - [x] NetworkPolicies baseline (done 2026-06-05 — `infrastructure/network-policies/`, default-deny-all per namespace except kube-system/ingress-nginx/argocd)
 - [x] Descheduler fix — `RemovePodsViolatingTopologySpreadConstraints` moved to correct extension point, schedule reduced to hourly (done 2026-06-05)
 - [x] Velero weekly schedule + exclude-namespaces (done 2026-06-05 — reduced B2 API calls, new namespaces covered automatically)
+- [x] Authentik forward auth for uptime-kuma, argo-rollouts, hubble-ui (done 2026-06-05)
 
 ---
 
@@ -1390,3 +1391,8 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - NetworkPolicy + Cilium: any NetworkPolicy applied to a pod (even just an ingress allow with broad `podSelector: {}`) activates full Cilium enforcement for ALL pods in that namespace — both ingress AND egress become restricted. `kube-system` policies broke CoreDNS within seconds of apply. `argocd` policies blocked port-forward connections. `ingress-nginx` policies would break backend routing. Keep these three namespaces policy-free.
 - NetworkPolicy + Cilium: `Operation not permitted` on egress means Cilium is enforcing an egress policy that doesn't have an explicit allow for that destination. Multiple egress NetworkPolicies on the same pod union correctly — but every policy on a pod activates enforcement, so a pod with any egress policy needs ALL its required egress explicitly allowed.
 - CNPG instance pods need kube-apiserver egress (`allow-kube-apiserver-egress`) in addition to the operator — they call `https://10.96.0.1:443` directly to self-manage cluster state. Without it they crash with `dial tcp 10.96.0.1:443: i/o timeout` even when the CNPG operator namespace has no deny-all.
+- Descheduler 0.36.0 on k8s 1.32: `RemovePodsViolatingTopologySpreadConstraints` does not exist in either `balance` or `deschedule` extension points — it was removed in this version. Moving it to `deschedule` causes `profile configures deschedule extension point of non-existing plugins` error. Remove it entirely; only `LowNodeUtilization` (balance) + `RemovePodsViolatingNodeAffinity` + `RemovePodsViolatingInterPodAntiAffinity` (deschedule) are valid.
+- Authentik forward auth added to: `status.yanatech.co.uk` (uptime-kuma, `apps/uptime-kuma/`), `rollouts.yanatech.co.uk` (argo-rollouts, `infrastructure/argo-rollouts/ak-outpost-svc.yaml` + Helm values annotations), `hubble.yanatech.co.uk` (cilium, `infrastructure/cilium/ak-outpost-svc.yaml` + Helm values annotations). Pattern: ExternalName Service + outpost Ingress in app namespace, auth annotations on main Ingress. Outpost pods auto-deploy to `authentik` namespace when applications are added to the Local Kubernetes outpost in Authentik UI.
+- Hubble UI forward auth + WebSocket: Authentik forward auth breaks Hubble's gRPC/WebSocket data streams (`Failed to fetch`, `Data streams are reconnecting`). Fix: add `nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"`, `proxy-http-version: "1.1"`, and `configuration-snippet` with `proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"` to the hubble-ui ingress annotations. These are set in `infrastructure/cilium/argocd-app-cilium.yaml` under `hubble.ui.ingress.annotations`.
+- ArgoCD permanent OutOfSync (cosmetic, all Healthy): `actions-runner-controller` (OCI registry limitation — permanent), `argo-rollouts` (cluster-scoped CRDs tracked twice by ArgoCD; `ignoreDifferences` + `RespectIgnoreDifferences=true` insufficient in ArgoCD 3.4), `infisical` (bundled nginx rendered by chart regardless of `enabled: false`; `Deployment infisical-infisical-standalone-infisical` drifts on every sync).
+- KEDA metrics apiserver (`v1beta1.external.metrics.k8s.io` APIService) requires an explicit ingress NetworkPolicy allowing ports 443/6443/8080 from anywhere — the kube-apiserver calls into it to serve HPA external metrics queries. Without `allow-metrics-apiserver-ingress` in the `keda` namespace, the APIService stays `FailedDiscoveryCheck` and ArgoCD marks the app Progressing indefinitely.
