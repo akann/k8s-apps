@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: ghcr.io/eshepelyuk/helm
     chart: apicurio-registry
-    targetRevision: "*"
+    targetRevision: "3.8.0"
     helm:
       valuesObject:
         registry:
@@ -22,19 +22,15 @@ spec:
           sql:
             url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
             username: apicurio
+            password: placeholder
           extraEnv:
-            - name: QUARKUS_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: apicurio-secret
-                  key: db-password
+            - name: REGISTRY_DATASOURCE_PASSWORD
+              value: placeholder
           ingress:
             enabled: true
             ingressClassName: nginx
             host: apicurio.yanatech.co.uk
             tls: true
-            annotations:
-              nginx.ingress.kubernetes.io/ssl-redirect: "true"
 
   ignoreDifferences:
     - group: networking.k8s.io
@@ -43,6 +39,12 @@ spec:
       namespace: apicurio
       jsonPointers:
         - /spec/tls
+    - group: apps
+      kind: Deployment
+      name: apicurio-apicurio-registry
+      namespace: apicurio
+      jsonPointers:
+        - /spec/template/spec/containers/0/env
 
   destination:
     server: https://kubernetes.default.svc
@@ -53,4 +55,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
