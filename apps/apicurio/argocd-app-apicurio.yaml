@@ -31,6 +31,15 @@ spec:
             tls: true
             annotations:
               nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+  ignoreDifferences:
+    - group: networking.k8s.io
+      kind: Ingress
+      name: apicurio-apicurio-registry
+      namespace: apicurio
+      jsonPointers:
+        - /spec/tls
+
   destination:
     server: https://kubernetes.default.svc
     namespace: apicurio
