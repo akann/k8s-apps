@@ -219,6 +219,12 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - port: 3001
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: authentik
+      ports:
+        - port: 3001
   egress:
     - {} # uptime-kuma probes all services — needs wide egress
 ---
