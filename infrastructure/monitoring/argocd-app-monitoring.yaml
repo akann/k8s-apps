@@ -41,6 +41,27 @@ spec:
               url: http://loki.monitoring.svc.cluster.local:3100
               access: proxy
               isDefault: false
+            - name: Tempo
+              type: tempo
+              url: http://tempo.monitoring.svc.cluster.local:3100
+              access: proxy
+              isDefault: false
+              jsonData:
+                httpMethod: GET
+                serviceMap:
+                  datasourceUid: prometheus
+                nodeGraph:
+                  enabled: true
+                lokiSearch:
+                  datasourceUid: loki
+                tracesToLogsV2:
+                  datasourceUid: loki
+                  spanStartTimeShift: "-1h"
+                  spanEndTimeShift: "1h"
+                  filterByTraceID: true
+                  filterBySpanID: false
+                tracesToMetrics:
+                  datasourceUid: prometheus
           ingress:
             enabled: true
             ingressClassName: nginx
