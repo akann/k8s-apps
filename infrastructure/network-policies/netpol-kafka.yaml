@@ -1,0 +1,162 @@
+---
+# kafka: Strimzi 1.0.0, KRaft mode, 3 dual-role brokers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kafka
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Kafka broker-to-broker communication (KRaft controller + replication)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-internal
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/kind: Kafka
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              strimzi.io/kind: Kafka
+      ports:
+        - port: 9090  # KRaft controller
+        - port: 9091  # broker replication
+        - port: 9092  # plaintext
+        - port: 9093  # TLS
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/kind: Kafka
+      ports:
+        - port: 9090
+        - port: 9091
+        - port: 9092
+        - port: 9093
+---
+# Kafka clients — allow ingress from any namespace (producers/consumers)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-clients
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/kind: Kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 9092
+        - port: 9093
+---
+# Kafka UI ingress from nginx
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-ui-ingress
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kafka-ui
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: authentik
+      ports:
+        - port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/kind: Kafka
+      ports:
+        - port: 9092
+        - port: 9093
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: authentik
+      ports:
+        - port: 9000
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Strimzi operator egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-strimzi-operator
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/kind: cluster-operator
+  policyTypes:
+    - Egress
+  egress:
+    - {} # operator manages Kafka CRDs cluster-wide
+---
+# Monitoring scrape
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: kafka
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9404  # Kafka JMX exporter metrics
+        - port: 8080
+---
+# Kafka egress — DNS only (brokers don't initiate outbound)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-egress
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/kind: Kafka
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

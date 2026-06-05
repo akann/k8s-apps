@@ -1,0 +1,153 @@
+---
+# kube-system: CoreDNS, Cilium, kube-proxy replacement, metrics-server, descheduler
+# Allow broad ingress/egress — system components need wide access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# CoreDNS — allow ingress on 53 from all namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-coredns-ingress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: kube-dns
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# CoreDNS — egress to upstream resolvers + kube-apiserver
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-coredns-egress
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: kube-dns
+  policyTypes:
+    - Egress
+  egress:
+    - {} # unrestricted — CoreDNS forwards to upstream resolvers
+---
+# Cilium agents — need wide access for eBPF dataplane management
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cilium-agents
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: cilium
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - {} # unrestricted — cilium agent needs health checks + hubble
+  egress:
+    - {} # unrestricted — cilium agent manages cluster-wide networking
+---
+# Hubble relay
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hubble-relay
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: hubble-relay
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 4245
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9965
+  egress:
+    - ports:
+        - port: 4244 # hubble peer port on nodes
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Hubble UI
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-hubble-ui
+  namespace: kube-system
+spec:
+  podSelector:
+    matchLabels:
+      k8s-app: hubble-ui
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8081
+  egress:
+    - ports:
+        - port: 4245 # hubble relay
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Descheduler, metrics-server, other system components — allow monitoring scrape
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: kube-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 10250 # kubelet
+        - port: 10255
+        - port: 9100  # node-exporter
+        - port: 9090
+        - port: 8080
+        - port: 8081
+        - port: 9965  # hubble metrics
