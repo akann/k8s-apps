@@ -95,6 +95,7 @@ Each host: 16 vCPUs, 64GB RAM, 8GB Swap
 | VMID | Name | Notes |
 |---|---|---|
 | 9000 | ubuntu-2404-template | Main template — disks on rbd, cloudinit on rbd |
+| 901 | ubuntu-24-template | Older template |
 
 ### Template Configuration (9000)
 - OS: Ubuntu 24.04
@@ -192,7 +193,7 @@ pvesh get /cluster/resources --type vm
 | Component | Version/Details |
 |---|---|
 | Container runtime | containerd |
-| CNI | Flannel |
+| CNI | Cilium 1.17.3 (native routing, kube-proxy replacement, Hubble enabled) |
 | Ceph CSI | ceph-csi-rbd (namespace: ceph-csi-rbd) |
 | Default StorageClass | ceph-rbd |
 | Load balancer | MetalLB |
@@ -209,8 +210,11 @@ pvesh get /cluster/resources --type vm
 | Config auto-reload | Stakater Reloader |
 | Node reboots | Kured 1.22.0 |
 | Push notifications | Gotify 2.6.3 |
-| Photo library | Immich v2.6.3 |
+| Photo library | Immich — removed, pending fresh deploy with CNPG vchord support |
 | Resource recommendations | Goldilocks v4.14.1 |
+| Database | CloudNativePG 1.29.1 (pg-main: 3-instance PG18 cluster) |
+| CI runners | Actions Runner Controller (gha-runner-scale-set 0.9.3) |
+| Container registry | Harbor v2.15.1 |
 | Pod rebalancing | Descheduler 0.36.0 |
 
 ### kubectl Access
@@ -221,10 +225,30 @@ kubectl get nodes
 
 ---
 
+## Cilium (CNI)
+
+Replaced Flannel on 2026-06-04. Runs in native routing mode leveraging the existing flat L2 network (`192.168.22.0/24`) between all k8s VMs via `vmbr0`.
+
+- **Version:** 1.17.3
+- **Mode:** Native routing (no VXLAN/overlay)
+- **kube-proxy:** fully replaced by Cilium eBPF
+- **Interface:** `eth0` on all k8s nodes
+- **Pod CIDR:** `10.244.0.0/16` (IPAM: cluster-pool)
+- **k8s API:** `192.168.22.21:6443` (cp-1 direct — no kube-vip VIP)
+- **Namespace:** `kube-system`
+- **Manifest:** `infrastructure/cilium/argocd-app-cilium.yaml`
+
+### Hubble (traffic visibility)
+- **URL:** `https://hubble.yanatech.co.uk`
+- Relay connected to all 6 nodes on port 4244
+- UI ingress via ingress-nginx + `wildcard-yanatech-tls`
+
+---
+
 ## Networking
 
 ### MetalLB
-- **IP Pool:** `192.168.22.200 - 192.168.22.220` (pool name: `k8s-pool`)
+- **IP Pool:** `192.168.22.200 - 192.168.22.249` (pool name: `k8s-pool`, 50 IPs)
 - **Mode:** L2Advertisement
 - **Ingress VIP:** `192.168.22.200` (ingress-nginx)
 
@@ -317,81 +341,74 @@ infrastructure/loki/argocd-app-promtail.yaml
 
 ---
 
-## PostgreSQL (Shared Database VM)
+## PostgreSQL (CloudNativePG)
 
-Dedicated Proxmox VM for app databases that must survive a Kubernetes cluster rebuild (Vaultwarden, Authentik) plus any future apps needing Postgres (e.g. Nextcloud). Lives outside k8s on purpose — a cluster teardown can't take the credential/identity data with it.
+**pg1 (VM 110) decommissioned 2026-06-04.** All databases now run in-cluster via CloudNativePG (CNPG). CNPG provides streaming replication, automatic failover, and Barman WAL archiving to Backblaze B2.
 
-### VM
+### pg-main Cluster
 
-| VMID | Name | Host | IP | vCPU | RAM | Disk |
-|---|---|---|---|---|---|---|
-| 110 | postgres-1 | pve1 (HA-managed, can run on any node) | 192.168.22.40 | 2 | 8GB | 20GB on `rbd` |
+- **Namespace:** `cnpg-clusters`
+- **Instances:** 3 (primary on pg-main-1, standbys on pg-main-2/3, one per worker node)
+- **Image:** `ghcr.io/cloudnative-pg/postgresql:18` (standard — no custom extensions needed for current databases)
+- **Storage:** 50Gi ceph-rbd per instance
+- **CNPG operator:** `cnpg-system` namespace, chart `cloudnative-pg` v1.29.1
+- **Manifest:** `infrastructure/cnpg-clusters/`
 
-- Cloned full from template 9000; CPU type `host`; `vmbr0`, no VLAN tag
-- Cloud-init: `--cicustom "user=local:snippets/postgres-init.yaml"`
-- Disk is thin-provisioned on Ceph and grows online: `qm resize 110 scsi0 +Ng` → `growpart /dev/sda 1` → `resize2fs /dev/sda1`
-- HA enabled: `ha-manager add vm:110 --state started --max_restart 3`
+### Services
 
-### Cloud-init Snippet (`/var/lib/vz/snippets/postgres-init.yaml`)
-Must be copied to all three nodes (node-local storage). Installs PostgreSQL 18 from the PGDG repo.
-```yaml
-#cloud-config
-package_update: true
-package_upgrade: true
-packages:
-  - qemu-guest-agent
-  - curl
-  - ca-certificates
-  - gnupg
-users:
-  - name: ubuntu
-    lock_passwd: false
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    ssh_authorized_keys:
-      - <pve1 root ssh key>
-chpasswd:
-  expire: false
-  users:
-    - {name: ubuntu, password: ubuntu, type: text}
-ssh_pwauth: true
-preserve_hostname: false
-runcmd:
-  - systemctl enable --now qemu-guest-agent
-  - install -d /usr/share/postgresql-common/pgdg
-  - curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-  - sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-  - apt-get update
-  - apt-get install -y postgresql-18
-```
-
-### PostgreSQL Config
-
-- **Version:** 18.4 (PGDG repo, `noble-pgdg`)
-- Config dir: `/etc/postgresql/18/main/`
-- Tuning drop-in `conf.d/tuning.conf`: `listen_addresses = '*'`, `shared_buffers 2GB`, `effective_cache_size 6GB`, `maintenance_work_mem 512MB`, `work_mem 16MB`, `max_connections 200`, `wal_compression on`
-- LAN access via `pg_hba.conf`: `host all all 192.168.22.0/24 scram-sha-256`
+| Service | FQDN | Purpose |
+|---|---|---|
+| pg-main-rw | `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` | Primary (read/write) — all apps connect here |
+| pg-main-ro | `pg-main-ro.cnpg-clusters.svc.cluster.local:5432` | Read-only replicas |
+| pg-main-r | `pg-main-r.cnpg-clusters.svc.cluster.local:5432` | Any instance |
 
 ### Databases / Roles
 
 | Database | Owner role | Used by |
 |---|---|---|
-| vaultwarden | vaultwarden | Vaultwarden ✅ live (migrated from Authentik's PG 2026-05-31) |
-| authentik | authentik | Authentik ✅ live (migrated 2026-05-31; bundled PG kept as rollback) |
-| nextcloud | nextcloud | Nextcloud ✅ live (2026-06-02) |
-| immich | immich | Immich ✅ live (2026-06-02) |
+| vaultwarden | vaultwarden | Vaultwarden ✅ (migrated from pg1 2026-06-04) |
+| authentik | authentik | Authentik ✅ (migrated from pg1 2026-06-04) |
+| nextcloud | nextcloud | Nextcloud ✅ (migrated from pg1 2026-06-04) |
 
-- Role passwords (scram-sha-256) stored in Vaultwarden
-- **`vaultwarden` role password must ALSO live outside Vaultwarden** (bootstrap secret manifest) — otherwise a cold rebuild is a circular-dependency lockout
-- **pgvector + VectorChord installed** for Immich ML features: `postgresql-18-pgvector` (0.8.2) from PGDG APT, VectorChord 1.1.1 `.deb` from GitHub. `shared_preload_libraries = 'vchord.so'` set in postgresql.conf. Extensions `cube`, `earthdistance`, `vector`, `vchord` must be created in the `immich` database as superuser before Immich starts
+- Role passwords stored in Vaultwarden
+- Immich removed 2026-06-04 — pending fresh deploy once CNPG vchord/GLIBC issue resolved
 
-### Backups
+### Backups (Barman → Backblaze B2)
 
-- **Not covered by Velero** (that's k8s-namespace only). DB-level dumps are the safety net against logical corruption.
-- `/usr/local/bin/pg-backup.sh`: nightly `pg_dumpall | gzip` → Backblaze B2 (`b2:yanatech-pg/`) via rclone, 7-day local retention in `/var/backups/pg`
-- Cron: `/etc/cron.d/pg-backup`, daily 02:30 ✅ live (verified 2026-06-01)
-- rclone configured at `/root/.config/rclone/rclone.conf` (runs as root via cron) — B2 key scoped to `yanatech-pg` bucket, stored in Vaultwarden
-- Also copy config to ubuntu home if needed: `sudo cp /root/.config/rclone/rclone.conf ~/.config/rclone/rclone.conf`
+- **Bucket:** `yanatech-cnpg`
+- **Endpoint:** `https://s3.eu-central-003.backblazeb2.com`
+- **WAL archiving:** continuous, gzip compressed
+- **Base backups:** scheduled daily at 02:00 via `ScheduledBackup` CRD
+- **Retention:** 7 days
+- **B2 credentials:** `cnpg-b2-credentials` secret in `cnpg-clusters` namespace (stored in Vaultwarden as `cnpg-b2-credentials`)
+
+### Bootstrap prerequisites (manually created, not in git)
+```bash
+kubectl create namespace cnpg-clusters
+
+kubectl create secret generic cnpg-b2-credentials \
+  --namespace cnpg-clusters \
+  --from-literal=ACCESS_KEY_ID='<keyID>' \
+  --from-literal=ACCESS_SECRET_KEY='<applicationKey>'
+
+kubectl create secret docker-registry harbor-pull-secret \
+  --namespace cnpg-clusters \
+  --docker-server=harbor.yanatech.co.uk \
+  --docker-username='robot$cnpg-pull' \
+  --docker-password='<robot-secret>'
+
+# After cluster is up, create roles and databases:
+kubectl exec -it -n cnpg-clusters pg-main-1 -- psql -U postgres
+# CREATE ROLE vaultwarden WITH LOGIN PASSWORD '...';
+# CREATE ROLE authentik WITH LOGIN PASSWORD '...';
+# CREATE ROLE nextcloud WITH LOGIN PASSWORD '...';
+# CREATE DATABASE vaultwarden OWNER vaultwarden;
+# CREATE DATABASE authentik OWNER authentik;
+# CREATE DATABASE nextcloud OWNER nextcloud;
+```
+
+### Cloud-init Snippet (historical — pg1 decommissioned 2026-06-04)
+Retained for reference only. pg1 was VM 110 (192.168.22.40), PostgreSQL 18.4, HA-managed on pve1.
 
 ---
 
@@ -434,7 +451,7 @@ Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, a
 - **Auth:** Authentik SSO (OAuth2) + internal fallback (`admin@yanatech.co.uk` / `pgadmin`)
 - **OAuth2 credentials:** `pgadmin-oauth-secret` in `pgadmin` namespace (stored in Vaultwarden)
 - **Config:** `config_local.py` mounted via ConfigMap `pgadmin-config-local` in `pgadmin` namespace
-- **Connected to:** pg1 (`192.168.22.40`) — `vaultwarden` and `authentik` databases
+- **Connected to:** CNPG pg-main (`pg-main-rw.cnpg-clusters.svc.cluster.local`) — vaultwarden, authentik, nextcloud databases
 
 ### Bootstrap prerequisites (manually created, not in git)
 ```bash
@@ -713,10 +730,116 @@ kubectl rollout restart deployment/velero -n velero
 
 ---
 
+## Harbor (Private Container Registry)
+
+Private container registry for all homelab and product images. Replaces `ghcr.io` for product microservices — all CI builds push here.
+
+- **Namespace:** `harbor`
+- **Version:** v2.15.1
+- **URL:** `https://harbor.yanatech.co.uk`
+- **Helm chart:** `harbor/harbor` from `https://helm.goharbor.io`
+- **Auth:** Authentik OIDC + local admin fallback
+- **Manifest:** `infrastructure/harbor/argocd-app-harbor.yaml`
+- **Credentials secret:** `harbor-secret` in `harbor` namespace (stored in Vaultwarden)
+
+### Storage (ceph-rbd PVCs)
+
+| PVC | Size | Purpose |
+|---|---|---|
+| registry | 100Gi | Image blob storage |
+| database | 10Gi | Internal PostgreSQL |
+| jobservice | 10Gi | Job logs |
+| redis | 5Gi | Cache |
+| trivy | 10Gi | Vulnerability scan cache |
+
+### Projects
+
+| Project | Access | Purpose |
+|---|---|---|
+| library | Public | Default Harbor project |
+| infra | Private | CNPG custom image, internal tools |
+| yana-forex | Private | Forex platform microservice images |
+| yana-ecommerce | Private | E-commerce microservice images |
+
+### Authentik OIDC
+
+- Slug: `harbor`
+- Redirect URI: `https://harbor.yanatech.co.uk/c/oidc/callback`
+- Scopes: `openid`, `profile`, `email`
+- OIDC endpoint: `https://auth.yanatech.co.uk/application/o/harbor/`
+- Auto-onboard: enabled (`oidc_auto_onboard: true`)
+- Admin group: `authentik Admins`
+- OIDC credentials: stored in Vaultwarden as `harbor-oidc`
+
+### Bootstrap prerequisites (manually created, not in git)
+```bash
+kubectl create namespace harbor
+
+kubectl create secret generic harbor-secret \
+  --namespace harbor \
+  --from-literal=HARBOR_ADMIN_PASSWORD='<admin-password>' \
+  --from-literal=HARBOR_SECRET_KEY='<secret-key>' \
+  --from-literal=secretKey='<secret-key>'
+```
+
+Note: `secretKey` and `HARBOR_SECRET_KEY` must both be present with the same value — the chart mounts `secretKey` as a file volume and reads `HARBOR_ADMIN_PASSWORD` as an env var. Missing either key causes harbor-core to fail to start.
+
+### Direct admin login URL
+`https://harbor.yanatech.co.uk/account/sign-in?redirect_url=/harbor/projects` — use this when OIDC is the default auth mode and you need to log in as `admin`.
+
+---
+
+## Actions Runner Controller (CI on-LAN)
+
+Self-hosted GitHub Actions runners running inside the cluster. Builds happen on-LAN and push directly to Harbor. Uses the new ARC (gha-runner-scale-set) not the legacy summerwind ARC.
+
+- **Namespace:** `actions-runner`
+- **Controller chart:** `gha-runner-scale-set-controller` from `oci://ghcr.io/actions/actions-runner-controller-charts` (version 0.9.3)
+- **Runner chart:** `gha-runner-scale-set` from same OCI registry
+- **Manifest:** `infrastructure/actions-runner/`
+- **PAT secret:** `github-pat` in `actions-runner` namespace (stored in Vaultwarden as `github-actions-runner-pat`)
+
+### Runner Sets
+
+| Runner Set | Repo | Min | Max | Listener |
+|---|---|---|---|---|
+| runners-k8s-apps | akann/k8s-apps | 0 | 4 | Running |
+| runners-yana-forex | akann/yana-forex | 0 | 4 | Running |
+| runners-yana-ecommerce | akann/yana-ecommerce | 0 | 4 | Running |
+
+- Runners scale from 0 → max on job queue, back to 0 when idle
+- Each runner: 1-2 CPU, 2-4Gi RAM, scheduled on workers only
+- `controllerServiceAccount.name: actions-runner-controller-gha-rs-controller` must be set explicitly in each runner set — auto-discovery fails
+
+### Bootstrap prerequisites
+```bash
+kubectl create namespace actions-runner
+
+kubectl create secret generic github-pat \
+  --namespace actions-runner \
+  --from-literal=github_token='<PAT from Vaultwarden>'
+```
+
+### Using runners in workflows
+```yaml
+# .github/workflows/build.yaml
+jobs:
+  build:
+    runs-on: runners-k8s-apps   # matches runner set name
+```
+
+---
+
 ## Installed Services
 
 | Service | Namespace | URL | Managed by |
 |---|---|---|---|
+| Cilium | kube-system | - | ArgoCD |
+| Hubble UI | kube-system | https://hubble.yanatech.co.uk | ArgoCD |
+| Harbor | harbor | https://harbor.yanatech.co.uk | ArgoCD |
+| Actions Runner Controller | actions-runner | - | ArgoCD |
+| CloudNativePG | cnpg-system | - | ArgoCD |
+| CNPG pg-main cluster | cnpg-clusters | - | ArgoCD |
 | ingress-nginx | ingress-nginx | - | ArgoCD |
 | MetalLB | metallb-system | - | ArgoCD |
 | cert-manager | cert-manager | - | ArgoCD |
@@ -735,7 +858,6 @@ kubectl rollout restart deployment/velero -n velero
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
 | pgAdmin4 | pgadmin | https://pgadmin.yanatech.co.uk | ArgoCD |
 | Nextcloud | nextcloud | https://cloud.yanatech.co.uk | ArgoCD |
-| Immich | immich | https://photos.yanatech.co.uk | ArgoCD |
 | Gotify | gotify | https://gotify.yanatech.co.uk | ArgoCD |
 | Reloader | reloader | - | ArgoCD |
 | Kured | kured | - | ArgoCD |
@@ -814,7 +936,9 @@ bash bootstrap.sh
 | `pgadmin-oauth-secret` | pgadmin | Authentik OAuth2 OAUTH2_CLIENT_ID + OAUTH2_CLIENT_SECRET |
 | `nextcloud-secret` | nextcloud | nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password |
 | `gotify-secret` | gotify | admin-password |
-| `immich-secret` | immich | db-url (`postgresql://immich:<password>@192.168.22.40:5432/immich`) |
+| `immich-secret` | immich | db-url (`postgresql://immich:<password>@pg-main-rw.cnpg-clusters.svc.cluster.local:5432/immich`) — for when Immich is redeployed |
+| `cnpg-b2-credentials` | cnpg-clusters | ACCESS_KEY_ID, ACCESS_SECRET_KEY (Backblaze B2 bucket yanatech-cnpg) |
+| `harbor-pull-secret` | cnpg-clusters | docker-registry secret for harbor.yanatech.co.uk (robot$cnpg-pull) |
 
 ### yanatech CI/CD Pipeline
 ```
@@ -834,19 +958,27 @@ ArgoCD detects change → deploys to cluster
 ## Pending / TODO
 
 - [x] Dedicated PostgreSQL VM on Proxmox for shared database (VM 110 — see PostgreSQL section)
-- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — OIDC refresh token not stored, running with token auth), pgAdmin4 ✅ (done 2026-06-01), Nextcloud ✅ (done 2026-06-02), Immich ✅ (done 2026-06-02)
-- [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to pg1 at 192.168.22.40)
+- [x] Authentik SSO integration: Grafana ✅ (done 2026-05-31), ArgoCD ✅ (done 2026-06-01), Headlamp ⏳ (blocked by upstream Headlamp bug — OIDC refresh token not stored, running with token auth), pgAdmin4 ✅ (done 2026-06-01), Nextcloud ✅ (done 2026-06-02), Harbor ✅ (done 2026-06-04)
+- [x] pgAdmin4 deployment with Authentik SSO (done 2026-06-01 — `apps/pgadmin/`, connected to CNPG pg-main)
 - [x] Loki + Promtail log aggregation (done 2026-06-01 — `infrastructure/loki/`, wired into Grafana)
-- [x] Nextcloud (done 2026-06-02 — `apps/nextcloud/`, on pg1 + ceph-rbd, accessible at `https://cloud.yanatech.co.uk`)
+- [x] Nextcloud (done 2026-06-02 — `apps/nextcloud/`, on CNPG pg-main + ceph-rbd, accessible at `https://cloud.yanatech.co.uk`)
 - [x] Gotify push notifications + Alertmanager integration (done 2026-06-02 — `apps/gotify/`, bridge at `alertmanager-gotify-bridge`)
 - [x] Stakater Reloader (done 2026-06-02 — `infrastructure/reloader/`, watching all namespaces)
 - [x] Kured automatic node reboots (done 2026-06-02 — `infrastructure/kured/`, window 04:00-06:00 Europe/London)
 - [x] Goldilocks resource recommendations (done 2026-06-03 — `infrastructure/goldilocks/`, dashboard at `https://goldilocks.yanatech.co.uk`)
 - [x] Descheduler pod rebalancing (done 2026-06-03 — `infrastructure/descheduler/`, runs every 5 minutes)
-- [x] Move Vaultwarden database to dedicated PostgreSQL VM (done 2026-05-31 — now on VM 110; old DB dropped from Authentik's PG, final dump kept on cp-1)
-- [x] Move Authentik database to VM 110 (done 2026-05-31 — bundled Bitnami PG disabled 2026-06-02, plaintext password removed from git)
+- [x] Move Vaultwarden database to CNPG (done 2026-06-04 — migrated from pg1 to pg-main-rw.cnpg-clusters)
+- [x] Move Authentik database to CNPG (done 2026-06-04 — migrated from pg1 to pg-main-rw.cnpg-clusters)
+- [x] Move Nextcloud database to CNPG (done 2026-06-04 — migrated from pg1 to pg-main-rw.cnpg-clusters)
+- [x] Decommission pg1 VM 110 (done 2026-06-04 — all databases migrated, VM destroyed)
 - [ ] Headlamp SSO — revisit when Headlamp 0.43.0+ ships with OIDC refresh token fix
-- [x] Immich self-hosted photo library (done 2026-06-02 — `apps/immich/`, on pg1 + ceph-rbd, accessible at `https://photos.yanatech.co.uk`)
+- [ ] Immich — removed 2026-06-04, pending fresh deploy. Blocked by: CNPG vchord GLIBC issue (vchord 1.1.1 requires GLIBC_2.33, CNPG bootstrap uses GLIBC_2.31 Bullseye). Resolution: use CNPG 1.29 Image Catalog or build bookworm-based custom image correctly.
+- [x] Cilium CNI (done 2026-06-04 — replaced Flannel, native routing mode, kube-proxy removed, Hubble enabled at `https://hubble.yanatech.co.uk`)
+- [x] MetalLB pool expanded (done 2026-06-04 — `192.168.22.200-249`, 50 IPs)
+- [x] Sync-wave annotations on all ArgoCD apps + bootstrap.sh ordering by wave (done 2026-06-04)
+- [x] Harbor private container registry (done 2026-06-04 — `infrastructure/harbor/`, Authentik OIDC, projects: infra/yana-forex/yana-ecommerce)
+- [x] Actions Runner Controller (done 2026-06-04 — `infrastructure/actions-runner/`, runner sets for k8s-apps/yana-forex/yana-ecommerce, scale 0→4)
+- [x] CloudNativePG operator + pg-main cluster (done 2026-06-04 — `infrastructure/cnpg/`, 3-instance PG18, Barman B2 backups)
 
 ---
 
@@ -894,7 +1026,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Wildcard TLS secret must exist in each namespace — Reflector handles this automatically
 - pfSense web UI must not use port 443 on `62.3.101.138` (conflicts with K8s ingress)
 - Authentik requires PostgreSQL and Redis — both enabled via Helm values
-- ArgoCD v3.4 does not support app-of-apps via directory source for Application resources — use bootstrap.sh instead
+- ArgoCD v3.4 does not support app-of-apps via directory source for Application resources — bootstrap.sh enumerates all apps explicitly grouped by sync-wave (0-7). Wave order matches dependency chain (metallb/ceph-csi → cilium/cert-manager/ingress → config → cluster-ops → platform → observability → foundational apps → all apps). ApplicationSet migration planned as a dedicated session.
 - MetalLB IP pool name is `k8s-pool` (not `default-pool`)
 - Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB dropped from Authentik's PG 2026-05-31 — final pre-drop dump retained on cp-1
 - Vaultwarden Deployment must use `strategy: { type: Recreate }`. Its `/data` PVC is RWO on ceph-rbd, so the default RollingUpdate deadlocks on restart — the new pod can't mount the volume while the old pod holds it (Multi-Attach), leaving the rollout stuck. If it ever deadlocks, `scale --replicas=0` (wait for both pods gone) then `--replicas=1`
@@ -904,7 +1036,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Loading an Authentik dump into a fresh DB needs a SUPERUSER (the dump has `CREATE EXTENSION` + materialized views a plain LOGIN role can't create, and `ON_ERROR_STOP` aborts the whole load on the first one). Temporarily `ALTER ROLE authentik SUPERUSER` on VM 110 for the load, then `NOSUPERUSER`
 - Strimzi 1.0.0 only supports Kafka 4.x — do not use 3.x versions
 - kube-prometheus-stack Helm release name is `kube-prometheus-stack` (set via releaseName in ArgoCD app)
-- `bootstrap.sh` enumerates every ArgoCD Application explicitly (no globbing) — a new app needs BOTH its `argocd-app-<name>.yaml` committed AND a matching `kubectl apply` line in `bootstrap.sh`, or it won't deploy on a fresh cluster (this gap previously hit authentik, velero, uptime-kuma)
+- `bootstrap.sh` enumerates every ArgoCD Application explicitly grouped by sync-wave — a new app needs BOTH its `argocd-app-<name>.yaml` committed AND a matching `kubectl apply` line in the correct wave section of `bootstrap.sh`, or it won't deploy on a fresh cluster
 - ArgoCD does NOT honor Helm's `crds.keep` / `helm.sh/resource-policy: keep` annotation when pruning — deleting a CRD-bearing Application (cert-manager, metallb, etc.) can cascade-delete its CRDs and all dependent resources. Don't delete those Applications directly; `crds.keep: true` only protects against `helm uninstall`
 - cert-manager operator is ArgoCD-managed via the jetstack chart (was a manual `helm install` until migrated) — the `cert-manager` app must apply before `cert-manager-config` so CRDs exist before the ClusterIssuer; bootstrap.sh orders them correctly, and the config app self-heals if it races ahead
 - ArgoCD can show a permanent `OutOfSync` (app still Healthy) when the kube-apiserver defaults a field the Helm chart doesn't template — e.g. `hostUsers: true` on Deployments (v1.32 user-namespace defaulting). It's cosmetic, not real drift; a sync won't fix it because the apiserver re-adds the field. Fix with an `ignoreDifferences` entry on that jsonPointer (see `infrastructure/headlamp/argocd-app-headlamp.yaml` → `/spec/template/spec/hostUsers` for the pattern)
@@ -930,3 +1062,19 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Immich chart (0.10.0+): postgresql subchart removed — omit `postgresql:` key entirely from values (setting `enabled: false` triggers a template error). DB connection via `DB_URL` env var under `server.controllers.main.containers.main.env`. Extensions `cube` and `earthdistance` require superuser — must be pre-created in the immich database before first start or migrations fail with `permission denied to create extension`
 - Authentik forward auth pattern for nginx ingress: requires a **standalone outpost deployment** (not the embedded outpost) — the embedded outpost does not serve `/outpost.goauthentik.io/auth/nginx`. Create a new Proxy Provider (Forward auth, single application) + Application + dedicated Outpost (Local Kubernetes Cluster) in Authentik UI; Authentik auto-deploys the outpost pod and service (`ak-outpost-<name>`) in the `authentik` namespace. Then: (1) add `auth-url`, `auth-signin`, `auth-response-headers`, `auth-snippet` (with `proxy_set_header X-Original-URL`) annotations to the app ingress; (2) create an ExternalName Service in the app namespace pointing to the outpost; (3) create a second ingress routing `/outpost.goauthentik.io` to the outpost ExternalName service. `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` must be set in ingress-nginx values
 - ingress-nginx snippet annotations: `allowSnippetAnnotations: true` enables `nginx.ingress.kubernetes.io/auth-snippet` and `configuration-snippet`. `annotations-risk-level: Critical` is required when combining `auth-snippet` with `auth-url` — without it the admission webhook blocks the ingress with "risky annotation" error
+- Cilium native routing mode: all k8s nodes on `192.168.22.0/24` flat L2 via `vmbr0` on Proxmox — no BGP integration needed, direct routing between nodes on same subnet. kube-proxy fully replaced by Cilium eBPF. Flannel `cni0`/`flannel.1` interfaces removed from all nodes during migration. Hubble relay connects to all 6 nodes on port 4244.
+- When draining nodes during maintenance, Kafka and ingress-nginx PDBs will block eviction — delete them before draining: `kubectl delete pdb -n kafka kafka-cluster-kafka kafka-cluster-entity-operator` and `kubectl delete pdb -n ingress-nginx ingress-nginx-controller`. Strimzi and ArgoCD recreate them automatically after pods reschedule.
+- After a CNI migration or node drain, pods with stale IPs (from previous CNI) will CrashLoopBackOff on liveness/readiness probes — fix with `kubectl rollout restart daemonset/<name>` to get fresh IPs. Kured was affected by this after the Flannel→Cilium migration.
+- Harbor v2.15.1 secret key trap: the chart mounts `secretKey` (exact key name) from the secret as a file volume for the core encryption key — `existingSecretSecretKeyKey` in Helm values does NOT override this mount. The secret must contain BOTH `HARBOR_ADMIN_PASSWORD` (env var) AND `secretKey` (file mount) as separate keys with the same secret-key value. If harbor-core fails with `references non-existent secret key: secretKey`, the secret is missing the `secretKey` key.
+- Harbor database initialises with `HARBOR_ADMIN_PASSWORD` from the secret on **first boot only** — if the secret was wrong/empty during first boot, the password is baked into the DB. Fix: scale all Harbor deployments to 0, delete the `database-data-harbor-database-0` PVC, scale back up to let it reinitialise with the correct secret.
+- Harbor OIDC + admin fallback: once OIDC auth mode is enabled, the main login page redirects to Authentik. To log in as local `admin`, use the direct URL: `https://harbor.yanatech.co.uk/account/sign-in?redirect_url=/harbor/projects`
+- Harbor `notary` is disabled (`notary.enabled: false`) — deprecated in v2.15+ and removed in future versions. Do not enable it.
+- Actions Runner Controller (new ARC): use OCI registry `ghcr.io/actions/actions-runner-controller-charts` not the legacy HTTP repo `actions-runner-controller.github.io/actions-runner-controller`. The legacy summerwind ARC uses `RunnerDeployment` CRDs which no longer install correctly — use `gha-runner-scale-set-controller` + `gha-runner-scale-set` charts only.
+- ARC with ArgoCD: OCI Helm charts show `Unknown` sync status permanently — this is a known ArgoCD limitation with OCI registries, not a real error. Apps are Healthy despite the Unknown sync status.
+- ARC controller CRDs (`AutoscalingRunnerSet.actions.github.com` etc.) require `ServerSideApply=true` and `Replace=true` in ArgoCD syncOptions — without these the CRDs fail to install and the controller CrashLoopBackOffs with `no matches for kind "AutoscalingRunnerSet"`.
+- ARC runner sets require `controllerServiceAccount.name: actions-runner-controller-gha-rs-controller` set explicitly in values — auto-discovery via label `app.kubernetes.io/part-of=gha-rs-controller` fails when installed via ArgoCD and causes `No gha-rs-controller deployment found` error during helm template rendering.
+- CNPG `spec.postgresql.parameters.shared_preload_libraries` is blocked by the admission webhook (`Can't set fixed configuration parameter`) — use `spec.postgresql.shared_preload_libraries` (list field) instead.
+- CNPG superuser secret is named `pg-main-app` (not `pg-main-superuser`) — contains the `app` user, not postgres superuser. Access postgres superuser via `kubectl exec -it -n cnpg-clusters pg-main-1 -- psql -U postgres`.
+- CNPG + vchord 1.1.1 GLIBC issue: vchord 1.1.1 requires GLIBC_2.33 but the CNPG bootstrap-controller init container runs on Debian Bullseye (GLIBC 2.31). Neither the tensorchord/vchord-scratch approach nor tensorchord/vchord-postgres image resolves this — the init container itself is Bullseye-based. Fix requires either: (1) CNPG 1.29 Image Catalog feature, or (2) a vchord build targeting GLIBC 2.31, or (3) waiting for CNPG to ship a Bookworm-based bootstrap image.
+- Nextcloud stores the DB host in `config.php` on the PVC in addition to env vars — patching the k8s secret and ArgoCD app values is insufficient. Must also `sed` the `dbhost` value in `/var/www/html/config/config.php` directly, then delete the pod to pick it up cleanly.
+- CNPG Barman Cloud deprecation: native Barman Cloud backup support is deprecated in CNPG 1.29 and will be removed in 1.30. Plan to migrate to the Barman Cloud Plugin before upgrading to 1.30.
