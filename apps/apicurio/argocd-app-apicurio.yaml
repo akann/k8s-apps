@@ -22,10 +22,7 @@ spec:
           sql:
             url: jdbc:postgresql://pg-main-rw.cnpg-clusters.svc.cluster.local:5432/apicurio
             username: apicurio
-            password: placeholder
-          extraEnv:
-            - name: REGISTRY_DATASOURCE_PASSWORD
-              value: placeholder
+            password: eAZ5btVb7c833m
           ingress:
             enabled: true
             ingressClassName: nginx
@@ -39,12 +36,6 @@ spec:
       namespace: apicurio
       jsonPointers:
         - /spec/tls
-    - group: apps
-      kind: Deployment
-      name: apicurio-apicurio-registry
-      namespace: apicurio
-      jsonPointers:
-        - /spec/template/spec/containers/0/env
 
   destination:
     server: https://kubernetes.default.svc
