@@ -14,7 +14,7 @@ spec:
     helm:
       releaseName: descheduler
       valuesObject:
-        schedule: "*/5 * * * *"
+        schedule: "0 * * * *"
         deschedulerPolicy:
           profiles:
             - name: default
@@ -26,12 +26,12 @@ spec:
               plugins:
                 balance:
                   enabled:
-                    - RemovePodsViolatingTopologySpreadConstraints
                     - LowNodeUtilization
                 deschedule:
                   enabled:
                     - RemovePodsViolatingNodeAffinity
                     - RemovePodsViolatingInterPodAntiAffinity
+                    - RemovePodsViolatingTopologySpreadConstraints
         resources:
           requests:
             cpu: 50m

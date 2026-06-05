@@ -37,20 +37,26 @@ spec:
               - mountPath: /target
                 name: plugins
         schedules:
-          daily-backup:
-            schedule: "0 2 * * *"
+          weekly-backup:
+            schedule: "0 2 * * 0"
             template:
               ttl: 720h
-              includedNamespaces:
-                - vaultwarden
-                - authentik
-                - monitoring
-                - kafka
-                - ingress-nginx
-                - cert-manager
-                - argocd
-                - nextcloud
-                - pgadmin
+              excludedNamespaces:
+                - kube-system
+                - kube-public
+                - kube-node-lease
+                - default
+                - cilium-secrets
+                - metallb-system
+                - ceph-csi-rbd
+                - cnpg-system
+                - external-secrets
+                - reloader
+                - kured
+                - goldilocks
+                - keda
+                - argo-rollouts
+                - immich
         snapshotsEnabled: false
   destination:
     server: https://kubernetes.default.svc
