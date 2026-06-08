@@ -30,6 +30,18 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: cnpg-clusters
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: immich
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -79,7 +91,6 @@ spec:
     - Ingress
     - Egress
 ---
-# Allow CNPG operator to manage cluster instances
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -95,7 +106,6 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: cnpg-system
 ---
-# CNPG pods need kube-apiserver egress to self-manage
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -115,7 +125,6 @@ spec:
         - port: 53
           protocol: TCP
 ---
-# PostgreSQL — accept connections from all app namespaces
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -177,7 +186,6 @@ spec:
       ports:
         - port: 5432
 ---
-# CNPG streaming replication between instances
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -205,7 +213,6 @@ spec:
       ports:
         - port: 5432
 ---
-# CNPG Barman WAL archiving — egress to Backblaze B2
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -226,7 +233,6 @@ spec:
         - port: 53
           protocol: TCP
 ---
-# Monitoring scrape (CNPG exposes metrics on 9187)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
