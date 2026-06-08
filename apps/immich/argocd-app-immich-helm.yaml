@@ -13,24 +13,28 @@ spec:
     targetRevision: 0.10.3
     helm:
       valuesObject:
-        env:
-          DB_HOSTNAME: "immich-postgres-rw.immich.svc.cluster.local"
-          DB_USERNAME: "immich"
-          DB_DATABASE_NAME: "immich"
-          DB_PASSWORD:
-            valueFrom:
-              secretKeyRef:
-                name: immich-secrets
-                key: DB_PASSWORD
-          SECRET_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: immich-secrets
-                key: SECRET_KEY
-          REDIS_HOSTNAME: '{{ printf "%s-valkey-master" .Release.Name }}'
-          IMMICH_MACHINE_LEARNING_URL: '{{ printf "http://%s-machine-learning:3003" .Release.Name }}'
-        image:
-          tag: v1.134.0
+        controllers:
+          main:
+            containers:
+              main:
+                image:
+                  tag: v1.134.0
+                env:
+                  DB_HOSTNAME: "immich-postgres-rw.immich.svc.cluster.local"
+                  DB_USERNAME: "immich"
+                  DB_DATABASE_NAME: "immich"
+                  DB_PASSWORD:
+                    valueFrom:
+                      secretKeyRef:
+                        name: immich-secrets
+                        key: DB_PASSWORD
+                  SECRET_KEY:
+                    valueFrom:
+                      secretKeyRef:
+                        name: immich-secrets
+                        key: SECRET_KEY
+                  REDIS_HOSTNAME: '{{ printf "%s-valkey" .Release.Name }}'
+                  IMMICH_MACHINE_LEARNING_URL: '{{ printf "http://%s-machine-learning:3003" .Release.Name }}'
         immich:
           metrics:
             enabled: true
@@ -67,9 +71,13 @@ spec:
               memory: 4Gi
         valkey:
           enabled: true
-          architecture: standalone
-          auth:
-            enabled: false
+          controllers:
+            main:
+              containers:
+                main:
+                  image:
+                    repository: docker.io/valkey/valkey
+                    tag: 9.0-alpine
   destination:
     server: https://kubernetes.default.svc
     namespace: immich
