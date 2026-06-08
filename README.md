@@ -385,8 +385,9 @@ infrastructure/loki/argocd-app-promtail.yaml
 - **Retention:** 7 days
 - **B2 credentials:** `cnpg-b2-credentials` secret in `cnpg-clusters` namespace (stored in Vaultwarden as `cnpg-b2-credentials`)
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# cnpg-b2-credentials no longer needed — CNPG Barman WAL archiving disabled (B2 free tier cap)
 kubectl create namespace cnpg-clusters
 
 kubectl create secret generic cnpg-b2-credentials \
@@ -456,11 +457,13 @@ Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, a
 - **Config:** `config_local.py` mounted via ConfigMap `pgadmin-config-local` in `pgadmin` namespace
 - **Connected to:** CNPG pg-main (`pg-main-rw.cnpg-clusters.svc.cluster.local`) — vaultwarden, authentik, nextcloud databases
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# pgadmin-oauth-secret now managed by ESO from Infisical /pgadmin/
 kubectl create namespace pgadmin
 
-kubectl create secret generic pgadmin-oauth-secret \
+# ESO creates pgadmin-oauth-secret automatically — no manual secret creation needed
+# kubectl create secret generic pgadmin-oauth-secret \
   --namespace pgadmin \
   --from-literal=OAUTH2_CLIENT_ID=<client-id> \
   --from-literal=OAUTH2_CLIENT_SECRET=<client-secret>
@@ -515,9 +518,10 @@ Self-hosted cloud storage, accessible at `https://cloud.yanatech.co.uk`. Databas
 - **Auth:** Authentik SSO (user_oidc app) + local admin fallback (`admin`)
 - **Credentials secret:** `nextcloud-secret` in `nextcloud` namespace (stored in Vaultwarden)
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
-# On pg1
+# pg1 decommissioned — nextcloud now uses CNPG pg-main
+# nextcloud-secret managed by ESO from Infisical /nextcloud/
 sudo -u postgres psql <<SQL
 CREATE ROLE nextcloud WITH LOGIN PASSWORD '<db-password>';
 CREATE DATABASE nextcloud OWNER nextcloud;
@@ -751,11 +755,13 @@ Private container registry for all homelab and product images. Replaces `ghcr.io
 - Admin group: `authentik Admins`
 - OIDC credentials: stored in Vaultwarden as `harbor-oidc`
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# harbor-secret now managed by ESO from Infisical /harbor/
 kubectl create namespace harbor
 
-kubectl create secret generic harbor-secret \
+# ESO creates harbor-secret automatically — no manual secret creation needed
+# kubectl create secret generic harbor-secret \
   --namespace harbor \
   --from-literal=HARBOR_ADMIN_PASSWORD='<admin-password>' \
   --from-literal=HARBOR_SECRET_KEY='<secret-key>' \
@@ -1323,7 +1329,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
 - ArgoCD apps that pull a **remote Helm chart with inline `spec.source.helm.values`** (e.g. `monitoring`, `authentik`) render from the live Application CR, NOT from git — editing the `argocd-app-*.yaml` in git is a silent no-op until you `kubectl apply -f` the Application manifest (then ArgoCD re-renders + auto-syncs). Apps whose `source` is a git directory of plain manifests (e.g. `vaultwarden`) DO sync straight from git on push. Different mechanisms — don't assume a git push is enough
 - Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://auth.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
-- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually, not in git). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
+- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually via `kubectl patch secret argocd-secret -n argocd --type merge -p '{"data":{"dex.authentik.clientSecret":"<base64>"}}'` — not in ESO, must be re-applied after cluster rebuild). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
 - argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
 - argo-cd ArgoCD Application must be an `argocd-app-argocd.yaml` wrapping the Helm chart with `valuesObject` — a standalone `values.yaml` cannot be `kubectl apply`'d directly (it has no `apiVersion`/`kind`). Use `valuesObject:` not `values: |` to avoid YAML indentation issues with multiline strings like `dex.config`
 - pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`
