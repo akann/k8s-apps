@@ -89,7 +89,12 @@ spec:
     - Egress
   egress:
     - to:
-        - podSelector: {} # in-namespace datasources: Prometheus, Loki, Tempo
+        - podSelector: {}  # in-namespace datasources: Prometheus, Loki, Tempo
+      ports:
+        - port: 9090  # Prometheus
+        - port: 3100  # Loki
+        - port: 3200  # Tempo query
+        - port: 4317  # OTLP gRPC
     - to:
         - namespaceSelector:
             matchLabels:
