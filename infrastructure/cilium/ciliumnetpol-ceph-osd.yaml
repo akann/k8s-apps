@@ -1,0 +1,43 @@
+# CiliumNetworkPolicy required for ceph-csi-rbd to reach Ceph OSD nodes
+# Standard NetworkPolicy egress rules do not apply to external IPs in Cilium native routing mode
+# Must use toCIDR to explicitly allow traffic to Proxmox node IPs
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ceph-osd-egress
+  namespace: ceph-csi-rbd
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDR:
+        - 192.168.22.11/32
+        - 192.168.22.12/32
+        - 192.168.22.13/32
+      toPorts:
+        - ports:
+            - port: "6789"
+              protocol: TCP
+            - port: "3300"
+              protocol: TCP
+            - port: "6800"
+              protocol: TCP
+            - port: "6801"
+              protocol: TCP
+            - port: "6802"
+              protocol: TCP
+            - port: "6803"
+              protocol: TCP
+            - port: "6804"
+              protocol: TCP
+            - port: "6805"
+              protocol: TCP
+            - port: "6806"
+              protocol: TCP
+            - port: "6807"
+              protocol: TCP
+            - port: "6808"
+              protocol: TCP
+            - port: "6809"
+              protocol: TCP
+            - port: "6810"
+              protocol: TCP
