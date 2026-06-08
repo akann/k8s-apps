@@ -210,7 +210,7 @@ pvesh get /cluster/resources --type vm
 | Config auto-reload | Stakater Reloader |
 | Node reboots | Kured 1.22.0 |
 | Push notifications | Gotify 2.6.3 |
-| Photo library | Immich — removed, pending fresh deploy with CNPG vchord support |
+| Photo library | Immich v2.7.5 (photos.yanatech.co.uk) |
 | Resource recommendations | Goldilocks v4.14.1 |
 | Database | CloudNativePG 1.29.1 (pg-main: 3-instance PG18 cluster) |
 | CI runners | Actions Runner Controller (gha-runner-scale-set 0.9.3) |
@@ -374,7 +374,7 @@ infrastructure/loki/argocd-app-promtail.yaml
 | nextcloud | nextcloud | Nextcloud ✅ (migrated from pg1 2026-06-04) |
 
 - Role passwords stored in Vaultwarden
-- Immich removed 2026-06-04 — pending fresh deploy once CNPG vchord/GLIBC issue resolved
+- [x] Immich deployed 2026-06-08 — v2.7.5, CNPG immich-postgres (tensorchord/cloudnative-vectorchord:16-1.1.1), 200Gi library PVC, photos.yanatech.co.uk
 
 ### Backups (Barman → Backblaze B2)
 
@@ -383,10 +383,11 @@ infrastructure/loki/argocd-app-promtail.yaml
 - **WAL archiving:** continuous, gzip compressed
 - **Base backups:** scheduled daily at 02:00 via `ScheduledBackup` CRD
 - **Retention:** 7 days
-- **B2 credentials:** `cnpg-b2-credentials` secret in `cnpg-clusters` namespace (stored in Vaultwarden as `cnpg-b2-credentials`)
+- **B2 credentials:** `cnpg-b2-credentials` secret — DEPRECATED, Barman WAL archiving disabled (B2 free tier cap hit). Secret still exists in cluster but unused.
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# cnpg-b2-credentials no longer needed — CNPG Barman WAL archiving disabled (B2 free tier cap)
 kubectl create namespace cnpg-clusters
 
 kubectl create secret generic cnpg-b2-credentials \
@@ -447,7 +448,7 @@ rclone delete --min-age 30d b2:yanatech-proxmox/
 
 ## pgAdmin4
 
-Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, accessible at `https://pgadmin.yanatech.co.uk`.
+Web-based PostgreSQL management UI. Deployed to Kubernetes via ArgoCD, accessible at `https://pgadmin.yanatech.co.uk`. Connects to CNPG pg-main (`pg-main-rw.cnpg-clusters.svc.cluster.local:5432`) and `immich-postgres-rw.immich.svc.cluster.local:5432`.
 
 - **Namespace:** `pgadmin`
 - **Helm chart:** `pgadmin4` from `https://helm.runix.net`, version `1.64.0`
@@ -456,11 +457,13 @@ Web-based PostgreSQL management UI for pg1. Deployed to Kubernetes via ArgoCD, a
 - **Config:** `config_local.py` mounted via ConfigMap `pgadmin-config-local` in `pgadmin` namespace
 - **Connected to:** CNPG pg-main (`pg-main-rw.cnpg-clusters.svc.cluster.local`) — vaultwarden, authentik, nextcloud databases
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# pgadmin-oauth-secret now managed by ESO from Infisical /pgadmin/
 kubectl create namespace pgadmin
 
-kubectl create secret generic pgadmin-oauth-secret \
+# ESO creates pgadmin-oauth-secret automatically — no manual secret creation needed
+# kubectl create secret generic pgadmin-oauth-secret \
   --namespace pgadmin \
   --from-literal=OAUTH2_CLIENT_ID=<client-id> \
   --from-literal=OAUTH2_CLIENT_SECRET=<client-secret>
@@ -505,19 +508,20 @@ EOF
 
 ## Nextcloud
 
-Self-hosted cloud storage, accessible at `https://cloud.yanatech.co.uk`. Database on pg1, files on ceph-rbd PVC.
+Self-hosted cloud storage, accessible at `https://cloud.yanatech.co.uk`. Database on CNPG pg-main, files on ceph-rbd PVC.
 
 - **Namespace:** `nextcloud`
 - **Helm chart:** `nextcloud` from `https://nextcloud.github.io/helm/`, version `6.6.10`
 - **Image:** `nextcloud:30.0.10-fpm` + nginx sidecar
-- **Database:** pg1 (`192.168.22.40`), database `nextcloud`, role `nextcloud`
+- **Database:** CNPG pg-main (`pg-main-rw.cnpg-clusters.svc.cluster.local`), database `nextcloud`, role `nextcloud`
 - **Storage:** 100Gi ceph-rbd PVC (`nextcloud-nextcloud`)
 - **Auth:** Authentik SSO (user_oidc app) + local admin fallback (`admin`)
 - **Credentials secret:** `nextcloud-secret` in `nextcloud` namespace (stored in Vaultwarden)
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
-# On pg1
+# pg1 decommissioned — nextcloud now uses CNPG pg-main
+# nextcloud-secret managed by ESO from Infisical /nextcloud/
 sudo -u postgres psql <<SQL
 CREATE ROLE nextcloud WITH LOGIN PASSWORD '<db-password>';
 CREATE DATABASE nextcloud OWNER nextcloud;
@@ -548,70 +552,47 @@ Generate passwords: `openssl rand -hex 16`
 
 ## Immich
 
-Self-hosted photo and video library with ML features (face recognition, semantic search, duplicate detection). Accessible at `https://photos.yanatech.co.uk`.
+Self-hosted photo and video library with ML features (face recognition, semantic search, duplicate detection).
 
 - **Namespace:** `immich`
-- **Helm chart:** OCI `ghcr.io/immich-app/immich-charts/immich` version `0.12.0` (app v2.6.3)
-- **Components:** immich-server, immich-machine-learning, valkey (in-cluster cache)
-- **Database:** pg1 (`192.168.22.40`), database `immich`, role `immich`
-- **Storage:** 500Gi ceph-rbd PVC (`immich-library`) for photos/videos
-- **Auth:** Authentik SSO (OAuth2) + local admin fallback
+- **Version:** v2.7.5
+- **Helm chart:** OCI `ghcr.io/immich-app/immich-charts/immich` version `0.10.3` (`apps/immich/argocd-app-immich-helm.yaml`)
+- **Manifests:** `apps/immich/` (ArgoCD app, postgres cluster, PVCs, secrets, network policies, ingress)
+- **Components:** immich-server (port 2283), immich-machine-learning, valkey (in-cluster cache)
+- **Database:** CNPG cluster `immich-postgres` in `immich` namespace — `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (UID 26, compatible with CNPG bootstrap)
+- **Storage:** 200Gi ceph-rbd PVC (`immich-library`) for photos/videos; 20Gi for postgres
 - **URL:** `https://photos.yanatech.co.uk`
-- **Credentials secret:** `immich-secret` in `immich` namespace (key: `db-url`)
-- **Manifest:** `apps/immich/argocd-app-immich.yaml`
+- **Secrets:** ESO from Infisical `/immich/` — `DB_PASSWORD`, `SECRET_KEY` → `immich-secrets`; `immich-db-credentials` (basic-auth for CNPG)
+- **Extensions:** `vchord` (CASCADE), `cube` (CASCADE), `earthdistance` (CASCADE) — created via `postInitSQL` as superuser
 
-### pg1 prerequisites (must be done before deploying)
+### Bootstrap (fresh cluster)
 ```bash
-# Install extensions on pg1 (one-time setup, already done)
-sudo apt install -y postgresql-18-pgvector
-wget https://github.com/tensorchord/VectorChord/releases/download/1.1.1/postgresql-18-vchord_1.1.1-1_$(dpkg --print-architecture).deb
-sudo apt install -y ./postgresql-18-vchord_1.1.1-1_$(dpkg --print-architecture).deb
-sudo -u postgres psql -c "ALTER SYSTEM SET shared_preload_libraries = 'vchord.so';"
-sudo systemctl restart postgresql
+# Secrets sync first (ESO must be ready)
+kubectl apply -f apps/immich/namespace.yaml
+kubectl apply -f apps/immich/external-secret.yaml
 
-# Create role, database and extensions
-sudo -u postgres psql -c "CREATE ROLE immich WITH LOGIN PASSWORD '<password>';"
-sudo -u postgres psql -c "CREATE DATABASE immich OWNER immich;"
-sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS cube;"
-sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS earthdistance;"
-sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS vector;"
-sudo -u postgres psql -d immich -c "CREATE EXTENSION IF NOT EXISTS vchord;"
+# Wait for secrets
+kubectl get externalsecret -n immich -w
+
+# Then postgres + PVC
+kubectl apply -f apps/immich/postgres-cluster.yaml
+kubectl apply -f apps/immich/library-pvc.yaml
+
+# Wait for postgres
+kubectl get cluster immich-postgres -n immich -w
+
+# Then ArgoCD apps
+kubectl apply -f apps/immich/argocd-app-immich.yaml
+kubectl apply -f apps/immich/argocd-app-immich-helm.yaml
 ```
-
-### K8s bootstrap prerequisites
-```bash
-kubectl create namespace immich
-
-# Pre-create library PVC before ArgoCD sync
-kubectl apply -f - <<'EOF'
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: immich-library
-  namespace: immich
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: ceph-rbd
-  resources:
-    requests:
-      storage: 500Gi
-EOF
-
-kubectl create secret generic immich-secret \
-  --namespace immich \
-  --from-literal=db-url='postgresql://immich:<password>@192.168.22.40:5432/immich'
-```
-
-Generate password: `openssl rand -hex 16`
 
 ### Notes
-- The immich Helm chart (0.10.0+) removed the bundled postgresql subchart — do not set `postgresql.enabled: false` in values, it will cause a template error. Simply omit the `postgresql:` key entirely
-- DB env vars go under `server.controllers.main.containers.main.env` — the top-level `env:` key and `server.env:` are silently ignored
-- `cube` and `earthdistance` extensions require superuser to create — must be done as postgres superuser before Immich starts, not by the `immich` role
-- VectorChord 1.1.1 is compatible with Immich (accepted range >= 0.3, < 2.0)
-- pgvector 0.8.2 is compatible (required range >= 0.7, < 0.9)
-- Authentik SSO via OAuth2: configure in Immich admin UI → Authentication → OAuth. Redirect URIs (all required): `https://photos.yanatech.co.uk/auth/login`, `https://photos.yanatech.co.uk/user-settings`, `app.immich:///oauth-callback`. Issuer URL: `https://auth.yanatech.co.uk/application/o/immich/`
+- Immich v2.x supports VectorChord `>=0.3 <2.0` — vchord 1.1.1 works
+- `ghcr.io/immich-app/postgres` image uses UID 999 (Alpine) — NOT compatible with CNPG (expects UID 26). Use `ghcr.io/tensorchord/cloudnative-vectorchord` instead
+- Helm chart 0.10.x (bjw-s common v4): env vars must go under `controllers.main.containers.main.env` — top-level `env`/`envFrom` silently ignored
+- Helm chart does not render ingress correctly — use plain `apps/immich/immich-ingress.yaml` manifest instead
+- Port changed from 3001 (v1.x) to 2283 (v2.x)
+- Authentik SSO via OAuth2: configure in Immich admin UI → Administration → Settings → OAuth. Redirect URIs: `https://photos.yanatech.co.uk/auth/login`, `https://photos.yanatech.co.uk/user-settings`, `app.immich:///oauth-callback`. Issuer URL: `https://auth.yanatech.co.uk/application/o/immich/`
 
 ---
 
@@ -632,7 +613,7 @@ Push notification server for cluster alerts. Alertmanager sends to a bridge (`al
 - Alertmanager webhook URL points to the bridge; bridge forwards to `http://gotify.gotify.svc.cluster.local/message`
 - App token stored in Alertmanager config values and bridge env (`GOTIFY_TOKEN`)
 - Watchdog + InfoInhibitor alerts routed to null receiver — everything else goes to Gotify
-- Reboot window 04:00-06:00 to avoid overlap with pg1 backup (02:30) and Proxmox backup (03:30)
+- Reboot window 04:00-06:00 to avoid overlap with Velero weekly backup (Sunday 02:00) and Proxmox backup (03:30)
 
 ### Notes
 - Alertmanager's generic webhook sends a different JSON structure than Gotify's API expects — the bridge is mandatory
@@ -677,7 +658,7 @@ Kubernetes Reboot Daemon — watches for `/var/run/reboot-required` on each node
 - **Namespace:** `kured`
 - **Helm chart:** `kubereboot/kured` 5.12.0 (app version 1.22.0)
 - **Mode:** DaemonSet — one pod per node (6 total: 3 control plane + 3 workers)
-- **Reboot window:** 04:00–06:00 Europe/London (avoids pg1 backup at 02:30 and Proxmox backup at 03:30)
+- **Reboot window:** 04:00–06:00 Europe/London (avoids Velero weekly backup Sunday 02:00 and Proxmox backup at 03:30)
 - **Reboot delay:** 60s between nodes
 - **Notifications:** Gotify via `notifyUrl`
 - **Manifest:** `infrastructure/kured/argocd-app-kured.yaml`
@@ -774,11 +755,13 @@ Private container registry for all homelab and product images. Replaces `ghcr.io
 - Admin group: `authentik Admins`
 - OIDC credentials: stored in Vaultwarden as `harbor-oidc`
 
-### Bootstrap prerequisites (manually created, not in git)
+### Bootstrap prerequisites
 ```bash
+# harbor-secret now managed by ESO from Infisical /harbor/
 kubectl create namespace harbor
 
-kubectl create secret generic harbor-secret \
+# ESO creates harbor-secret automatically — no manual secret creation needed
+# kubectl create secret generic harbor-secret \
   --namespace harbor \
   --from-literal=HARBOR_ADMIN_PASSWORD='<admin-password>' \
   --from-literal=HARBOR_SECRET_KEY='<secret-key>' \
@@ -1114,7 +1097,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Service | Namespace | URL | Managed by |
 |---|---|---|---|
 | Cilium | kube-system | - | ArgoCD |
-| Hubble UI | kube-system | https://hubble.yanatech.co.uk | ArgoCD (Authentik forward auth) |
+| Hubble UI | kube-system | https://hubble.yanatech.co.uk | ArgoCD |
 | Harbor | harbor | https://harbor.yanatech.co.uk | ArgoCD |
 | Actions Runner Controller | actions-runner | - | ArgoCD |
 | CloudNativePG | cnpg-system | - | ArgoCD |
@@ -1122,7 +1105,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | ESO | external-secrets | - | ArgoCD |
 | Infisical | infisical | https://infisical.yanatech.co.uk | ArgoCD |
 | KEDA | keda | - | ArgoCD |
-| Argo Rollouts | argo-rollouts | https://rollouts.yanatech.co.uk | ArgoCD (Authentik forward auth) |
+| Argo Rollouts | argo-rollouts | https://rollouts.yanatech.co.uk | ArgoCD |
 | Tempo | monitoring | - | ArgoCD |
 | Apicurio Registry | apicurio | https://apicurio.yanatech.co.uk | ArgoCD |
 | ingress-nginx | ingress-nginx | - | ArgoCD |
@@ -1139,7 +1122,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Kafka | kafka | - | ArgoCD |
 | Kafka UI | kafka | https://kafka-ui.yanatech.co.uk | ArgoCD |
 | Velero | velero | - | ArgoCD |
-| Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD (Authentik forward auth) |
+| Uptime Kuma | uptime-kuma | https://status.yanatech.co.uk | ArgoCD |
 | Headlamp | headlamp | https://headlamp.yanatech.co.uk | ArgoCD |
 | pgAdmin4 | pgadmin | https://pgadmin.yanatech.co.uk | ArgoCD |
 | Nextcloud | nextcloud | https://cloud.yanatech.co.uk | ArgoCD |
@@ -1149,6 +1132,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Goldilocks | goldilocks | https://goldilocks.yanatech.co.uk | ArgoCD |
 | Descheduler | kube-system | - | ArgoCD |
 | yanatech website | yanatech | https://www.yanatech.co.uk | ArgoCD |
+| Immich | immich | https://photos.yanatech.co.uk | ArgoCD |
 
 ---
 
@@ -1203,8 +1187,8 @@ k8s-apps/
 #    - pgadmin-oauth-secret in pgadmin (OAUTH2_CLIENT_ID, OAUTH2_CLIENT_SECRET)
 #    - pgadmin-config-local ConfigMap in pgadmin (config_local.py with OAuth2 config)
 #    - nextcloud-secret in nextcloud (nextcloud-username, nextcloud-password, nextcloud-token, db-username, db-password)
-#    - immich-secret in immich (db-url as postgresql://immich:<password>@192.168.22.40:5432/immich)
-#    - immich-library PVC (500Gi ceph-rbd) must be created before ArgoCD syncs immich
+#    - immich secrets managed by ESO from Infisical /immich/
+#    - immich-library PVC (200Gi ceph-rbd) and immich-postgres cluster must be ready before ArgoCD syncs immich
 # 3. Run bootstrap script:
 bash bootstrap.sh
 ```
@@ -1225,7 +1209,7 @@ bash bootstrap.sh
 | `nextcloud-secret` | nextcloud | nextcloud-username/password/token, db-username/password/host | `/nextcloud` |
 | `gotify-secret` | gotify | admin-password | `/gotify` |
 | `immich-secret` | immich | db-url (for future redeploy) | `/immich` |
-| `cnpg-b2-credentials` | cnpg-clusters | ACCESS_KEY_ID, ACCESS_SECRET_KEY | `/cnpg-clusters` |
+| `cnpg-b2-credentials` | cnpg-clusters | ACCESS_KEY_ID, ACCESS_SECRET_KEY (DEPRECATED — Barman disabled) | `/cnpg-clusters` |
 | `harbor-pull-secret` | cnpg-clusters | docker-registry (robot$cnpg-pull) | `/cnpg-clusters` |
 | `harbor-secret` | harbor | HARBOR_ADMIN_PASSWORD, secretKey | `/harbor` |
 | `github-pat` | actions-runner | github_token | `/actions-runner` |
@@ -1276,11 +1260,10 @@ ArgoCD detects change → deploys to cluster
 - [x] Write ExternalSecret CRDs for all namespaces (done 2026-06-05 — 13 ExternalSecrets deployed, all syncing)
 - [x] Tempo distributed tracing (done 2026-06-05 — `infrastructure/tempo/`, single binary, 20Gi ceph-rbd, wired into Grafana)
 - [x] KEDA event-driven autoscaling (done 2026-06-05 — `infrastructure/keda/`, wave 3, CRDs: scaledobjects/scaledjobs/triggerauthentications)
-- [x] Argo Rollouts progressive delivery (done 2026-06-05 — `infrastructure/argo-rollouts/`, dashboard at `https://rollouts.yanatech.co.uk`, Authentik forward auth)
+- [x] Argo Rollouts progressive delivery (done 2026-06-05 — `infrastructure/argo-rollouts/`, dashboard at `https://rollouts.yanatech.co.uk`)
 - [x] NetworkPolicies baseline (done 2026-06-05 — `infrastructure/network-policies/`, default-deny-all per namespace except kube-system/ingress-nginx/argocd)
 - [x] Descheduler fix — `RemovePodsViolatingTopologySpreadConstraints` moved to correct extension point, schedule reduced to hourly (done 2026-06-05)
 - [x] Velero weekly schedule + exclude-namespaces (done 2026-06-05 — reduced B2 API calls, new namespaces covered automatically)
-- [x] Authentik forward auth for uptime-kuma, argo-rollouts, hubble-ui (done 2026-06-05)
 
 ---
 
@@ -1330,7 +1313,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Authentik requires PostgreSQL and Redis — both enabled via Helm values
 - ArgoCD v3.4 does not support app-of-apps via directory source for Application resources — bootstrap.sh enumerates all apps explicitly grouped by sync-wave (0-7). Wave order matches dependency chain (metallb/ceph-csi → cilium/cert-manager/ingress → config → cluster-ops → platform → observability → foundational apps → all apps). ApplicationSet migration planned as a dedicated session.
 - MetalLB IP pool name is `k8s-pool` (not `default-pool`)
-- Vaultwarden database now lives on VM 110 (`192.168.22.40`, db `vaultwarden`), migrated off Authentik's bundled Postgres 2026-05-31. `DATABASE_URL` in `vaultwarden-secret` points there; role password is URL-safe hex (a base64 password breaks `postgresql://` parsing). Old DB dropped from Authentik's PG 2026-05-31 — final pre-drop dump retained on cp-1
+- Vaultwarden was migrated off Authentik's bundled Postgres 2026-05-31 to pg1, then migrated to CNPG pg-main 2026-06-04. `DATABASE_URL` in `vaultwarden-secret` managed by ESO from Infisical. Role password must be URL-safe (hex preferred — base64 breaks `postgresql://` parsing).
 - Vaultwarden Deployment must use `strategy: { type: Recreate }`. Its `/data` PVC is RWO on ceph-rbd, so the default RollingUpdate deadlocks on restart — the new pod can't mount the volume while the old pod holds it (Multi-Attach), leaving the rollout stuck. If it ever deadlocks, `scale --replicas=0` (wait for both pods gone) then `--replicas=1`
 - Migrating a Postgres DB between the in-cluster Bitnami instance and VM 110: the Bitnami pod stores passwords in files (`$POSTGRES_PASSWORD_FILE`, `$POSTGRES_POSTGRES_PASSWORD_FILE`), not env values, and the `postgres` superuser password in the file can be stale vs the running DB — the `authentik` role (cluster owner) works. Dump/load via `PGPASSWORD` + discrete `PG*` env vars, never a `postgresql://` URL, to avoid special-char parsing failures
 - Authentik DB connection lives entirely in the manual `authentik-secret` (`AUTHENTIK_POSTGRESQL__HOST/__NAME/__USER/__PASSWORD`); the chart sets `authentik.existingSecret` and does NOT put the host in values, so cutover = patch `__HOST` in the secret + restart `authentik-server`/`authentik-worker`. No git change needed for the repoint
@@ -1346,7 +1329,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
 - ArgoCD apps that pull a **remote Helm chart with inline `spec.source.helm.values`** (e.g. `monitoring`, `authentik`) render from the live Application CR, NOT from git — editing the `argocd-app-*.yaml` in git is a silent no-op until you `kubectl apply -f` the Application manifest (then ArgoCD re-renders + auto-syncs). Apps whose `source` is a git directory of plain manifests (e.g. `vaultwarden`) DO sync straight from git on push. Different mechanisms — don't assume a git push is enough
 - Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://auth.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
-- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually, not in git). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
+- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually via `kubectl patch secret argocd-secret -n argocd --type merge -p '{"data":{"dex.authentik.clientSecret":"<base64>"}}'` — not in ESO, must be re-applied after cluster rebuild). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
 - argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
 - argo-cd ArgoCD Application must be an `argocd-app-argocd.yaml` wrapping the Helm chart with `valuesObject` — a standalone `values.yaml` cannot be `kubectl apply`'d directly (it has no `apiVersion`/`kind`). Use `valuesObject:` not `values: |` to avoid YAML indentation issues with multiline strings like `dex.config`
 - pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`
@@ -1354,7 +1337,7 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - kube-prometheus-stack CRDs exceed the 262144-byte annotation limit on sync — fixed by adding `ServerSideApply=true` to the monitoring app's `syncOptions`. Required whenever the chart version is bumped
 - Grafana env config in kube-prometheus-stack: `GF_AUTH_GENERIC_OAUTH_CLIENT_ID` and `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET` must both go in `grafana.envValueFrom` (not `grafana.env`) — putting either in `env` with a `valueFrom` block causes a Deployment validation error (`may not be specified when value is not empty`)
 - Nextcloud chart (6.6.10) auto-installer silently fails if `config/` directory is not writable by `www-data` (uid 33) — fix with `extraInitContainers` running `chown -R 33:33 /var/www/html` on the `nextcloud-main` volume before startup. `trusted_domains` defaults to `localhost` only — must add the actual hostname via `occ config:system:set trusted_domains 1 --value=<host>` or via `configs.proxy.config.php`. `nginx.ingress.kubernetes.io/server-snippet` annotation is blocked by ingress-nginx by default — use plain annotations instead. The `installed: false` from `occ status` is misleading if `config.php` exists but `trusted_domains` is wrong; run `php occ maintenance:install` manually to confirm the real error
-- Nextcloud bootstrap secret: generate passwords with `openssl rand -hex 16`; db-password must be set on pg1 first (`CREATE ROLE nextcloud WITH LOGIN PASSWORD '...'`), then referenced in the k8s secret
+- Nextcloud database credentials managed by ESO from Infisical `/nextcloud/`. CNPG pg-main creates the nextcloud role automatically via the cluster spec.
 - Loki 6.x chart: `deploymentMode: SingleBinary` must be set explicitly, AND `backend.replicas: 0`, `read.replicas: 0`, `write.replicas: 0` must all be zeroed — otherwise the chart validator fires with "more than zero replicas configured for both single binary and simple scalable targets". The `negative structured metadata bytes received` errors in Loki logs are a cosmetic Promtail/Loki version skew issue — ingestion works correctly despite them
 - ServiceMonitor resources must have label `release: kube-prometheus-stack` to be picked up by the Prometheus operator (confirmed via `kubectl get prometheus -n monitoring -o jsonpath='{.items[0].spec.serviceMonitorSelector}'`)
 - Nextcloud OIDC SSO via `user_oidc` app: Nextcloud blocks outbound HTTP requests to RFC1918 addresses by default (`allow_local_address: false` in Guzzle) — `allow_local_remote_servers: true` must be set in config, otherwise the OIDC discovery URL fails with `Host "192.168.22.200" violates local access rules` when Authentik resolves to the MetalLB ingress VIP
@@ -1391,8 +1374,16 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - NetworkPolicy + Cilium: any NetworkPolicy applied to a pod (even just an ingress allow with broad `podSelector: {}`) activates full Cilium enforcement for ALL pods in that namespace — both ingress AND egress become restricted. `kube-system` policies broke CoreDNS within seconds of apply. `argocd` policies blocked port-forward connections. `ingress-nginx` policies would break backend routing. Keep these three namespaces policy-free.
 - NetworkPolicy + Cilium: `Operation not permitted` on egress means Cilium is enforcing an egress policy that doesn't have an explicit allow for that destination. Multiple egress NetworkPolicies on the same pod union correctly — but every policy on a pod activates enforcement, so a pod with any egress policy needs ALL its required egress explicitly allowed.
 - CNPG instance pods need kube-apiserver egress (`allow-kube-apiserver-egress`) in addition to the operator — they call `https://10.96.0.1:443` directly to self-manage cluster state. Without it they crash with `dial tcp 10.96.0.1:443: i/o timeout` even when the CNPG operator namespace has no deny-all.
-- Descheduler 0.36.0 on k8s 1.32: `RemovePodsViolatingTopologySpreadConstraints` does not exist in either `balance` or `deschedule` extension points — it was removed in this version. Moving it to `deschedule` causes `profile configures deschedule extension point of non-existing plugins` error. Remove it entirely; only `LowNodeUtilization` (balance) + `RemovePodsViolatingNodeAffinity` + `RemovePodsViolatingInterPodAntiAffinity` (deschedule) are valid.
-- Authentik forward auth added to: `status.yanatech.co.uk` (uptime-kuma, `apps/uptime-kuma/`), `rollouts.yanatech.co.uk` (argo-rollouts, `infrastructure/argo-rollouts/ak-outpost-svc.yaml` + Helm values annotations), `hubble.yanatech.co.uk` (cilium, `infrastructure/cilium/ak-outpost-svc.yaml` + Helm values annotations). Pattern: ExternalName Service + outpost Ingress in app namespace, auth annotations on main Ingress. Outpost pods auto-deploy to `authentik` namespace when applications are added to the Local Kubernetes outpost in Authentik UI.
-- Hubble UI forward auth + WebSocket: Authentik forward auth breaks Hubble's gRPC/WebSocket data streams (`Failed to fetch`, `Data streams are reconnecting`). Fix: add `nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"`, `proxy-http-version: "1.1"`, and `configuration-snippet` with `proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"` to the hubble-ui ingress annotations. These are set in `infrastructure/cilium/argocd-app-cilium.yaml` under `hubble.ui.ingress.annotations`.
-- ArgoCD permanent OutOfSync (cosmetic, all Healthy): `actions-runner-controller` (OCI registry limitation — permanent), `argo-rollouts` (cluster-scoped CRDs tracked twice by ArgoCD; `ignoreDifferences` + `RespectIgnoreDifferences=true` insufficient in ArgoCD 3.4), `infisical` (bundled nginx rendered by chart regardless of `enabled: false`; `Deployment infisical-infisical-standalone-infisical` drifts on every sync).
-- KEDA metrics apiserver (`v1beta1.external.metrics.k8s.io` APIService) requires an explicit ingress NetworkPolicy allowing ports 443/6443/8080 from anywhere — the kube-apiserver calls into it to serve HPA external metrics queries. Without `allow-metrics-apiserver-ingress` in the `keda` namespace, the APIService stays `FailedDiscoveryCheck` and ArgoCD marks the app Progressing indefinitely.
+- Descheduler 0.36.0 on k8s 1.32: `RemovePodsViolatingTopologySpreadConstraints` does not exist in either `balance` or `deschedule` extension points — removed entirely. Only valid plugins: `LowNodeUtilization` (balance) + `RemovePodsViolatingNodeAffinity` + `RemovePodsViolatingInterPodAntiAffinity` (deschedule).
+- Authentik forward auth added to: `status.yanatech.co.uk` (uptime-kuma), `rollouts.yanatech.co.uk` (argo-rollouts), `hubble.yanatech.co.uk` (cilium). Pattern: ExternalName Service + outpost Ingress in app namespace, auth annotations on main Ingress. Outpost pods auto-deploy to `authentik` namespace when applications are added to the Local Kubernetes outpost in Authentik UI. For Helm-managed ingresses (cilium/argo-rollouts), add auth annotations under the chart's ingress values rather than creating a separate manifest.
+- Hubble UI forward auth + WebSocket: Authentik forward auth breaks Hubble's gRPC/WebSocket data streams. Fix: add `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"`, `proxy-http-version: "1.1"`, and `configuration-snippet` with `proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"` to the hubble-ui ingress annotations in `infrastructure/cilium/argocd-app-cilium.yaml`.
+- Cilium native routing + Ceph CSI: standard `NetworkPolicy` egress rules do NOT apply to external IPs (Proxmox nodes 192.168.22.x) in Cilium native routing mode. Ceph CSI provisioner needs to reach OSD ports (6802-6809) on Proxmox nodes — this ONLY works with a `CiliumNetworkPolicy` using `toCIDR` + `toPorts`. Without it, `CreateVolume` GRPC calls hang indefinitely and PVCs stay Pending. File: `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`.
+- Ceph CSI provisioner in-memory operation lock: when `CreateVolume` hangs (Ceph OSD unreachable), the CSI driver holds an in-memory lock on the volume ID. Restarting the provisioner deployment does NOT clear the lock if there are old goroutines still running. The only reliable fix: (1) delete PVCs, (2) scale provisioner to 0, (3) scale back up, (4) immediately recreate PVCs. Deleting orphaned RBD images on Ceph (`rbd rm kubernetes/<image>`) and RADOS OMAP entries (`rados rmomapkey kubernetes csi.volumes.default <key>`) may also be needed for truly stuck volumes.
+- CNPG image UID compatibility: CNPG bootstrap-controller init container runs as UID 26 (postgres). Images built on the official CNPG base (Debian Bullseye/Bookworm) use UID 26. Images built on Alpine or other bases use different UIDs (e.g. 999) and fail CNPG initdb with `could not look up effective user ID`. The `ghcr.io/immich-app/postgres` image uses UID 999 and is NOT compatible with CNPG. Use `ghcr.io/tensorchord/cloudnative-vectorchord` (UID 26) instead.
+- Immich v2.x VectorChord compatibility: Immich v1.134 supports VectorChord `>=0.3 <0.4`. Immich v2.x supports `>=0.3 <2.0` (1.1.1 works). Fresh installs should use Immich v2.x + `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1`. The `vectors.so` (pgvecto.rs) library is NOT included in the tensorchord/cloudnative-vectorchord image — remove it from `shared_preload_libraries` and `postInitSQL`.
+- Immich Helm chart 0.10.x (bjw-s common v4): `env` vars must be under `controllers.main.containers.main.env`, NOT at top-level. Top-level `env`/`envFrom` keys are ignored. `envFrom` with secretRef also does not work at top level — use `valueFrom.secretKeyRef` per env var. Ingress config goes under `server.ingress.main` but may not render — safer to create a plain Ingress manifest separately. Port changed from 3001 (v1.x) to 2283 (v2.x).
+- Infisical bundled nginx webhook (`infisical-ingress-nginx-admission` ValidatingWebhookConfiguration) intermittently blocks Ingress creation cluster-wide — the webhook times out when the infisical namespace has network policies. Workaround: `kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission` (Infisical recreates it on next sync). Add `allow-kube-apiserver-egress` to the `infisical` namespace to prevent the bundled nginx admission job from failing.
+- CNPG operator needs egress to ALL managed namespaces — add each new CNPG cluster namespace to the `allow-cnpg-operator` egress in `cnpg-system`. Also add an `allow-cnpg-operator` ingress policy in each cluster namespace allowing ports 8000/5432/9187 from `cnpg-system`.
+- KEDA metrics apiserver (`v1beta1.external.metrics.k8s.io` APIService): requires `allow-metrics-apiserver-ingress` NetworkPolicy in `keda` namespace allowing ports 443/6443/8080 from anywhere — kube-apiserver calls in to serve HPA external metrics. Without it, the APIService stays `FailedDiscoveryCheck` and ArgoCD marks keda Progressing indefinitely.
+- ArgoCD permanent OutOfSync (cosmetic, all Healthy): `actions-runner-controller` (OCI registry limitation), `argo-rollouts` (cluster-scoped CRDs tracked twice; `ignoreDifferences` + `RespectIgnoreDifferences=true` insufficient in ArgoCD 3.4), `infisical` (bundled nginx chart mutation).
+- CNPG Barman WAL archiving disabled on pg-main — was hitting Backblaze B2 free tier Class C transaction cap. Removed `spec.backup` from `infrastructure/cnpg-clusters/pg-main.yaml`. Rely on Velero weekly backups instead. Re-enable if B2 paid plan or alternative S3 storage is available.
