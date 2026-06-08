@@ -1,0 +1,20 @@
+# CiliumNetworkPolicy required for Grafana to reach Prometheus ClusterIP
+# Standard NetworkPolicy in-namespace podSelector rules don't always work for
+# service VIP traffic in Cilium native routing mode
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-grafana-to-prometheus
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
