@@ -20,7 +20,7 @@ spec:
           env:
             GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
             GF_AUTH_GENERIC_OAUTH_NAME: Authentik
-            GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email groups
+            GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email profiles
             GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://auth.yanatech.co.uk/application/o/authorize/
             GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://auth.yanatech.co.uk/application/o/token/
             GF_AUTH_GENERIC_OAUTH_API_URL: https://auth.yanatech.co.uk/application/o/userinfo/
@@ -76,6 +76,16 @@ spec:
             serviceMonitorSelector:
               matchLabels:
                 release: kube-prometheus-stack
+            additionalScrapeConfigs:
+              - job_name: ceph
+                static_configs:
+                  - targets:
+                      - 192.168.22.11:9283
+                      - 192.168.22.12:9283
+                      - 192.168.22.13:9283
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
             storageSpec:
               volumeClaimTemplate:
                 spec:
