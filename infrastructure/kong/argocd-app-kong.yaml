@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kong
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.konghq.com
+    chart: ingress
+    targetRevision: 0.24.0
+    helm:
+      releaseName: kong
+      valuesObject:
+        gateway:
+          enabled: true
+          env:
+            role: traditional
+            database: "off"
+          proxy:
+            enabled: true
+            type: LoadBalancer
+            annotations:
+              metallb.universe.tf/loadBalancerIPs: 192.168.22.201
+            http:
+              enabled: true
+              servicePort: 80
+              containerPort: 8000
+            tls:
+              enabled: false  # TLS terminated at ingress-nginx
+          admin:
+            enabled: true
+            type: ClusterIP
+            clusterIP: None
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        controller:
+          enabled: true
+          ingressController:
+            enabled: true
+            gatewayDiscovery:
+              enabled: true
+              generateAdminApiService: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kong
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
