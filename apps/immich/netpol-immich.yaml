@@ -3,17 +3,6 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-all
-  namespace: immich
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
   name: allow-immich-ingress
   namespace: immich
 spec:
@@ -82,22 +71,3 @@ spec:
         - port: 8000
         - port: 5432
         - port: 9187
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-kube-apiserver-egress
-  namespace: immich
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
-  egress:
-    - ports:
-        - port: 443
-        - port: 6443
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
