@@ -47,6 +47,39 @@ spec:
   egress:
     - {} # unrestricted — Prometheus scrapes all namespaces
 ---
+# Prometheus — ingress from Grafana and in-namespace components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - port: 9090
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 9090
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9090
+        - port: 8080
+---
 # Alertmanager — needs to reach Gotify bridge + external webhook
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
