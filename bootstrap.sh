@@ -42,9 +42,42 @@
 # ESO-MANAGED SECRETS (auto-created via Infisical after ESO deploys):
 # ============================================================
 #   All other secrets (vaultwarden, nextcloud, harbor, pgadmin, immich,
-#   infisical, apicurio, cnpg-clusters, etc.) are managed by ESO ExternalSecrets
-#   pointing to Infisical. They sync automatically once ESO + Infisical are up.
+#   infisical, apicurio, cnpg-clusters, redis, mongodb, etc.) are managed
+#   by ESO ExternalSecrets pointing to Infisical. They sync automatically
+#   once ESO + Infisical are up.
 #   Add eso-k8s machine identity to Infisical project members in UI (not just org-level).
+#
+# ============================================================
+# INFISICAL FOLDERS — create before ESO syncs:
+# ============================================================
+#   infisical secrets folders create --name="redis" --path="/" --env="prod" --projectId="69b39965-b778-47a7-ba52-2cd66a7aad0a"
+#   infisical secrets folders create --name="mongodb" --path="/" --env="prod" --projectId="69b39965-b778-47a7-ba52-2cd66a7aad0a"
+#   # Set secrets:
+#   infisical secrets set REDIS_PASSWORD="$(openssl rand -hex 16)" --projectId 69b39965-b778-47a7-ba52-2cd66a7aad0a --env prod --path /redis
+#   infisical secrets set MONGODB_ROOT_PASSWORD="$(openssl rand -hex 16)" --projectId 69b39965-b778-47a7-ba52-2cd66a7aad0a --env prod --path /mongodb
+#   infisical secrets set MONGODB_PASSWORD="$(openssl rand -hex 16)" --projectId 69b39965-b778-47a7-ba52-2cd66a7aad0a --env prod --path /mongodb
+#   infisical secrets set MONGODB_REPLICA_SET_KEY="$(openssl rand -hex 32)" --projectId 69b39965-b778-47a7-ba52-2cd66a7aad0a --env prod --path /mongodb
+#
+# ============================================================
+# POST-INSTALL MANUAL STEPS:
+# ============================================================
+#   1. Patch ArgoCD dex secret:
+#      kubectl -n argocd patch secret argocd-secret \
+#        -p '{"stringData":{"dex.authentik.clientSecret":"<secret from Vaultwarden: argocd-dex>"}}'
+#   2. Patch infisical ingress to use nginx class (bundled nginx is disabled):
+#      kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission 2>/dev/null; true
+#      kubectl patch ingress infisical-ingress -n infisical --type='json' \
+#        -p='[{"op":"replace","path":"/spec/ingressClassName","value":"nginx"},{"op":"add","path":"/spec/tls","value":[{"hosts":["infisical.yanatech.co.uk"],"secretName":"wildcard-yanatech-tls"}]},{"op":"replace","path":"/spec/rules","value":[{"host":"infisical.yanatech.co.uk","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"infisical-infisical-standalone-infisical","port":{"number":8080}}}}]}}]}]'
+#   3. Set infisical webhook failurePolicy to Ignore:
+#      kubectl patch validatingwebhookconfiguration infisical-ingress-nginx-admission \
+#        --type='json' -p='[{"op":"replace","path":"/webhooks/0/failurePolicy","value":"Ignore"}]'
+#   4. Headlamp SA token (SSO broken upstream):
+#      kubectl create token headlamp -n headlamp --duration=8760h
+#   5. Set up Immich admin account at https://photos.yanatech.co.uk
+#   6. Configure Immich Authentik SSO in Immich admin UI → Administration → Settings → OAuth
+#   7. Set up RedisInsight connection: host redis-master.redis.svc.cluster.local, port 6379
+#   8. Set up Mongo Express Authentik outpost in Authentik UI
+#   9. Set up RedisInsight Authentik outpost in Authentik UI
 #
 # ============================================================
 # NOTE: sync-wave annotations on each argocd-app-*.yaml control ordering.
@@ -101,23 +134,35 @@ kubectl apply -f infrastructure/infisical/argocd-app-infisical.yaml
 echo "  --> Wait for ESO + Infisical to be ready before continuing"
 echo "  --> Add eso-k8s machine identity to Infisical project members in UI"
 echo "  --> ESO ClusterSecretStore will then sync all app secrets automatically"
+echo "  --> Patch infisical ingress manually (see POST-INSTALL MANUAL STEPS above)"
 
 echo "Applying infrastructure apps (wave 7 — CNPG)..."
 kubectl apply -f infrastructure/cnpg/argocd-app-cnpg.yaml
 kubectl apply -f infrastructure/cnpg-clusters/argocd-app-cnpg-clusters.yaml
 
-echo "Applying infrastructure apps (wave 8 — harbor, actions runners)..."
+echo "Applying infrastructure apps (wave 8 — data stores)..."
+kubectl apply -f infrastructure/redis/argocd-app-redis.yaml
+kubectl apply -f infrastructure/redis-insight/argocd-app-redis-insight.yaml
+kubectl apply -f infrastructure/mongodb/argocd-app-mongodb.yaml
+kubectl apply -f infrastructure/mongo-express/argocd-app-mongo-express.yaml
+
+echo "Applying infrastructure apps (wave 9 — API gateway)..."
+kubectl apply -f infrastructure/kong/argocd-app-kong.yaml
+kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission 2>/dev/null; true
+kubectl apply -f infrastructure/kong/ingress-kong-admin.yaml
+
+echo "Applying infrastructure apps (wave 10 — harbor, actions runners)..."
 kubectl apply -f infrastructure/harbor/argocd-app-harbor.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-forex.yaml
 
-echo "Applying apps (wave 9 — foundational apps)..."
+echo "Applying apps (wave 11 — foundational apps)..."
 kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
 kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 
-echo "Applying apps (wave 10 — all other apps)..."
+echo "Applying apps (wave 12 — all other apps)..."
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
@@ -143,13 +188,11 @@ echo ""
 echo "============================================================"
 echo "Done. ArgoCD will sync everything automatically."
 echo ""
-echo "Post-bootstrap manual steps:"
-echo "  1. Patch ArgoCD dex secret:"
-echo "     kubectl -n argocd patch secret argocd-secret \\"
-echo "       -p '{\"stringData\":{\"dex.authentik.clientSecret\":\"<secret from Vaultwarden: argocd-dex>\"}}'"
-echo "  2. Headlamp SA token (SSO broken upstream — use SA token instead):"
-echo "     kubectl create token headlamp -n headlamp --duration=8760h"
-echo "  3. Set up Immich admin account at https://photos.yanatech.co.uk"
-echo "  4. Configure Immich Authentik SSO in Immich admin UI → Administration → Settings → OAuth"
+echo "POST-INSTALL MANUAL STEPS (see comments at top of this file for details):"
+echo "  1. Patch ArgoCD dex secret"
+echo "  2. Patch infisical ingress to use nginx ingressClassName"
+echo "  3. Set infisical webhook failurePolicy to Ignore"
+echo "  4. Headlamp SA token: kubectl create token headlamp -n headlamp --duration=8760h"
+echo "  5. Set up Immich admin account at https://photos.yanatech.co.uk"
+echo "  6. Configure Immich/RedisInsight/Mongo Express Authentik outposts"
 echo "============================================================"
-
