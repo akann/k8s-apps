@@ -25,7 +25,7 @@ spec:
             - containerPort: 8081
           env:
             - name: ME_CONFIG_MONGODB_URL
-              value: "mongodb://root:$(MONGODB_ROOT_PASSWORD)@mongodb.mongodb.svc.cluster.local:27017/?authSource=admin&replicaSet=rs0"
+              value: "mongodb://root:$(MONGODB_ROOT_PASSWORD)@mongodb-headless.mongodb.svc.cluster.local:27017/?authSource=admin&replicaSet=rs0"
             - name: MONGODB_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
