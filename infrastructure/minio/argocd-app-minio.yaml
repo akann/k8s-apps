@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.min.io/
+    chart: minio
+    targetRevision: 5.4.0
+    helm:
+      releaseName: minio
+      valuesObject:
+        existingSecret: minio-secret
+        mode: standalone
+        persistence:
+          enabled: true
+          storageClass: ceph-rbd
+          size: 50Gi
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - minio.yanatech.co.uk
+          tls:
+            - hosts:
+                - minio.yanatech.co.uk
+              secretName: wildcard-yanatech-tls
+        consoleIngress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            - minio-console.yanatech.co.uk
+          tls:
+            - hosts:
+                - minio-console.yanatech.co.uk
+              secretName: wildcard-yanatech-tls
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        metrics:
+          serviceMonitor:
+            enabled: true
+            namespace: monitoring
+            additionalLabels:
+              release: kube-prometheus-stack
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
