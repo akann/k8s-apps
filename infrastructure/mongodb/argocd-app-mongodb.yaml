@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mongodb
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: mongodb
+    targetRevision: 19.1.4
+    helm:
+      releaseName: mongodb
+      valuesObject:
+        architecture: replicaset
+        replicaCount: 2
+        auth:
+          enabled: true
+          rootUser: root
+          existingSecret: mongodb-secret
+          databases:
+            - yana_stocks
+            - yana_ecommerce
+          usernames:
+            - yana
+          passwords:
+            - ""  # managed via existingSecret
+        persistence:
+          enabled: true
+          storageClass: ceph-rbd
+          size: 10Gi
+        metrics:
+          enabled: true
+          serviceMonitor:
+            enabled: true
+            namespace: monitoring
+            labels:
+              release: kube-prometheus-stack
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mongodb
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
