@@ -1,0 +1,19 @@
+# CiliumNetworkPolicy for ESO webhook — kube-apiserver calls in from node IPs
+# Standard NetworkPolicy ingress without fromSelector doesn't cover node-originated traffic
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-eso-webhook-ingress
+  namespace: external-secrets
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-secrets-webhook
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP
