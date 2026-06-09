@@ -78,6 +78,11 @@ spec:
                   image:
                     repository: docker.io/valkey/valkey
                     tag: 9.0-alpine
+  ignoreDifferences:
+    - group: networking.k8s.io
+      kind: Ingress
+      name: immich-app-server
+      namespace: immich
   destination:
     server: https://kubernetes.default.svc
     namespace: immich
