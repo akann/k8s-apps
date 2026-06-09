@@ -72,6 +72,8 @@ spec:
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       name: infisical-ingress-nginx-admission
+      jsonPointers:
+        - /webhooks/0/failurePolicy
     - group: networking.k8s.io
       kind: IngressClass
       name: infisical-nginx
