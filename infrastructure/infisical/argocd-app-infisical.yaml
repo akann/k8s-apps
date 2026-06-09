@@ -35,6 +35,8 @@ spec:
           enabled: false
           controller:
             replicaCount: 0
+            admissionWebhooks:
+              enabled: false
         postgresql:
           enabled: false
         redis:
