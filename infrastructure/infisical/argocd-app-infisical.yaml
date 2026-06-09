@@ -33,6 +33,8 @@ spec:
                   - infisical.yanatech.co.uk
         ingress-nginx:
           enabled: false
+          controller:
+            replicaCount: 0
         postgresql:
           enabled: false
         redis:
