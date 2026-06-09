@@ -44,6 +44,13 @@ spec:
           limits:
             cpu: 1
             memory: 512Mi
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      name: mongodb
+      namespace: mongodb
+      jsonPointers:
+        - /spec/volumeClaimTemplates
   destination:
     server: https://kubernetes.default.svc
     namespace: mongodb
