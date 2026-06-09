@@ -11,6 +11,17 @@ spec:
     repoURL: https://github.com/akann/k8s-apps
     targetRevision: HEAD
     path: apps/immich
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      namespace: immich
+      jsonPointers:
+        - /metadata/annotations
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      namespace: immich
+      jsonPointers:
+        - /metadata/annotations
   destination:
     server: https://kubernetes.default.svc
     namespace: immich
