@@ -21,12 +21,11 @@ spec:
           rootUser: root
           existingSecret: mongodb-secret
           databases:
-            - yana_stocks
-            - yana_ecommerce
+            - yana
           usernames:
             - yana
           passwords:
-            - ""  # managed via existingSecret
+            - ""
         persistence:
           enabled: true
           storageClass: ceph-rbd
