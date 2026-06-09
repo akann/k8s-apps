@@ -11,6 +11,10 @@ spec:
     repoURL: https://charts.external-secrets.io
     chart: external-secrets
     targetRevision: "*"
+    helm:
+      valuesObject:
+        webhook:
+          create: false
   destination:
     server: https://kubernetes.default.svc
     namespace: external-secrets
