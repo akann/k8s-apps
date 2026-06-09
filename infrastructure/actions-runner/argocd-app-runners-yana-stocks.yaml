@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: runners-yana-forex
+  name: runners-yana-stocks
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "9"
@@ -13,7 +13,7 @@ spec:
     targetRevision: "0.9.3"
     helm:
       valuesObject:
-        githubConfigUrl: https://github.com/akann/yana-forex
+        githubConfigUrl: https://github.com/akann/yana-stocks
         githubConfigSecret: github-pat
         minRunners: 0
         maxRunners: 4

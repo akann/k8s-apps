@@ -156,7 +156,7 @@ kubectl apply -f infrastructure/harbor/argocd-app-harbor.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
-kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-forex.yaml
+kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
 
 echo "Applying apps (wave 11 — foundational apps)..."
 kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
