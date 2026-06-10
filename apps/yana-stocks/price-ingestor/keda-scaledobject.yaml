@@ -1,0 +1,19 @@
+# Scales price-ingestor to 1 during US market hours (14:30–21:00 UTC Mon–Fri)
+# and to 0 outside market hours to save resources.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: price-ingestor
+  namespace: yana-stocks
+spec:
+  scaleTargetRef:
+    name: price-ingestor
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  triggers:
+    - type: cron
+      metadata:
+        timezone: "America/New_York"
+        start: "30 9 * * 1-5"   # 9:30 AM ET Mon–Fri (market open)
+        end:   "00 16 * * 1-5"  # 4:00 PM ET Mon–Fri (market close)
+        desiredReplicas: "1"

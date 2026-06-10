@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: price-processor
+  namespace: yana-stocks
+spec:
+  selector:
+    app: price-processor
+  ports:
+    - port: 3000
+      targetPort: 3000

@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ml-predictor
+  namespace: yana-stocks
+  annotations:
+    secret.reloader.stakater.com/reload: "ml-predictor-secret"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-predictor
+  template:
+    metadata:
+      labels:
+        app: ml-predictor
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
+      containers:
+        - name: ml-predictor
+          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ml-predictor-secret
+                  key: MONGODB_URI
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-predictor-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-predictor-secret
+                  key: MINIO_SECRET_KEY
+            - name: KAFKA_BROKERS
+              value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+            - name: MINIO_ENDPOINT
+              value: "minio.minio.svc.cluster.local:9000"
+            - name: MINIO_BUCKET
+              value: "yana-stocks-models"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: ml-predictor-success-rate
+        - setWeight: 50
+        - pause: { duration: 5m }
+        - setWeight: 100

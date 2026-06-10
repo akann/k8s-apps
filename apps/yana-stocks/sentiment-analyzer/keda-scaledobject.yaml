@@ -1,0 +1,22 @@
+# Scales sentiment-analyzer based on unprocessed messages in stocks.prices.processed.
+# When price activity is high, more news analysis is triggered.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: sentiment-analyzer
+  namespace: yana-stocks
+spec:
+  scaleTargetRef:
+    name: sentiment-analyzer
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        consumerGroup: sentiment-analyzer
+        topic: stocks.prices.processed
+        lagThreshold: "100"
+        offsetResetPolicy: latest

@@ -1,0 +1,70 @@
+# JWT-protected API routes
+---
+# /api/stocks/* → portfolio-api
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-stocks
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/stocks
+            pathType: Prefix
+            backend:
+              service:
+                name: portfolio-api
+                port:
+                  number: 3000
+---
+# /api/portfolio/* → portfolio-service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-portfolio
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/portfolio
+            pathType: Prefix
+            backend:
+              service:
+                name: portfolio-service
+                port:
+                  number: 3000
+---
+# /api/predict/* → ml-predictor
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-predict
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/predict
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-predictor
+                port:
+                  number: 8000

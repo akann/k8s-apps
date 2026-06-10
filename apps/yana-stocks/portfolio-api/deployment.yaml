@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portfolio-api
+  namespace: yana-stocks
+  annotations:
+    secret.reloader.stakater.com/reload: "portfolio-api-secret"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: portfolio-api
+  template:
+    metadata:
+      labels:
+        app: portfolio-api
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
+      containers:
+        - name: portfolio-api
+          image: harbor.yanatech.co.uk/yana-stocks/portfolio-api:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: REDIS_URL
+            - name: KAFKA_BROKERS
+              value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+            - name: USER_SERVICE_URL
+              value: "http://user-service.yana-stocks.svc.cluster.local:3000"
+            - name: PORTFOLIO_SERVICE_URL
+              value: "http://portfolio-service.yana-stocks.svc.cluster.local:3000"
+            - name: PRICE_PROCESSOR_URL
+              value: "http://price-processor.yana-stocks.svc.cluster.local:3000"
+            - name: ML_PREDICTOR_URL
+              value: "http://ml-predictor.yana-stocks.svc.cluster.local:8000"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

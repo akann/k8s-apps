@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: ml-predictor-success-rate
+  namespace: yana-stocks
+spec:
+  metrics:
+    - name: success-rate
+      interval: 30s
+      successCondition: result[0] >= 0.95
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: http://prometheus-operated.monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_request_duration_seconds_count{
+              job="ml-predictor",
+              status_code!~"5.."
+            }[1m])) /
+            sum(rate(http_request_duration_seconds_count{
+              job="ml-predictor"
+            }[1m]))

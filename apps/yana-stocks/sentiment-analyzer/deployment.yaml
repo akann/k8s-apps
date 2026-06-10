@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-analyzer
+  namespace: yana-stocks
+  annotations:
+    secret.reloader.stakater.com/reload: "sentiment-analyzer-secret"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-analyzer
+  template:
+    metadata:
+      labels:
+        app: sentiment-analyzer
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
+      containers:
+        - name: sentiment-analyzer
+          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:latest
+          env:
+            - name: NEWS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sentiment-analyzer-secret
+                  key: NEWS_API_KEY
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: sentiment-analyzer-secret
+                  key: MONGODB_URI
+            - name: KAFKA_BROKERS
+              value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+            - name: HUGGINGFACE_MODEL
+              value: "ProsusAI/finbert"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
