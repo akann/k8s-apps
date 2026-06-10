@@ -22,13 +22,27 @@ spec:
           name: actions-runner-controller-gha-rs-controller
         template:
           spec:
+            initContainers:
+              - name: init-dind-externals
+                image: ghcr.io/actions/actions-runner:latest
+                command: ["cp", "-r", "-v", "/home/runner/externals/.", "/home/runner/tmpDir/"]
+                volumeMounts:
+                  - name: dind-externals
+                    mountPath: /home/runner/tmpDir
             containers:
               - name: runner
                 image: ghcr.io/actions/actions-runner:latest
                 command: ["/home/runner/run.sh"]
+                env:
+                  - name: DOCKER_HOST
+                    value: unix:///var/run/docker.sock
                 volumeMounts:
-                  - name: docker-sock
-                    mountPath: /var/run/docker.sock
+                  - name: work
+                    mountPath: /home/runner/_work
+                  - name: dind-sock
+                    mountPath: /var/run
+                  - name: dind-externals
+                    mountPath: /home/runner/externals
                 resources:
                   requests:
                     cpu: "1"
@@ -36,10 +50,34 @@ spec:
                   limits:
                     cpu: "2"
                     memory: 4Gi
+              - name: dind
+                image: docker:27-dind
+                securityContext:
+                  privileged: true
+                env:
+                  - name: DOCKER_TLS_CERTDIR
+                    value: ""
+                volumeMounts:
+                  - name: work
+                    mountPath: /home/runner/_work
+                  - name: dind-sock
+                    mountPath: /var/run
+                  - name: dind-externals
+                    mountPath: /home/runner/externals
+                resources:
+                  requests:
+                    cpu: "500m"
+                    memory: 1Gi
+                  limits:
+                    cpu: "1"
+                    memory: 2Gi
             volumes:
-              - name: docker-sock
-                hostPath:
-                  path: /var/run/docker.sock
+              - name: work
+                emptyDir: {}
+              - name: dind-sock
+                emptyDir: {}
+              - name: dind-externals
+                emptyDir: {}
   destination:
     server: https://kubernetes.default.svc
     namespace: actions-runner
