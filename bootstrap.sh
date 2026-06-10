@@ -171,6 +171,7 @@ kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
 kubectl apply -f apps/gotify/argocd-app-gotify.yaml
 kubectl apply -f apps/apicurio/argocd-app-apicurio.yaml
 kubectl apply -f apps/kubernetes-dashboard/argocd-app-kubernetes-dashboard.yaml
+kubectl apply -f apps/yana-stocks/argocd-app-yana-stocks.yaml
 
 echo "Bootstrapping Immich (CNPG cluster + PVC must exist before Helm app)..."
 kubectl apply -f apps/immich/namespace.yaml
