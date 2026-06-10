@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-analyzer
+  namespace: yana-stocks
+  labels:
+    app: sentiment-analyzer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-analyzer
+  template:
+    metadata:
+      labels:
+        app: sentiment-analyzer
+    spec:
+      containers:
+        - name: sentiment-analyzer
+          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:latest
+          envFrom:
+            - secretRef:
+                name: sentiment-analyzer-secrets
+          env:
+            - name: HUGGINGFACE_MODEL
+              value: ProsusAI/finbert
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi

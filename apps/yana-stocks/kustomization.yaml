@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - frontend/ingress.yaml
+  - user-service/deployment.yaml
+  - user-service/service.yaml
+  - price-processor/deployment.yaml
+  - price-processor/service.yaml
+  - portfolio-service/deployment.yaml
+  - portfolio-service/service.yaml
+  - portfolio-api/deployment.yaml
+  - portfolio-api/service.yaml
+  - price-ingestor/deployment.yaml
+  - sentiment-analyzer/deployment.yaml
+  - ml-predictor/deployment.yaml
+  - ml-predictor/service.yaml
