@@ -39,14 +39,16 @@ spec:
             - name: ML_PREDICTOR_URL
               value: "http://ml-predictor.yana-stocks.svc.cluster.local:8000"
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /health
               port: 3000
             initialDelaySeconds: 60
             periodSeconds: 20
