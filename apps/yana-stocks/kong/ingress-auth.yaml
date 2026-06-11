@@ -1,11 +1,10 @@
-# /api/auth/* → user-service  (no JWT — public auth endpoints)
+# /api/auth/* → portfolio-api  (no JWT — public auth endpoints)
+# portfolio-api's AuthProxyController handles /api/auth/* and proxies to user-service internally
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-auth
   namespace: yana-stocks
-  annotations:
-    konghq.com/strip-path: "true"
 spec:
   ingressClassName: kong
   rules:
@@ -16,6 +15,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: user-service
+                name: portfolio-api
                 port:
                   number: 3000
