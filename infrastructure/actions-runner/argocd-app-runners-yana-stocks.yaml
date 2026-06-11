@@ -35,17 +35,6 @@ spec:
                   limits:
                     cpu: "2"
                     memory: 4Gi
-              - name: dind
-                resources:
-                  requests:
-                    cpu: "500m"
-                    memory: 1Gi
-                  limits:
-                    cpu: "1"
-                    memory: 2Gi
-            volumes:
-              - name: work
-                emptyDir: {}
   destination:
     server: https://kubernetes.default.svc
     namespace: actions-runner
