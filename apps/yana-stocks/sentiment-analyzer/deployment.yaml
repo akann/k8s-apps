@@ -37,6 +37,8 @@ spec:
               value: "ProsusAI/finbert"
             - name: PYTHONPATH
               value: "/app/src"
+            - name: HF_HOME
+              value: "/tmp/huggingface"
           resources:
             requests:
               cpu: 500m

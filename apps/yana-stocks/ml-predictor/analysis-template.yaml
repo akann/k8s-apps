@@ -6,6 +6,7 @@ metadata:
 spec:
   metrics:
     - name: success-rate
+      count: 5
       interval: 30s
       successCondition: result[0] >= 0.95
       failureLimit: 3
