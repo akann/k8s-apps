@@ -1,0 +1,28 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: cors
+  namespace: yana-stocks
+plugin: cors
+config:
+  origins:
+    - https://stocks.yanatech.co.uk
+  methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+    - HEAD
+  headers:
+    - Authorization
+    - Content-Type
+    - Accept
+    - Origin
+    - X-Requested-With
+  exposed_headers:
+    - Authorization
+  credentials: true
+  max_age: 3600
+  preflight_continue: false

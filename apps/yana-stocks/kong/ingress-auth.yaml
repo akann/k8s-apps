@@ -25,6 +25,8 @@ kind: Ingress
 metadata:
   name: api-auth
   namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
 spec:
   ingressClassName: kong
   rules:

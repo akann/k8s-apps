@@ -8,7 +8,7 @@ metadata:
   name: api-stocks
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth
+    konghq.com/plugins: jwt-auth,cors
 spec:
   ingressClassName: kong
   rules:
@@ -30,7 +30,7 @@ metadata:
   name: api-market
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth
+    konghq.com/plugins: jwt-auth,cors
 spec:
   ingressClassName: kong
   rules:
@@ -52,7 +52,7 @@ metadata:
   name: api-signals
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth
+    konghq.com/plugins: jwt-auth,cors
 spec:
   ingressClassName: kong
   rules:
@@ -74,7 +74,7 @@ metadata:
   name: api-portfolio
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth
+    konghq.com/plugins: jwt-auth,cors
 spec:
   ingressClassName: kong
   rules:
@@ -96,7 +96,7 @@ metadata:
   name: api-predict
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth
+    konghq.com/plugins: jwt-auth,cors
 spec:
   ingressClassName: kong
   rules:

@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - external-secret.yaml
   - kongplugin-jwt.yaml
+  - kongplugin-cors.yaml
   - kongconsumer.yaml
   - ingress-auth.yaml
   - ingress-api.yaml
