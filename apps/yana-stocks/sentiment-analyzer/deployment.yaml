@@ -35,6 +35,8 @@ spec:
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: HUGGINGFACE_MODEL
               value: "ProsusAI/finbert"
+            - name: PYTHONPATH
+              value: "/app/src"
           resources:
             requests:
               cpu: 500m
