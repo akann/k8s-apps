@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       initContainers:
         - name: migrate
-          image: harbor.yanatech.co.uk/yana-stocks/user-service:6d8accf35f71600af60db667ed8a07bd74e44d96
+          image: harbor.yanatech.co.uk/yana-stocks/user-service:a51a1f7f07f219fd569e8a5fc0cd7e27b26a3722
           command: ["/bin/sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma"]
           env:
             - name: DATABASE_URL
@@ -29,7 +29,7 @@ spec:
                   key: uri
       containers:
         - name: user-service
-          image: harbor.yanatech.co.uk/yana-stocks/user-service:6d8accf35f71600af60db667ed8a07bd74e44d96
+          image: harbor.yanatech.co.uk/yana-stocks/user-service:a51a1f7f07f219fd569e8a5fc0cd7e27b26a3722
           ports:
             - containerPort: 3000
           env:
