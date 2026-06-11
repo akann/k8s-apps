@@ -20,7 +20,7 @@ spec:
       initContainers:
         - name: migrate
           image: harbor.yanatech.co.uk/yana-stocks/user-service:6d8accf35f71600af60db667ed8a07bd74e44d96
-          command: ["node", "node_modules/.bin/prisma", "migrate", "deploy", "--schema=prisma/schema.prisma"]
+          command: ["/bin/sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma"]
           env:
             - name: DATABASE_URL
               valueFrom:
