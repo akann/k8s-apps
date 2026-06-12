@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: portfolio-service
-          image: harbor.yanatech.co.uk/yana-stocks/portfolio-service:89760506232a75ab6d9a5f6fce22548203be75c1
+          image: harbor.yanatech.co.uk/yana-stocks/portfolio-service:c2d33d24d02f9da183bb6cd6966ce3ac4ab2074c
           ports:
             - containerPort: 3000
           env:
