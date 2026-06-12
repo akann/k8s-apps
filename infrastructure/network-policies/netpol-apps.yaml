@@ -378,6 +378,27 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-cnpg-operator
+  namespace: yana-stocks
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: user-service-pg
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-intra-namespace
   namespace: yana-stocks
 spec:

@@ -79,6 +79,12 @@ spec:
       ports:
         - port: 9090
         - port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argo-rollouts
+      ports:
+        - port: 9090
 ---
 # Alertmanager — needs to reach Gotify bridge + external webhook
 apiVersion: networking.k8s.io/v1

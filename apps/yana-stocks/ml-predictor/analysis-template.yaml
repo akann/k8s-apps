@@ -5,19 +5,17 @@ metadata:
   namespace: yana-stocks
 spec:
   metrics:
-    - name: success-rate
+    - name: pod-readiness
+      initialDelay: 60s
       count: 5
       interval: 30s
-      successCondition: result[0] >= 0.95
+      successCondition: result[0] >= 1
       failureLimit: 3
       provider:
         prometheus:
           address: http://prometheus-operated.monitoring.svc.cluster.local:9090
           query: |
-            sum(rate(http_request_duration_seconds_count{
-              job="ml-predictor",
-              status_code!~"5.."
-            }[1m])) /
-            sum(rate(http_request_duration_seconds_count{
-              job="ml-predictor"
-            }[1m]))
+            min(
+              kube_pod_container_status_ready{namespace="yana-stocks",pod=~"ml-predictor-.*"}
+              or vector(1)
+            )
