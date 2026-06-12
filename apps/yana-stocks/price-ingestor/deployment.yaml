@@ -36,7 +36,7 @@ spec:
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: SYMBOLS
-              value: "AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ"
+              value: '["AAPL","GOOGL","MSFT","AMZN","TSLA","NVDA","META","JPM","V","JNJ"]'
           resources:
             requests:
               cpu: 100m
