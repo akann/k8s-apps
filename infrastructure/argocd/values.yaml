@@ -31,10 +31,10 @@ spec:
                       - profile
                       - email
                       - groups
-          "resource.customizations.ignoreDifferences.argoproj.io_Rollout": |
-            jqPathExpressions:
-              - '.metadata.annotations["rollout.argoproj.io/revision"]'
-              - '.spec.restartAt'
+            "resource.customizations.ignoreDifferences.argoproj.io_Rollout": |
+              jqPathExpressions:
+                - '.metadata.annotations["rollout.argoproj.io/revision"]'
+                - '.spec.restartAt'
           params:
             server.insecure: true
           rbac:
