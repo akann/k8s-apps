@@ -27,9 +27,9 @@ spec:
         - /spec/replicas
     - group: argoproj.io
       kind: Rollout
-      jqPathExpressions:
-        - '.metadata.annotations["rollout.argoproj.io/revision"]'
-        - .spec.restartAt
+      jsonPointers:
+        - /metadata/annotations/rollout.argoproj.io~1revision
+        - /spec/restartAt
     - group: external-secrets.io
       kind: ExternalSecret
       jqPathExpressions:
