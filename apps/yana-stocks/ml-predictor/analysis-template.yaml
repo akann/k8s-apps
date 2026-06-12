@@ -6,6 +6,7 @@ metadata:
 spec:
   metrics:
     - name: pod-readiness
+      initialDelay: 60s
       count: 5
       interval: 30s
       successCondition: result[0] >= 1
@@ -14,7 +15,7 @@ spec:
         prometheus:
           address: http://prometheus-operated.monitoring.svc.cluster.local:9090
           query: |
-            min(kube_pod_container_status_ready{
-              namespace="yana-stocks",
-              pod=~"ml-predictor-.*"
-            })
+            min(
+              kube_pod_container_status_ready{namespace="yana-stocks",pod=~"ml-predictor-.*"}
+              or vector(1)
+            )
