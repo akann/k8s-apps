@@ -89,6 +89,28 @@ spec:
                 port:
                   number: 3000
 ---
+# /api/news/* → portfolio-api (NewsController: /api/news/:symbol)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-news
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/news
+            pathType: Prefix
+            backend:
+              service:
+                name: portfolio-api
+                port:
+                  number: 3000
+---
 # /api/predict/* → ml-predictor (FastAPI: /api/predict/{symbol})
 apiVersion: networking.k8s.io/v1
 kind: Ingress
