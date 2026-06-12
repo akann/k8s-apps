@@ -42,6 +42,14 @@ spec:
         - port: 8000
         - port: 5432
         - port: 9187
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: yana-stocks
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
