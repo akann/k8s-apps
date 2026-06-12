@@ -39,6 +39,8 @@ spec:
               value: "/app/src"
             - name: HF_HOME
               value: "/tmp/huggingface"
+            - name: POLL_INTERVAL_SECONDS
+              value: "3600"
           resources:
             requests:
               cpu: 500m
