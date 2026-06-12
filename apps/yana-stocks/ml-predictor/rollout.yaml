@@ -5,6 +5,7 @@ metadata:
   namespace: yana-stocks
   annotations:
     secret.reloader.stakater.com/reload: "ml-predictor-secret"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
 spec:
   replicas: 1
   selector:
