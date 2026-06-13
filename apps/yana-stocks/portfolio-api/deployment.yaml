@@ -28,6 +28,11 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: REDIS_URL
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: MONGODB_URI
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: USER_SERVICE_URL
