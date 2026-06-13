@@ -43,11 +43,6 @@ spec:
               value: "http://price-processor.yana-stocks.svc.cluster.local:3000"
             - name: ML_PREDICTOR_URL
               value: "http://ml-predictor.yana-stocks.svc.cluster.local:8000"
-            - name: MONGODB_URI
-              valueFrom:
-                secretKeyRef:
-                  name: ml-predictor-secret
-                  key: MONGODB_URI
             - name: SENTIMENT_MONGODB_URI
               valueFrom:
                 secretKeyRef:
