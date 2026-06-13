@@ -48,6 +48,11 @@ spec:
                 secretKeyRef:
                   name: ml-predictor-secret
                   key: MONGODB_URI
+            - name: SENTIMENT_MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: SENTIMENT_MONGODB_URI
           readinessProbe:
             httpGet:
               path: /health
