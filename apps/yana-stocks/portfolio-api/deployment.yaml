@@ -53,6 +53,16 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: SENTIMENT_MONGODB_URI
+            - name: ALPACA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: ALPACA_API_KEY
+            - name: ALPACA_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: ALPACA_API_SECRET
           readinessProbe:
             httpGet:
               path: /health
