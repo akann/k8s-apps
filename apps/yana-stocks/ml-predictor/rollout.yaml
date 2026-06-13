@@ -5,6 +5,8 @@ metadata:
   namespace: yana-stocks
   annotations:
     secret.reloader.stakater.com/reload: "ml-predictor-secret"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: ServerSideApply=false
 spec:
   replicas: 1
   selector:
@@ -19,7 +21,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: ml-predictor
-          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:c2d33d24d02f9da183bb6cd6966ce3ac4ab2074c
+          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:f30f650d4ea38045b1638c318080cc8d58023db9
           ports:
             - containerPort: 8000
           env:

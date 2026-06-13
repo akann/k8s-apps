@@ -4,7 +4,7 @@ metadata:
   name: portfolio-api
   namespace: yana-stocks
   annotations:
-    secret.reloader.stakater.com/reload: "portfolio-api-secret"
+    secret.reloader.stakater.com/reload: "portfolio-api-secret,ml-predictor-secret"
 spec:
   replicas: 2
   selector:
@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: portfolio-api
-          image: harbor.yanatech.co.uk/yana-stocks/portfolio-api:c2d33d24d02f9da183bb6cd6966ce3ac4ab2074c
+          image: harbor.yanatech.co.uk/yana-stocks/portfolio-api:f30f650d4ea38045b1638c318080cc8d58023db9
           ports:
             - containerPort: 3000
           env:
@@ -43,6 +43,11 @@ spec:
               value: "http://price-processor.yana-stocks.svc.cluster.local:3000"
             - name: ML_PREDICTOR_URL
               value: "http://ml-predictor.yana-stocks.svc.cluster.local:8000"
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ml-predictor-secret
+                  key: MONGODB_URI
           readinessProbe:
             httpGet:
               path: /health
