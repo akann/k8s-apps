@@ -23,14 +23,15 @@ spec:
                 port:
                   number: 3000
 ---
-# /api/market/* → portfolio-api (StocksController: /api/market/movers)
+# /api/market/* → portfolio-api (StocksController: /api/market/movers, /api/market/assets)
+# No jwt-auth — market endpoints are public (shown on the unauthenticated homepage)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: api-market
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: cors
 spec:
   ingressClassName: kong
   rules:
