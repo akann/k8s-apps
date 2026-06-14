@@ -33,6 +33,16 @@ spec:
                 secretKeyRef:
                   name: price-processor-secret
                   key: REDIS_URL
+            - name: ALPACA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: price-processor-secret
+                  key: ALPACA_API_KEY
+            - name: ALPACA_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: price-processor-secret
+                  key: ALPACA_API_SECRET
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
           readinessProbe:
