@@ -36,7 +36,7 @@ spec:
                   name: price-processor-secret
                   key: MONGODB_URI
             - name: SYMBOLS
-              value: "AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ"
+              value: '["AAPL","GOOGL","MSFT","AMZN","TSLA","NVDA","META","JPM","V","JNJ"]'
           resources:
             requests:
               cpu: 200m
