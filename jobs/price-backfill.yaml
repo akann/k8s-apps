@@ -5,78 +5,16 @@ metadata:
   namespace: yana-stocks
 spec:
   ttlSecondsAfterFinished: 3600
-  backoffLimit: 2
+  backoffLimit: 0
   template:
     spec:
       restartPolicy: Never
+      imagePullSecrets:
+        - name: harbor-pull-secret
       containers:
         - name: backfill
-          image: python:3.12-slim
-          command: ["sh", "-c"]
-          args:
-            - |
-              pip install --quiet "alpaca-py>=0.36.0" "pymongo>=4.0" && python3 -c "
-              import os, sys, logging
-              from datetime import datetime, timezone, timedelta
-              from alpaca.data import StockHistoricalDataClient
-              from alpaca.data.requests import StockBarsRequest
-              from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
-              from alpaca.data.enums import DataFeed
-              import pymongo
-
-              logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
-              log = logging.getLogger('backfill')
-
-              SYMBOLS = ['AAPL','GOOGL','MSFT','AMZN','TSLA','NVDA','META','JPM','V','JNJ']
-              api_key = os.environ['ALPACA_API_KEY']
-              api_secret = os.environ['ALPACA_API_SECRET']
-              mongodb_uri = os.environ['MONGODB_URI']
-
-              client = StockHistoricalDataClient(api_key=api_key, secret_key=api_secret)
-              end = datetime.now(timezone.utc)
-              start = end - timedelta(days=95)
-
-              log.info('Fetching daily bars for %s symbols from %s to %s', len(SYMBOLS), start.date(), end.date())
-              request = StockBarsRequest(
-                  symbol_or_symbols=SYMBOLS,
-                  timeframe=TimeFrame(1, TimeFrameUnit.Day),
-                  start=start,
-                  end=end,
-                  feed=DataFeed.IEX,
-              )
-              bars = client.get_stock_bars(request).df
-              log.info('Fetched %d bars total', len(bars))
-
-              mongo = pymongo.MongoClient(mongodb_uri)
-              db = mongo['yana_stocks']
-              col = db['price_bars']
-              col.create_index([('symbol', 1), ('timestamp', 1)], unique=True)
-
-              upserted = 0
-              for (symbol, ts), row in bars.iterrows():
-                  ts_dt = ts.to_pydatetime()
-                  if ts_dt.tzinfo is None:
-                      ts_dt = ts_dt.replace(tzinfo=timezone.utc)
-                  doc = {
-                      'symbol': symbol,
-                      'timestamp': ts_dt,
-                      'open': float(row['open']),
-                      'high': float(row['high']),
-                      'low': float(row['low']),
-                      'close': float(row['close']),
-                      'volume': float(row['volume']),
-                  }
-                  result = col.update_one(
-                      {'symbol': symbol, 'timestamp': ts_dt},
-                      {'\$setOnInsert': doc},
-                      upsert=True,
-                  )
-                  if result.upserted_id:
-                      upserted += 1
-
-              log.info('Done: upserted %d new bars, skipped %d existing', upserted, len(bars) - upserted)
-              mongo.close()
-              "
+          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:latest
+          command: ["backfill-history"]
           env:
             - name: ALPACA_API_KEY
               valueFrom:
@@ -88,11 +26,17 @@ spec:
                 secretKeyRef:
                   name: price-ingestor-secret
                   key: ALPACA_API_SECRET
+            - name: ALPACA_BASE_URL
+              value: "https://data.alpaca.markets"
+            - name: ALPACA_FEED
+              value: "iex"
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
-                  name: ml-predictor-secret
+                  name: price-processor-secret
                   key: MONGODB_URI
+            - name: SYMBOLS
+              value: "AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ"
           resources:
             requests:
               cpu: 200m
