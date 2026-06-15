@@ -28,6 +28,7 @@
 A self-hosted, production-grade homelab running on a 6-node Kubernetes cluster across 3 Proxmox hypervisors. The cluster is managed entirely via GitOps (ArgoCD) — nothing is deployed manually without a subsequent commit to `github.com/akann/k8s-apps`.
 
 **Design principles:**
+
 - GitOps-first: git is the single source of truth
 - Zero-trust networking: every namespace has `default-deny-all` NetworkPolicy
 - Secrets never in git: all secrets pulled from Infisical via External Secrets Operator
@@ -55,8 +56,8 @@ graph TB
 
 ### 2.1 Proxmox Hypervisors
 
-| Host | IP | Role |
-|------|----|------|
+| Host | IP            | Role                          |
+| ---- | ------------- | ----------------------------- |
 | pve1 | 192.168.22.11 | Proxmox hypervisor + Ceph OSD |
 | pve2 | 192.168.22.12 | Proxmox hypervisor + Ceph OSD |
 | pve3 | 192.168.22.13 | Proxmox hypervisor + Ceph OSD |
@@ -93,60 +94,60 @@ graph TB
 
 ### 3.1 Nodes
 
-| Node | Role | IP | OS | K8s Version | CRI |
-|------|------|----|----|-------------|-----|
-| k8s-cp-1 | control-plane | 192.168.22.21 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
-| k8s-cp-2 | control-plane | 192.168.22.22 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
-| k8s-cp-3 | control-plane | 192.168.22.23 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
-| k8s-worker-1 | worker | 192.168.22.31 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
-| k8s-worker-2 | worker | 192.168.22.32 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
-| k8s-worker-3 | worker | 192.168.22.33 | Ubuntu 24.04.4 LTS | v1.32.13 | containerd 2.2.4 |
+| Node         | Role          | IP            | OS                 | K8s Version | CRI              |
+| ------------ | ------------- | ------------- | ------------------ | ----------- | ---------------- |
+| k8s-cp-1     | control-plane | 192.168.22.21 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-cp-2     | control-plane | 192.168.22.22 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-cp-3     | control-plane | 192.168.22.23 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-1 | worker        | 192.168.22.31 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-2 | worker        | 192.168.22.32 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-3 | worker        | 192.168.22.33 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
 
 The cluster uses **stacked etcd** — etcd runs on each control-plane node alongside the API server. kubeadm manages the cluster lifecycle.
 
 ### 3.2 Namespaces
 
-| Namespace | Purpose |
-|-----------|---------|
-| `actions-runner` | Self-hosted GitHub Actions runners (ARC) |
-| `apicurio` | API schema registry |
-| `argo-rollouts` | Canary/blue-green deployment controller |
-| `argocd` | GitOps engine |
-| `authentik` | SSO / identity provider |
-| `ceph-csi-rbd` | Ceph RBD CSI driver |
-| `cert-manager` | TLS certificate automation |
-| `cilium-secrets` | Cilium mTLS secrets |
-| `cnpg-clusters` | CloudNativePG shared PostgreSQL cluster |
-| `cnpg-system` | CloudNativePG operator |
-| `external-secrets` | External Secrets Operator |
-| `goldilocks` | VPA resource recommendations |
-| `gotify` | Push notification server |
-| `harbor` | Container image registry |
-| `headlamp` | Kubernetes web UI |
-| `immich` | Photo management (self-hosted Google Photos) |
-| `infisical` | Secrets manager |
-| `ingress-nginx` | HTTP/S ingress controller |
-| `kafka` | Strimzi Kafka cluster + operator |
-| `keda` | Kubernetes Event-Driven Autoscaling |
-| `kong` | API gateway |
-| `kube-system` | Core system components, Cilium, Hubble |
-| `kured` | Node reboot daemon (kured) |
-| `metallb-system` | Bare-metal load balancer |
-| `minio` | S3-compatible object storage |
-| `mongo-express` | MongoDB web UI |
-| `mongodb` | MongoDB replicaset |
-| `monitoring` | Prometheus, Grafana, Alertmanager, Loki, Tempo |
-| `nextcloud` | Self-hosted cloud storage |
-| `pgadmin` | PostgreSQL web UI |
-| `redis` | Redis standalone |
-| `redis-insight` | Redis web UI |
-| `reflector` | Kubernetes secret/configmap reflector |
-| `reloader` | Automatic pod rolling restarts on config changes |
-| `uptime-kuma` | Uptime monitoring |
-| `vaultwarden` | Bitwarden-compatible password manager |
-| `velero` | Cluster backup |
-| `yana-stocks` | yana-stocks microservices application |
-| `yanatech` | Static site / landing page |
+| Namespace          | Purpose                                          |
+| ------------------ | ------------------------------------------------ |
+| `actions-runner`   | Self-hosted GitHub Actions runners (ARC)         |
+| `apicurio`         | API schema registry                              |
+| `argo-rollouts`    | Canary/blue-green deployment controller          |
+| `argocd`           | GitOps engine                                    |
+| `authentik`        | SSO / identity provider                          |
+| `ceph-csi-rbd`     | Ceph RBD CSI driver                              |
+| `cert-manager`     | TLS certificate automation                       |
+| `cilium-secrets`   | Cilium mTLS secrets                              |
+| `cnpg-clusters`    | CloudNativePG shared PostgreSQL cluster          |
+| `cnpg-system`      | CloudNativePG operator                           |
+| `external-secrets` | External Secrets Operator                        |
+| `goldilocks`       | VPA resource recommendations                     |
+| `gotify`           | Push notification server                         |
+| `harbor`           | Container image registry                         |
+| `headlamp`         | Kubernetes web UI                                |
+| `immich`           | Photo management (self-hosted Google Photos)     |
+| `infisical`        | Secrets manager                                  |
+| `ingress-nginx`    | HTTP/S ingress controller                        |
+| `kafka`            | Strimzi Kafka cluster + operator                 |
+| `keda`             | Kubernetes Event-Driven Autoscaling              |
+| `kong`             | API gateway                                      |
+| `kube-system`      | Core system components, Cilium, Hubble           |
+| `kured`            | Node reboot daemon (kured)                       |
+| `metallb-system`   | Bare-metal load balancer                         |
+| `minio`            | S3-compatible object storage                     |
+| `mongo-express`    | MongoDB web UI                                   |
+| `mongodb`          | MongoDB replicaset                               |
+| `monitoring`       | Prometheus, Grafana, Alertmanager, Loki, Tempo   |
+| `nextcloud`        | Self-hosted cloud storage                        |
+| `pgadmin`          | PostgreSQL web UI                                |
+| `redis`            | Redis standalone                                 |
+| `redis-insight`    | Redis web UI                                     |
+| `reflector`        | Kubernetes secret/configmap reflector            |
+| `reloader`         | Automatic pod rolling restarts on config changes |
+| `uptime-kuma`      | Uptime monitoring                                |
+| `vaultwarden`      | Bitwarden-compatible password manager            |
+| `velero`           | Cluster backup                                   |
+| `yana-stocks`      | yana-stocks microservices application            |
+| `yanatech`         | Static site / landing page                       |
 
 ---
 
@@ -157,6 +158,7 @@ The cluster uses **stacked etcd** — etcd runs on each control-plane node along
 **Mode:** Native routing (no encapsulation — pods route directly at L3 across nodes).
 
 Key implications:
+
 - Inter-pod traffic is not encapsulated → lower overhead, full observability via Hubble
 - `NetworkPolicy` objects work, but **Ceph OSD egress** and **Grafana → Prometheus** require `CiliumNetworkPolicy` with `toCIDR` — standard `NetworkPolicy` ClusterIP routing fails in native routing mode
 - ESO webhook disabled because kube-apiserver cannot connect to in-cluster services via node IPs without a `CiliumNetworkPolicy`
@@ -167,11 +169,11 @@ Hubble UI: `hubble.yanatech.co.uk` (Authentik-protected)
 
 MetalLB provides `LoadBalancer` type services in bare-metal mode.
 
-| VIP | Service |
-|-----|---------|
-| 192.168.22.200 | ingress-nginx (all web traffic) |
+| VIP            | Service                                           |
+| -------------- | ------------------------------------------------- |
+| 192.168.22.200 | ingress-nginx (all web traffic)                   |
 | 192.168.22.201 | infisical bundled nginx (scaled to 0, do not use) |
-| 192.168.22.202 | Kong API Gateway (`kong-gateway-proxy`) |
+| 192.168.22.202 | Kong API Gateway (`kong-gateway-proxy`)           |
 
 Pool: `192.168.22.200–249`
 
@@ -179,11 +181,11 @@ Pool: `192.168.22.200–249`
 
 Two ingress classes are active:
 
-| Class | Controller | VIP | Purpose |
-|-------|-----------|-----|---------|
-| `nginx` | ingress-nginx | 192.168.22.200 | All web UIs, TLS termination |
-| `kong` | Kong Ingress Controller | 192.168.22.202 | yana-stocks API routing, JWT validation |
-| `infisical-nginx` | infisical bundled nginx | 192.168.22.201 | Infisical internal (disabled) |
+| Class             | Controller              | VIP            | Purpose                                 |
+| ----------------- | ----------------------- | -------------- | --------------------------------------- |
+| `nginx`           | ingress-nginx           | 192.168.22.200 | All web UIs, TLS termination            |
+| `kong`            | Kong Ingress Controller | 192.168.22.202 | yana-stocks API routing, JWT validation |
+| `infisical-nginx` | infisical bundled nginx | 192.168.22.201 | Infisical internal (disabled)           |
 
 **Note:** `ingress-nginx` requires `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` for Authentik forward-auth `auth-snippet` annotations.
 
@@ -251,14 +253,14 @@ For apps without native OIDC, Authentik forward auth is used:
 
 Every namespace has `default-deny-all`. Key policy files:
 
-| File | Coverage |
-|------|----------|
-| `infrastructure/network-policies/netpol-infrastructure.yaml` | All infrastructure namespaces |
-| `infrastructure/network-policies/netpol-cnpg.yaml` | CNPG operator + clusters |
-| `infrastructure/network-policies/netpol-monitoring.yaml` | Monitoring stack |
-| `infrastructure/network-policies/netpol-apiserver-egress.yaml` | kube-apiserver egress for operator namespaces |
-| `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml` | Ceph OSD egress (ports 6802-6809, `toCIDR` 192.168.22.0/24) |
-| `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml` | Grafana → Prometheus (ClusterIP bypass) |
+| File                                                           | Coverage                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------- |
+| `infrastructure/network-policies/netpol-infrastructure.yaml`   | All infrastructure namespaces                               |
+| `infrastructure/network-policies/netpol-cnpg.yaml`             | CNPG operator + clusters                                    |
+| `infrastructure/network-policies/netpol-monitoring.yaml`       | Monitoring stack                                            |
+| `infrastructure/network-policies/netpol-apiserver-egress.yaml` | kube-apiserver egress for operator namespaces               |
+| `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`             | Ceph OSD egress (ports 6802-6809, `toCIDR` 192.168.22.0/24) |
+| `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml`   | Grafana → Prometheus (ClusterIP bypass)                     |
 
 ---
 
@@ -266,16 +268,16 @@ Every namespace has `default-deny-all`. Key policy files:
 
 ### 5.1 Ceph RBD
 
-| Property | Value |
-|----------|-------|
-| Type | Ceph RBD (block storage) |
-| StorageClass | `ceph-rbd` (default) |
-| Raw capacity | 8.4 TiB |
-| OSDs | 6 (2 per Proxmox host) |
-| Monitors | 192.168.22.11-13:6789 |
-| Cluster ID | `92197a62-7cf9-49eb-a0cb-5e0b9bbff52a` |
-| Access mode | RWO (ReadWriteOnce) |
-| CSI namespace | `ceph-csi-rbd` |
+| Property      | Value                                  |
+| ------------- | -------------------------------------- |
+| Type          | Ceph RBD (block storage)               |
+| StorageClass  | `ceph-rbd` (default)                   |
+| Raw capacity  | 8.4 TiB                                |
+| OSDs          | 6 (2 per Proxmox host)                 |
+| Monitors      | 192.168.22.11-13:6789                  |
+| Cluster ID    | `92197a62-7cf9-49eb-a0cb-5e0b9bbff52a` |
+| Access mode   | RWO (ReadWriteOnce)                    |
+| CSI namespace | `ceph-csi-rbd`                         |
 
 All PersistentVolumeClaims cluster-wide use `ceph-rbd`. There is no NFS or local-path storage.
 
@@ -296,26 +298,26 @@ graph TB
 
 ### 5.2 PVC Inventory
 
-| Namespace | PVC | Size | Consumer |
-|-----------|-----|------|----------|
-| `cnpg-clusters` | pg-main-1/2/4 | 50 Gi × 3 | Shared PostgreSQL (pg-main) |
-| `harbor` | harbor-registry | 100 Gi | Image layers |
-| `harbor` | harbor-database | 10 Gi | Harbor PostgreSQL |
-| `harbor` | harbor-redis / trivy | 5 Gi / 10 Gi | Harbor cache/scanner |
-| `immich` | immich-library | 200 Gi | Photo library |
-| `immich` | immich-postgres-1 | 20 Gi | Immich CNPG PostgreSQL |
-| `kafka` | data-kafka-cluster-dual-role-{0,1,2} | 20 Gi × 3 | Kafka log data |
-| `minio` | minio | 50 Gi | Object storage |
-| `mongodb` | datadir-mongodb-{0,1} | 10 Gi × 2 | MongoDB replicas |
-| `monitoring` | prometheus-db | 20 Gi × 2 | Prometheus TSDB |
-| `monitoring` | alertmanager-db | 5 Gi × 2 | Alertmanager state |
-| `monitoring` | storage-loki-0 | 20 Gi | Loki log storage |
-| `monitoring` | storage-tempo-0 | 20 Gi | Tempo trace storage |
-| `nextcloud` | nextcloud-nextcloud | 100 Gi | Nextcloud data |
-| `redis` | redis-data-redis-master-0 | 5 Gi | Redis AOF/RDB |
-| `yana-stocks` | user-service-pg-1 | 10 Gi | yana-stocks PostgreSQL |
-| `vaultwarden` | vaultwarden-data | 5 Gi | Vault data |
-| `uptime-kuma` | uptime-kuma-pvc | 5 Gi | Kuma database |
+| Namespace       | PVC                                  | Size         | Consumer                    |
+| --------------- | ------------------------------------ | ------------ | --------------------------- |
+| `cnpg-clusters` | pg-main-1/2/4                        | 50 Gi × 3    | Shared PostgreSQL (pg-main) |
+| `harbor`        | harbor-registry                      | 100 Gi       | Image layers                |
+| `harbor`        | harbor-database                      | 10 Gi        | Harbor PostgreSQL           |
+| `harbor`        | harbor-redis / trivy                 | 5 Gi / 10 Gi | Harbor cache/scanner        |
+| `immich`        | immich-library                       | 200 Gi       | Photo library               |
+| `immich`        | immich-postgres-1                    | 20 Gi        | Immich CNPG PostgreSQL      |
+| `kafka`         | data-kafka-cluster-dual-role-{0,1,2} | 20 Gi × 3    | Kafka log data              |
+| `minio`         | minio                                | 50 Gi        | Object storage              |
+| `mongodb`       | datadir-mongodb-{0,1}                | 10 Gi × 2    | MongoDB replicas            |
+| `monitoring`    | prometheus-db                        | 20 Gi × 2    | Prometheus TSDB             |
+| `monitoring`    | alertmanager-db                      | 5 Gi × 2     | Alertmanager state          |
+| `monitoring`    | storage-loki-0                       | 20 Gi        | Loki log storage            |
+| `monitoring`    | storage-tempo-0                      | 20 Gi        | Tempo trace storage         |
+| `nextcloud`     | nextcloud-nextcloud                  | 100 Gi       | Nextcloud data              |
+| `redis`         | redis-data-redis-master-0            | 5 Gi         | Redis AOF/RDB               |
+| `yana-stocks`   | user-service-pg-1                    | 10 Gi        | yana-stocks PostgreSQL      |
+| `vaultwarden`   | vaultwarden-data                     | 5 Gi         | Vault data                  |
+| `uptime-kuma`   | uptime-kuma-pvc                      | 5 Gi         | Kuma database               |
 
 ---
 
@@ -326,19 +328,19 @@ graph TB
 ```mermaid
 graph LR
     Vaultwarden["Vaultwarden<br/>vault.yanatech.co.uk<br/>(bootstrap source)"] -->|"manual entry"| Infisical
-    
+
     subgraph Infisical["Infisical — infisical.yanatech.co.uk"]
         Project["Project: k8s-homelab<br/>ID: 69b39965-b778-47a7-ba52-2cd66a7aad0a<br/>Env: prod"]
     end
-    
+
     Infisical -->|"API pull"| ESO
-    
+
     subgraph ESO["External Secrets Operator"]
         CSS["ClusterSecretStore: infisical<br/>(ReadOnly, Valid)"]
         ES["ExternalSecret resources<br/>(refreshInterval: 1h)"]
         CSS --> ES
     end
-    
+
     ES -->|"creates/owns"| K8sSecret["Kubernetes Secrets<br/>(in each namespace)"]
     K8sSecret --> Pods["Application Pods"]
 ```
@@ -381,32 +383,32 @@ For a fresh cluster, Vaultwarden (at `vault.yanatech.co.uk`) is the source of tr
 
 ### 7.1 ArgoCD
 
-| Property | Value |
-|----------|-------|
-| Version | v3.4.2 |
-| URL | https://argocd.yanatech.co.uk |
-| Source repo | https://github.com/akann/k8s-apps |
-| Sync policy | Automated (prune: true, selfHeal: true) |
-| Namespace creation | Via `CreateNamespace=true` syncOption |
-| Apply method | `ServerSideApply=true` |
+| Property           | Value                                   |
+| ------------------ | --------------------------------------- |
+| Version            | v3.4.2                                  |
+| URL                | https://argocd.yanatech.co.uk           |
+| Source repo        | https://github.com/akann/k8s-apps       |
+| Sync policy        | Automated (prune: true, selfHeal: true) |
+| Namespace creation | Via `CreateNamespace=true` syncOption   |
+| Apply method       | `ServerSideApply=true`                  |
 
 All applications use **app-of-apps pattern** or direct ArgoCD `Application` manifests. The sync wave annotation controls deployment ordering.
 
 ### 7.2 ArgoCD Sync Waves
 
-| Wave | Components |
-|------|-----------|
-| 0 | MetalLB, Ceph CSI |
-| 1 | Cilium, cert-manager, ingress-nginx |
-| 2 | MetalLB IPAddressPool+L2Advertisement, cert-manager ClusterIssuers |
-| 3 | Reflector, Reloader, Kured, Descheduler, KEDA, Argo Rollouts, NetworkPolicies |
-| 4 | Authentik, kube-prometheus-stack, Tempo, Velero |
-| 5 | Loki+Promtail, Headlamp, Goldilocks, Redis, MongoDB, MinIO, Kong |
-| 6 | ESO, Infisical, Redis Insight, Mongo Express |
-| 7 | CNPG operator, CNPG clusters (pg-main, immich-postgres) |
-| 8 | Harbor, Actions Runner Controller |
-| 9+ | Applications (Vaultwarden, Kafka, Immich, Nextcloud, etc.) |
-| 10+ | yana-stocks services |
+| Wave | Components                                                                    |
+| ---- | ----------------------------------------------------------------------------- |
+| 0    | MetalLB, Ceph CSI                                                             |
+| 1    | Cilium, cert-manager, ingress-nginx                                           |
+| 2    | MetalLB IPAddressPool+L2Advertisement, cert-manager ClusterIssuers            |
+| 3    | Reflector, Reloader, Kured, Descheduler, KEDA, Argo Rollouts, NetworkPolicies |
+| 4    | Authentik, kube-prometheus-stack, Tempo, Velero                               |
+| 5    | Loki+Promtail, Headlamp, Goldilocks, Redis, MongoDB, MinIO, Kong              |
+| 6    | ESO, Infisical, Redis Insight, Mongo Express                                  |
+| 7    | CNPG operator, CNPG clusters (pg-main, immich-postgres)                       |
+| 8    | Harbor, Actions Runner Controller                                             |
+| 9+   | Applications (Vaultwarden, Kafka, Immich, Nextcloud, etc.)                    |
+| 10+  | yana-stocks services                                                          |
 
 ### 7.3 yana-stocks CI/CD Pipeline
 
@@ -414,14 +416,14 @@ All applications use **app-of-apps pattern** or direct ArgoCD `Application` mani
 graph LR
     Dev["Developer\npush to main"] --> GH["GitHub\ngithub.com/akann/yana-stocks"]
     GH --> ARC["ARC Runners\n(actions-runner ns)"]
-    
+
     subgraph CI["GitHub Actions CI"]
         ARC --> Turbo["Turborepo\n--filter=[HEAD^1]"]
         Turbo --> Tests["lint + type-check + test"]
         Tests --> Docker["docker build\n(multi-stage)"]
-        Docker --> Harbor["Push to Harbor\nharbor.yanatech.co.uk/yana-stocks/<svc>:<sha>"]
+        Docker --> Harbor["Push to Harbor\nharbor.yanatech.co.uk/yana-stocks/service:sha"]
     end
-    
+
     Harbor --> UpdateTag["Update image tag\nin k8s-apps repo"]
     UpdateTag --> ArgoCD["ArgoCD detects diff\nauto-syncs"]
     ArgoCD --> E2E["Playwright E2E\n(apps/e2e)"]
@@ -436,13 +438,13 @@ graph LR
 
 These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
-| App | Reason |
-|-----|--------|
-| `actions-runner-controller` | OCI registry limitation |
-| `argo-rollouts` | Cluster-scoped CRDs tracked twice |
-| `infisical` | Bundled nginx chart mutation |
-| `kafka` | Strimzi bootstrap Service patch timeout (upstream) |
-| `immich` | SharedResourceWarning (ingress shared between two apps) |
+| App                         | Reason                                                  |
+| --------------------------- | ------------------------------------------------------- |
+| `actions-runner-controller` | OCI registry limitation                                 |
+| `argo-rollouts`             | Cluster-scoped CRDs tracked twice                       |
+| `infisical`                 | Bundled nginx chart mutation                            |
+| `kafka`                     | Strimzi bootstrap Service patch timeout (upstream)      |
+| `immich`                    | SharedResourceWarning (ingress shared between two apps) |
 
 ---
 
@@ -452,11 +454,11 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 #### CloudNativePG (CNPG) — PostgreSQL
 
-| Cluster | Namespace | Instances | Primary | Size | Consumers |
-|---------|-----------|-----------|---------|------|-----------|
-| `pg-main` | `cnpg-clusters` | 3 | pg-main-1 | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
-| `immich-postgres` | `immich` | 1 | immich-postgres-1 | 20 Gi | Immich (pgvector/VectorChord) |
-| `user-service-pg` | `yana-stocks` | 1 | user-service-pg-1 | 10 Gi | yana-stocks user-service |
+| Cluster           | Namespace       | Instances | Primary           | Size      | Consumers                                              |
+| ----------------- | --------------- | --------- | ----------------- | --------- | ------------------------------------------------------ |
+| `pg-main`         | `cnpg-clusters` | 3         | pg-main-1         | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
+| `immich-postgres` | `immich`        | 1         | immich-postgres-1 | 20 Gi     | Immich (pgvector/VectorChord)                          |
+| `user-service-pg` | `yana-stocks`   | 1         | user-service-pg-1 | 10 Gi     | yana-stocks user-service                               |
 
 **pg-main connection:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`  
 **Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)
@@ -485,25 +487,25 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 ### 8.2 Message Broker — Kafka (Strimzi)
 
-| Property | Value |
-|----------|-------|
-| Operator | Strimzi `strimzi-cluster-operator` |
-| Cluster name | `kafka-cluster` |
-| Mode | KRaft (combined broker + controller, no ZooKeeper) |
-| Brokers | 3 dual-role pods (`kafka-cluster-dual-role-{0,1,2}`) |
-| Bootstrap | `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` |
-| PVC per broker | 20 Gi (ceph-rbd) |
-| UI | `kafka-ui.yanatech.co.uk` (Authentik-protected) |
+| Property       | Value                                                        |
+| -------------- | ------------------------------------------------------------ |
+| Operator       | Strimzi `strimzi-cluster-operator`                           |
+| Cluster name   | `kafka-cluster`                                              |
+| Mode           | KRaft (combined broker + controller, no ZooKeeper)           |
+| Brokers        | 3 dual-role pods (`kafka-cluster-dual-role-{0,1,2}`)         |
+| Bootstrap      | `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` |
+| PVC per broker | 20 Gi (ceph-rbd)                                             |
+| UI             | `kafka-ui.yanatech.co.uk` (Authentik-protected)              |
 
 **Topics:**
 
-| Topic | Partitions | Replication | Retention | Producer | Consumer(s) |
-|-------|-----------|-------------|-----------|----------|------------|
-| `stocks.prices.raw` | 3 | 3 | 24h | price-ingestor | price-processor |
-| `stocks.prices.processed` | 3 | 3 | 7d | price-processor | ml-predictor, portfolio-api |
-| `stocks.signals.sentiment` | 3 | 3 | 7d | sentiment-analyzer | portfolio-api |
-| `stocks.signals.prediction` | 3 | 3 | 7d | ml-predictor | portfolio-api |
-| `stocks.portfolio.events` | 3 | 3 | 30d | portfolio-service | price-processor |
+| Topic                       | Partitions | Replication | Retention | Producer           | Consumer(s)                 |
+| --------------------------- | ---------- | ----------- | --------- | ------------------ | --------------------------- |
+| `stocks.prices.raw`         | 3          | 3           | 24h       | price-ingestor     | price-processor             |
+| `stocks.prices.processed`   | 3          | 3           | 7d        | price-processor    | ml-predictor, portfolio-api |
+| `stocks.signals.sentiment`  | 3          | 3           | 7d        | sentiment-analyzer | portfolio-api               |
+| `stocks.signals.prediction` | 3          | 3           | 7d        | ml-predictor       | portfolio-api               |
+| `stocks.portfolio.events`   | 3          | 3           | 30d       | portfolio-service  | price-processor             |
 
 ### 8.3 Container Registry — Harbor
 
@@ -515,13 +517,13 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 ### 8.4 Cluster Maintenance
 
-| Tool | Purpose | Namespace |
-|------|---------|-----------|
-| **Kured** | Auto-reboot nodes when `/var/run/reboot-required` is set (after kernel updates) | `kured` |
-| **Descheduler** | Evict and reschedule pods to rebalance cluster | `kube-system` (daemonset) |
-| **Goldilocks** | VPA-based resource request recommendations | `goldilocks` |
-| **Reloader** | Rolling restart pods when ConfigMaps/Secrets change | `reloader` |
-| **Reflector** | Mirror `wildcard-yanatech-tls` Secret + any annotated resources across namespaces | `reflector` |
+| Tool            | Purpose                                                                           | Namespace                 |
+| --------------- | --------------------------------------------------------------------------------- | ------------------------- |
+| **Kured**       | Auto-reboot nodes when `/var/run/reboot-required` is set (after kernel updates)   | `kured`                   |
+| **Descheduler** | Evict and reschedule pods to rebalance cluster                                    | `kube-system` (daemonset) |
+| **Goldilocks**  | VPA-based resource request recommendations                                        | `goldilocks`              |
+| **Reloader**    | Rolling restart pods when ConfigMaps/Secrets change                               | `reloader`                |
+| **Reflector**   | Mirror `wildcard-yanatech-tls` Secret + any annotated resources across namespaces | `reflector`               |
 
 ---
 
@@ -529,33 +531,34 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 ### 9.1 Service URLs
 
-| Service | URL | Auth | Notes |
-|---------|-----|------|-------|
-| ArgoCD | https://argocd.yanatech.co.uk | Native | GitOps UI |
-| Authentik | https://auth.yanatech.co.uk | Native | SSO IdP |
-| Grafana | https://grafana.yanatech.co.uk | Authentik OIDC | Metrics dashboards |
-| Immich | https://photos.yanatech.co.uk | Native | Photo management |
-| Infisical | https://infisical.yanatech.co.uk | Native | Secrets manager |
-| Harbor | https://harbor.yanatech.co.uk | Native | Container registry |
-| Nextcloud | https://cloud.yanatech.co.uk | Native | Cloud storage |
-| Kong API GW | https://api-gateway.yanatech.co.uk | JWT (per-route) | yana-stocks API |
-| MinIO Console | https://minio-console.yanatech.co.uk | Native | Object storage UI |
-| MongoDB UI | https://mongo.yanatech.co.uk | Authentik forward | Mongo Express |
-| Redis UI | https://redis.yanatech.co.uk | Authentik forward | Redis Insight |
-| Headlamp | https://headlamp.yanatech.co.uk | SA token | Kubernetes UI |
-| Kafka UI | https://kafka-ui.yanatech.co.uk | Authentik forward | Kafka browser |
-| Argo Rollouts | https://rollouts.yanatech.co.uk | Authentik forward | Canary dashboard |
-| pgAdmin | https://pgadmin.yanatech.co.uk | Native | PostgreSQL UI |
-| Apicurio | https://apicurio.yanatech.co.uk | Authentik forward | Schema registry |
-| Vaultwarden | https://vault.yanatech.co.uk | Native | Password manager |
-| Uptime Kuma | https://status.yanatech.co.uk | Authentik forward | Uptime monitoring |
-| Hubble UI | https://hubble.yanatech.co.uk | Authentik forward | Cilium network viz |
-| Goldilocks | https://goldilocks.yanatech.co.uk | Authentik forward | Resource recommendations |
-| Gotify | https://gotify.yanatech.co.uk | Native | Push notifications |
-| yana-stocks | https://stocks.yanatech.co.uk | JWT (in-app) | Stock market app |
-| yanatech | https://yanatech.co.uk | Public | Landing page |
+| Service       | URL                                  | Auth              | Notes                    |
+| ------------- | ------------------------------------ | ----------------- | ------------------------ |
+| ArgoCD        | https://argocd.yanatech.co.uk        | Native            | GitOps UI                |
+| Authentik     | https://auth.yanatech.co.uk          | Native            | SSO IdP                  |
+| Grafana       | https://grafana.yanatech.co.uk       | Authentik OIDC    | Metrics dashboards       |
+| Immich        | https://photos.yanatech.co.uk        | Native            | Photo management         |
+| Infisical     | https://infisical.yanatech.co.uk     | Native            | Secrets manager          |
+| Harbor        | https://harbor.yanatech.co.uk        | Native            | Container registry       |
+| Nextcloud     | https://cloud.yanatech.co.uk         | Native            | Cloud storage            |
+| Kong API GW   | https://api-gateway.yanatech.co.uk   | JWT (per-route)   | yana-stocks API          |
+| MinIO Console | https://minio-console.yanatech.co.uk | Native            | Object storage UI        |
+| MongoDB UI    | https://mongo.yanatech.co.uk         | Authentik forward | Mongo Express            |
+| Redis UI      | https://redis.yanatech.co.uk         | Authentik forward | Redis Insight            |
+| Headlamp      | https://headlamp.yanatech.co.uk      | SA token          | Kubernetes UI            |
+| Kafka UI      | https://kafka-ui.yanatech.co.uk      | Authentik forward | Kafka browser            |
+| Argo Rollouts | https://rollouts.yanatech.co.uk      | Authentik forward | Canary dashboard         |
+| pgAdmin       | https://pgadmin.yanatech.co.uk       | Native            | PostgreSQL UI            |
+| Apicurio      | https://apicurio.yanatech.co.uk      | Authentik forward | Schema registry          |
+| Vaultwarden   | https://vault.yanatech.co.uk         | Native            | Password manager         |
+| Uptime Kuma   | https://status.yanatech.co.uk        | Authentik forward | Uptime monitoring        |
+| Hubble UI     | https://hubble.yanatech.co.uk        | Authentik forward | Cilium network viz       |
+| Goldilocks    | https://goldilocks.yanatech.co.uk    | Authentik forward | Resource recommendations |
+| Gotify        | https://gotify.yanatech.co.uk        | Native            | Push notifications       |
+| yana-stocks   | https://stocks.yanatech.co.uk        | JWT (in-app)      | Stock market app         |
+| yanatech      | https://yanatech.co.uk               | Public            | Landing page             |
 
 **Note on Headlamp:** Authentik SSO is broken upstream; use a long-lived ServiceAccount token:
+
 ```bash
 kubectl create token headlamp -n headlamp --duration=8760h
 ```
@@ -571,16 +574,16 @@ A production-grade, event-driven microservices application for real-time stock d
 
 ### 10.1 Service Overview
 
-| Service | Language | Pattern | Replicas | Dependencies |
-|---------|----------|---------|----------|-------------|
-| `frontend` | Next.js 14 (App Router) | Deployment | 2 | portfolio-api |
-| `portfolio-api` | NestJS | Deployment | 2 | user-service, portfolio-service, price-processor, ml-predictor, Redis |
-| `portfolio-service` | NestJS | Deployment | 2 | MongoDB, Kafka |
-| `price-processor` | NestJS | Deployment | 2 | MongoDB, Redis, Kafka |
-| `user-service` | NestJS | Deployment | 2 | CNPG PostgreSQL, Redis, Kafka |
-| `price-ingestor` | Python | Deployment + KEDA | 0–3 | Alpaca API, Kafka |
-| `sentiment-analyzer` | Python | Deployment + KEDA | 0–3 | NewsAPI, MongoDB, Kafka |
-| `ml-predictor` | Python | Argo Rollouts (canary) | 1 | MongoDB, MinIO, Kafka |
+| Service              | Language                | Pattern                | Replicas | Dependencies                                                          |
+| -------------------- | ----------------------- | ---------------------- | -------- | --------------------------------------------------------------------- |
+| `frontend`           | Next.js 14 (App Router) | Deployment             | 2        | portfolio-api                                                         |
+| `portfolio-api`      | NestJS                  | Deployment             | 2        | user-service, portfolio-service, price-processor, ml-predictor, Redis |
+| `portfolio-service`  | NestJS                  | Deployment             | 2        | MongoDB, Kafka                                                        |
+| `price-processor`    | NestJS                  | Deployment             | 2        | MongoDB, Redis, Kafka                                                 |
+| `user-service`       | NestJS                  | Deployment             | 2        | CNPG PostgreSQL, Redis, Kafka                                         |
+| `price-ingestor`     | Python                  | Deployment + KEDA      | 0–3      | Alpaca API, Kafka                                                     |
+| `sentiment-analyzer` | Python                  | Deployment + KEDA      | 0–3      | NewsAPI, MongoDB, Kafka                                               |
+| `ml-predictor`       | Python                  | Argo Rollouts (canary) | 1        | MongoDB, MinIO, Kafka                                                 |
 
 ### 10.2 Data Flow
 
@@ -588,7 +591,7 @@ A production-grade, event-driven microservices application for real-time stock d
 graph TB
     Alpaca["☁️ Alpaca Markets API"] -->|"OHLCV bars"| PI["price-ingestor\n(Python, KEDA 0-3)"]
     PI -->|"stocks.prices.raw"| Kafka[("Kafka\nkafka-cluster")]
-    
+
     Kafka -->|"stocks.prices.raw"| PP["price-processor\n(NestJS, 2 replicas)"]
     PP -->|"OHLCV history"| Mongo[("MongoDB rs0")]
     PP -->|"latest price TTL 5s"| Redis[("Redis")]
@@ -632,13 +635,13 @@ sequenceDiagram
     participant Kong as Kong Gateway
     participant US as user-service
     participant Redis as Redis
-    
+
     C->>Kong: POST /api/auth/login
     Kong->>US: Forward (no JWT check)
     US->>Redis: Store refreshToken (7d TTL)
-    US-->>C: { accessToken (JWT 15m), refreshToken (opaque 7d) }
-    
-    C->>Kong: GET /api/stocks/AAPL<br/>Authorization: Bearer <accessToken>
+    US-->>C: accessToken (JWT 15m)\nrefreshToken (opaque 7d)
+
+    C->>Kong: GET /api/stocks/AAPL\nAuthorization: Bearer accessToken
     Kong->>Kong: Validate JWT signature
     Kong->>US: Forward with user context
     US-->>C: Stock data
@@ -647,22 +650,22 @@ sequenceDiagram
     Kong->>US: Forward refreshToken
     US->>Redis: Validate + delete old token
     US->>Redis: Store new refreshToken
-    US-->>C: New accessToken + new refreshToken
+    US-->>C: New accessToken\nNew refreshToken
 ```
 
 ### 10.4 Kong API Routes
 
-| Route | Method | Target | JWT Required |
-|-------|--------|--------|-------------|
-| `/api/auth/*` | ALL | `user-service:3000` | No |
-| `/api/stocks/*` | GET | `portfolio-api:3000` | Yes |
-| `/api/portfolio/*` | ALL | `portfolio-service:3000` | Yes |
-| `/api/predict/*` | GET | `ml-predictor:8000` | Yes |
-| `/api/market/*` | GET | `portfolio-api:3000` | Yes |
-| `/api/signals/*` | GET | `portfolio-api:3000` | Yes |
-| `/api/news/*` | GET | `portfolio-api:3000` | Yes |
-| `/api/health` | GET | `portfolio-api:3000` | No |
-| `/*` | ALL | `frontend:3000` | No |
+| Route              | Method | Target                   | JWT Required |
+| ------------------ | ------ | ------------------------ | ------------ |
+| `/api/auth/*`      | ALL    | `user-service:3000`      | No           |
+| `/api/stocks/*`    | GET    | `portfolio-api:3000`     | Yes          |
+| `/api/portfolio/*` | ALL    | `portfolio-service:3000` | Yes          |
+| `/api/predict/*`   | GET    | `ml-predictor:8000`      | Yes          |
+| `/api/market/*`    | GET    | `portfolio-api:3000`     | Yes          |
+| `/api/signals/*`   | GET    | `portfolio-api:3000`     | Yes          |
+| `/api/news/*`      | GET    | `portfolio-api:3000`     | Yes          |
+| `/api/health`      | GET    | `portfolio-api:3000`     | No           |
+| `/*`               | ALL    | `frontend:3000`          | No           |
 
 ### 10.5 KEDA Autoscaling
 
@@ -869,11 +872,11 @@ Requires `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` 
 
 ### 13.1 Velero
 
-| Property | Value |
-|----------|-------|
-| Schedule | Weekly, Sundays at 02:00 UTC |
-| Schedule name | `velero-weekly-backup` |
-| Namespace | `velero` |
+| Property      | Value                        |
+| ------------- | ---------------------------- |
+| Schedule      | Weekly, Sundays at 02:00 UTC |
+| Schedule name | `velero-weekly-backup`       |
+| Namespace     | `velero`                     |
 
 Velero backs up Kubernetes resources and PVC snapshots. Configure a `BackupStorageLocation` pointing to MinIO (`minio.minio.svc.cluster.local:9000`) for object storage of backups.
 
@@ -883,13 +886,13 @@ CloudNativePG clusters support WAL archiving to S3-compatible storage. Configure
 
 ### 13.3 Recovery Priorities
 
-| Priority | Data | RTO |
-|----------|------|-----|
-| Critical | Vaultwarden (password vault) | Restore from Velero backup |
-| High | Infisical secrets, CNPG data | Restore from WAL / Velero |
-| High | Immich photo library (200 Gi PVC) | Restore PVC from Ceph snapshot |
-| Medium | Nextcloud files, MongoDB | Restore from Velero |
-| Low | Redis, monitoring TSDB | Ephemeral acceptable, re-seed |
+| Priority | Data                              | RTO                            |
+| -------- | --------------------------------- | ------------------------------ |
+| Critical | Vaultwarden (password vault)      | Restore from Velero backup     |
+| High     | Infisical secrets, CNPG data      | Restore from WAL / Velero      |
+| High     | Immich photo library (200 Gi PVC) | Restore PVC from Ceph snapshot |
+| Medium   | Nextcloud files, MongoDB          | Restore from Velero            |
+| Low      | Redis, monitoring TSDB            | Ephemeral acceptable, re-seed  |
 
 ---
 
@@ -902,6 +905,7 @@ The infisical bundled nginx creates `infisical-ingress-nginx-admission` Validati
 **Permanent fix applied:** infisical nginx scaled to 0, `admissionWebhooks.enabled: false`, `failurePolicy: Ignore` patched.
 
 **If it reappears:**
+
 ```bash
 kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission 2>/dev/null; true
 kubectl delete service infisical-ingress-nginx-controller-admission -n infisical 2>/dev/null; true
@@ -918,6 +922,7 @@ Standard `NetworkPolicy` cannot reach Ceph OSDs on ports 6802-6809 (bare-metal I
 ### Infisical Ingress Class Reversion
 
 After ArgoCD sync, infisical ingress may revert to `infisical-nginx` class. Manual patch:
+
 ```bash
 kubectl patch ingress infisical-ingress -n infisical --type='json' \
   -p='[{"op":"replace","path":"/spec/ingressClassName","value":"nginx"},...]'
