@@ -23,6 +23,10 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: OTEL_SERVICE_NAME
+              value: "frontend"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           readinessProbe:
             httpGet:
               path: /api/health

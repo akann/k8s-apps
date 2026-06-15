@@ -470,5 +470,11 @@ spec:
               kubernetes.io/metadata.name: minio
       ports:
         - port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 4318  # Tempo OTLP HTTP
     - ports:
         - port: 443  # Alpaca, NewsAPI, HuggingFace

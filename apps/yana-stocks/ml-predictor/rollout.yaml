@@ -48,6 +48,10 @@ spec:
               value: "yana-stocks-models"
             - name: PYTHONPATH
               value: "/app/src"
+            - name: OTEL_SERVICE_NAME
+              value: "ml-predictor"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           readinessProbe:
             httpGet:
               path: /health

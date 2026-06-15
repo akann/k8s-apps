@@ -46,6 +46,10 @@ spec:
               value: "/tmp/huggingface"
             - name: POLL_INTERVAL_SECONDS
               value: "3600"
+            - name: OTEL_SERVICE_NAME
+              value: "sentiment-analyzer"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           resources:
             requests:
               cpu: 500m

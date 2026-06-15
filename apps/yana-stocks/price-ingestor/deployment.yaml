@@ -37,6 +37,10 @@ spec:
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: SYMBOLS
               value: '["AAPL","GOOGL","MSFT","AMZN","TSLA","NVDA","META","JPM","V","JNJ"]'
+            - name: OTEL_SERVICE_NAME
+              value: "price-ingestor"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           resources:
             requests:
               cpu: 100m

@@ -45,6 +45,10 @@ spec:
                   key: ALPACA_API_SECRET
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+            - name: OTEL_SERVICE_NAME
+              value: "price-processor"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           readinessProbe:
             httpGet:
               path: /health

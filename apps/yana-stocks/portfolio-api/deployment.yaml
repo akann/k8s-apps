@@ -60,6 +60,10 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: ALPACA_API_SECRET
+            - name: OTEL_SERVICE_NAME
+              value: "portfolio-api"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo.monitoring.svc.cluster.local:4318"
           readinessProbe:
             httpGet:
               path: /health
