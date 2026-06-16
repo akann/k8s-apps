@@ -7,6 +7,7 @@ plugin: cors
 config:
   origins:
     - https://stocks.yanatech.co.uk
+    - http://localhost:3000
   methods:
     - GET
     - POST
