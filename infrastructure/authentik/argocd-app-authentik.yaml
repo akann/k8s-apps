@@ -16,13 +16,6 @@ spec:
         authentik:
           existingSecret:
             secretName: authentik-secret
-          email:
-            host: mail-eu.smtp2go.com
-            port: 2525
-            use_tls: true
-            use_ssl: false
-            from: info@yanatech.co.uk
-            username: yanatech.co.uk
         postgresql:
           enabled: false
         redis:
@@ -30,13 +23,26 @@ spec:
           master:
             persistence:
               storageClass: ceph-rbd
-        server:
+        global:
           env:
+            - name: AUTHENTIK_EMAIL__HOST
+              value: mail-eu.smtp2go.com
+            - name: AUTHENTIK_EMAIL__PORT
+              value: "2525"
+            - name: AUTHENTIK_EMAIL__USE_TLS
+              value: "true"
+            - name: AUTHENTIK_EMAIL__USE_SSL
+              value: "false"
+            - name: AUTHENTIK_EMAIL__FROM
+              value: info@yanatech.co.uk
+            - name: AUTHENTIK_EMAIL__USERNAME
+              value: yanatech.co.uk
             - name: AUTHENTIK_EMAIL__PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: authentik-secret
                   key: AUTHENTIK_EMAIL__PASSWORD
+        server:
           ingress:
             enabled: true
             ingressClassName: nginx
@@ -46,13 +52,6 @@ spec:
               - hosts:
                   - authentik.yanatech.co.uk
                 secretName: wildcard-yanatech-tls
-        worker:
-          env:
-            - name: AUTHENTIK_EMAIL__PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: authentik-secret
-                  key: AUTHENTIK_EMAIL__PASSWORD
   destination:
     server: https://kubernetes.default.svc
     namespace: authentik
