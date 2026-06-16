@@ -38,25 +38,13 @@ spec:
                 secretKeyRef:
                   name: user-service-pg-app
                   key: uri
-            - name: REDIS_URL
+            - name: AUTHENTIK_API_URL
+              value: "https://authentik.yanatech.co.uk"
+            - name: AUTHENTIK_API_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: user-service-secret
-                  key: REDIS_URL
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: user-service-secret
-                  key: JWT_SECRET
-            - name: JWT_EXPIRES_IN
-              value: "15m"
-            - name: JWT_REFRESH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: user-service-secret
-                  key: JWT_REFRESH_SECRET
-            - name: JWT_REFRESH_EXPIRES_IN
-              value: "7d"
+                  key: AUTHENTIK_API_TOKEN
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: OTEL_SERVICE_NAME

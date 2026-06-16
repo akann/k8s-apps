@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yana-stocks-authentik-blueprint
+  namespace: yana-stocks
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+data:
+  blueprint.yaml: |
+    version: 1
+    metadata:
+      name: yana-stocks-oidc-setup
+    entries:
+      # OAuth2/OIDC Provider — public client (PKCE, authorization_code flow)
+      - model: authentik_providers_oauth2.oauth2provider
+        state: present
+        identifiers:
+          name: yana-stocks
+        attrs:
+          name: yana-stocks
+          authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+          client_type: public
+          client_id: yana-stocks
+          include_claims_in_id_token: true
+          redirect_uris: |
+            https://stocks.yanatech.co.uk/callback
+            http://localhost:3000/callback
+          sub_mode: user_id
+          access_code_validity: "minutes=1"
+          access_token_validity: "minutes=5"
+          refresh_token_validity: "days=30"
+          signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+          issuer_mode: per_provider
+
+      # Application
+      - model: authentik_core.application
+        state: present
+        identifiers:
+          slug: yana-stocks
+        attrs:
+          name: yana-stocks
+          slug: yana-stocks
+          provider: !Find [authentik_providers_oauth2.oauth2provider, [name, yana-stocks]]
+          meta_launch_url: https://stocks.yanatech.co.uk
+          policy_engine_mode: any
+
+      # Enrollment flow with email verification
+      - model: authentik_flows.flow
+        state: present
+        identifiers:
+          slug: yana-stocks-enrollment
+        attrs:
+          name: "yana-stocks — Enrollment"
+          slug: yana-stocks-enrollment
+          designation: enrollment
+          title: Create your yana-stocks account
+          authentication: require_unauthenticated
+
+      # Email verification stage (activates account on confirmation click)
+      - model: authentik_stages_email.emailstage
+        state: present
+        identifiers:
+          name: yana-stocks-email-confirm
+        attrs:
+          name: yana-stocks-email-confirm
+          activate_user_on_success: true
+          subject: Activate your yana-stocks account
+          template: email/account_confirmation.html
+          timeout: 10080
+
+      # Bind email stage to enrollment flow (order 10)
+      - model: authentik_flows.flowstagebinding
+        state: present
+        identifiers:
+          target: !Find [authentik_flows.flow, [slug, yana-stocks-enrollment]]
+          stage: !Find [authentik_stages_email.emailstage, [name, yana-stocks-email-confirm]]
+          order: 10
+        attrs:
+          target: !Find [authentik_flows.flow, [slug, yana-stocks-enrollment]]
+          stage: !Find [authentik_stages_email.emailstage, [name, yana-stocks-email-confirm]]
+          order: 10
+          re_evaluate_policies: false
