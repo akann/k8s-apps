@@ -317,7 +317,7 @@ Payment namespace: hardened NetworkPolicy, blue-green Rollout strategy only
 | Service | Namespace | URL | Phase | Status |
 |---|---|---|---|---|
 | Vaultwarden | vaultwarden | vault.yanatech.co.uk | existing | ✅ Live (CNPG) |
-| Authentik | authentik | auth.yanatech.co.uk | existing | ✅ Live (CNPG) |
+| Authentik | authentik | authentik.yanatech.co.uk | existing | ✅ Live (CNPG) |
 | Grafana | monitoring | grafana.yanatech.co.uk | existing | ✅ Live |
 | ArgoCD | argocd | argocd.yanatech.co.uk | existing | ✅ Live |
 | Kafka + UI | kafka | kafka-ui.yanatech.co.uk | existing | ✅ Live |

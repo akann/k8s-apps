@@ -28,10 +28,10 @@ spec:
             enabled: true
             ingressClassName: nginx
             hosts:
-              - auth.yanatech.co.uk
+              - authentik.yanatech.co.uk
             tls:
               - hosts:
-                  - auth.yanatech.co.uk
+                  - authentik.yanatech.co.uk
                 secretName: wildcard-yanatech-tls
   destination:
     server: https://kubernetes.default.svc

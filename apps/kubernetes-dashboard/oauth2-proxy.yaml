@@ -18,7 +18,7 @@ spec:
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
           args:
             - --provider=oidc
-            - --oidc-issuer-url=https://auth.yanatech.co.uk/application/o/kubernetes-dashboard/
+            - --oidc-issuer-url=https://authentik.yanatech.co.uk/application/o/kubernetes-dashboard/
             - --client-id=$(CLIENT_ID)
             - --client-secret=$(CLIENT_SECRET)
             - --cookie-secret=$(COOKIE_SECRET)
