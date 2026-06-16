@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: price-ingestor
-          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:6eb3163aeb20bafe88f2f8da7f258cdf26cf4acc
+          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:b9fca57ceb10c7d2362d898b9c216950d24a2f3b
           env:
             - name: ALPACA_API_KEY
               valueFrom:
