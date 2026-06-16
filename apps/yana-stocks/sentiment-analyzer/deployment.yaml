@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: sentiment-analyzer
-          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:c6d5bb0ccb4983a5585095f051121c084c01883a
+          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:6eb3163aeb20bafe88f2f8da7f258cdf26cf4acc
           env:
             - name: ALPACA_API_KEY
               valueFrom:
