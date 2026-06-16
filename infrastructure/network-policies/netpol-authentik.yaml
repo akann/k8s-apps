@@ -88,3 +88,6 @@ spec:
     - ports:
         - port: 443  # LDAP/email/external integrations
         - port: 6443
+    - ports:
+        - port: 2525  # SMTP2GO STARTTLS
+        - port: 465   # SMTP2GO SSL
