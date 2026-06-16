@@ -484,12 +484,12 @@ data:
         'OAUTH2_DISPLAY_NAME': 'Login with Authentik',
         'OAUTH2_CLIENT_ID': '<client-id>',
         'OAUTH2_CLIENT_SECRET': '<client-secret>',
-        'OAUTH2_TOKEN_URL': 'https://authentik.yanatech.co.uk/application/o/token/',
-        'OAUTH2_AUTHORIZATION_URL': 'https://authentik.yanatech.co.uk/application/o/authorize/',
-        'OAUTH2_API_BASE_URL': 'https://authentik.yanatech.co.uk/application/o/pgadmin/',
-        'OAUTH2_SERVER_METADATA_URL': 'https://authentik.yanatech.co.uk/application/o/pgadmin/.well-known/openid-configuration',
-        'OAUTH2_USERINFO_ENDPOINT': 'https://authentik.yanatech.co.uk/application/o/userinfo/',
-        'OAUTH2_JWKS_URI': 'https://authentik.yanatech.co.uk/application/o/pgadmin/jwks/',
+        'OAUTH2_TOKEN_URL': 'https://auth.yanatech.co.uk/application/o/token/',
+        'OAUTH2_AUTHORIZATION_URL': 'https://auth.yanatech.co.uk/application/o/authorize/',
+        'OAUTH2_API_BASE_URL': 'https://auth.yanatech.co.uk/application/o/pgadmin/',
+        'OAUTH2_SERVER_METADATA_URL': 'https://auth.yanatech.co.uk/application/o/pgadmin/.well-known/openid-configuration',
+        'OAUTH2_USERINFO_ENDPOINT': 'https://auth.yanatech.co.uk/application/o/userinfo/',
+        'OAUTH2_JWKS_URI': 'https://auth.yanatech.co.uk/application/o/pgadmin/jwks/',
         'OAUTH2_SCOPE': 'openid email profile',
         'OAUTH2_ICON': 'fa-openid',
         'OAUTH2_BUTTON_COLOR': '#fd4b2d',
@@ -545,7 +545,7 @@ Generate passwords: `openssl rand -hex 16`
 - `trusted_domains` defaults to `localhost` only — set via `configs.proxy.config.php` in values or `php occ config:system:set trusted_domains 1 --value=cloud.yanatech.co.uk`
 - `nginx.ingress.kubernetes.io/server-snippet` is blocked by ingress-nginx — CalDAV/CardDAV redirects handled inside Nextcloud instead
 - `proxy-body-size: "0"` required for large file uploads
-- Authentik SSO via `user_oidc` app: install with `php occ app:install user_oidc`, configure with `php occ user_oidc:provider authentik --clientid=... --clientsecret=... --discoveryuri=https://authentik.yanatech.co.uk/application/o/nextcloud/.well-known/openid-configuration --unique-uid=0 --mapping-uid=preferred_username`
+- Authentik SSO via `user_oidc` app: install with `php occ app:install user_oidc`, configure with `php occ user_oidc:provider authentik --clientid=... --clientsecret=... --discoveryuri=https://auth.yanatech.co.uk/application/o/nextcloud/.well-known/openid-configuration --unique-uid=0 --mapping-uid=preferred_username`
 - `allow_local_remote_servers` must be set to `true` in config — Nextcloud blocks outbound requests to RFC1918 addresses by default, which breaks OIDC discovery when Authentik resolves to the MetalLB VIP (`192.168.22.200`). Set via `php occ config:system:set allow_local_remote_servers --value=true --type=boolean` or in `configs.proxy.config.php`
 
 ---
@@ -592,7 +592,7 @@ kubectl apply -f apps/immich/argocd-app-immich-helm.yaml
 - Helm chart 0.10.x (bjw-s common v4): env vars must go under `controllers.main.containers.main.env` — top-level `env`/`envFrom` silently ignored
 - Helm chart does not render ingress correctly — use plain `apps/immich/immich-ingress.yaml` manifest instead
 - Port changed from 3001 (v1.x) to 2283 (v2.x)
-- Authentik SSO via OAuth2: configure in Immich admin UI → Administration → Settings → OAuth. Redirect URIs: `https://photos.yanatech.co.uk/auth/login`, `https://photos.yanatech.co.uk/user-settings`, `app.immich:///oauth-callback`. Issuer URL: `https://authentik.yanatech.co.uk/application/o/immich/`
+- Authentik SSO via OAuth2: configure in Immich admin UI → Administration → Settings → OAuth. Redirect URIs: `https://photos.yanatech.co.uk/auth/login`, `https://photos.yanatech.co.uk/user-settings`, `app.immich:///oauth-callback`. Issuer URL: `https://auth.yanatech.co.uk/application/o/immich/`
 
 ---
 
@@ -750,7 +750,7 @@ Private container registry for all homelab and product images. Replaces `ghcr.io
 - Slug: `harbor`
 - Redirect URI: `https://harbor.yanatech.co.uk/c/oidc/callback`
 - Scopes: `openid`, `profile`, `email`
-- OIDC endpoint: `https://authentik.yanatech.co.uk/application/o/harbor/`
+- OIDC endpoint: `https://auth.yanatech.co.uk/application/o/harbor/`
 - Auto-onboard: enabled (`oidc_auto_onboard: true`)
 - Admin group: `authentik Admins`
 - OIDC credentials: stored in Vaultwarden as `harbor-oidc`
@@ -1117,7 +1117,7 @@ kubectl apply -f apps/apicurio/external-secret.yaml
 | Loki | monitoring | - | ArgoCD |
 | Promtail | monitoring | - | ArgoCD |
 | ArgoCD | argocd | https://argocd.yanatech.co.uk | Helm |
-| Authentik | authentik | https://authentik.yanatech.co.uk | ArgoCD |
+| Authentik | authentik | https://auth.yanatech.co.uk | ArgoCD |
 | Vaultwarden | vaultwarden | https://vault.yanatech.co.uk | ArgoCD |
 | Kafka | kafka | - | ArgoCD |
 | Kafka UI | kafka | https://kafka-ui.yanatech.co.uk | ArgoCD |
@@ -1333,8 +1333,8 @@ Rebalances pods across nodes after rescheduling events (node reboots, drains, ne
 - Cloud-init `users:` list must NOT include `- default` alongside an explicit `- name: ubuntu` — on Ubuntu cloud images the default user is already `ubuntu`, so the two definitions collide and `lock_passwd` / `chpasswd` / `ssh_pwauth` silently fail to apply, locking you out of the VM (no password, sometimes no key). Define `ubuntu` explicitly with no `- default` entry. Applies to every cloud-init snippet (`k8s-init.yaml`, `postgres-init.yaml`, etc.)
 - Cloud-init `chpasswd: { list: ... }` is deprecated and silently no-ops on the cloud-init shipped with Ubuntu 24.04 — the password never gets set, so console/password login fails even though SSH-key login still works (this is why the k8s VMs always worked by key but not by password). Use the modern form: `chpasswd: { expire: false, users: [{name: ubuntu, password: ubuntu, type: text}] }`. User/password modules only run once per instance, so an already-booted VM needs a fresh clone to pick up a snippet change
 - ArgoCD apps that pull a **remote Helm chart with inline `spec.source.helm.values`** (e.g. `monitoring`, `authentik`) render from the live Application CR, NOT from git — editing the `argocd-app-*.yaml` in git is a silent no-op until you `kubectl apply -f` the Application manifest (then ArgoCD re-renders + auto-syncs). Apps whose `source` is a git directory of plain manifests (e.g. `vaultwarden`) DO sync straight from git on push. Different mechanisms — don't assume a git push is enough
-- Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://authentik.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
-- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually via `kubectl patch secret argocd-secret -n argocd --type merge -p '{"data":{"dex.authentik.clientSecret":"<base64>"}}'` — not in ESO, must be re-applied after cluster rebuild). Dex config: issuer `https://authentik.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
+- Grafana OAuth via kube-prometheus-stack: the bundled grafana chart consumes env through `grafana.env` (map) + `grafana.envValueFrom` (map, for secretKeyRef) — `extraEnvVars` / `envFromSecrets` (Bitnami-style) are silently ignored. Authentik's `authorize`/`token`/`userinfo` endpoints are global (`https://auth.yanatech.co.uk/application/o/authorize/`); only discovery/jwks/`end-session` are slug-scoped (`/application/o/grafana/...`). Role mapping reads the `groups` claim (carried by the default `profile` scope): `contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'`. Client ID/secret live in `grafana-authentik-secret` (keys `client_id`/`client_secret`)
+- ArgoCD SSO via Authentik OIDC uses Dex (argocd-dex-server). Authentik app slug `argo-cd`; clientID in values (`infrastructure/argocd/argocd-app-argocd.yaml`), clientSecret in `argocd-secret` key `dex.authentik.clientSecret` (patched manually via `kubectl patch secret argocd-secret -n argocd --type merge -p '{"data":{"dex.authentik.clientSecret":"<base64>"}}'` — not in ESO, must be re-applied after cluster rebuild). Dex config: issuer `https://auth.yanatech.co.uk/application/o/argo-cd/`, scopes `openid profile email groups`, `insecureEnableGroups: true`. RBAC: `g, authentik Admins, role:admin` + `scopes: '[groups]'`. Redirect URIs in Authentik (strict, both required): `https://argocd.yanatech.co.uk/api/dex/callback` and `https://localhost:8085/auth/callback`
 - argo-cd Helm chart 9.x ingress quirks (all three silent-ignore traps hit in practice): (1) `server.ingress.hosts` (list) is ignored — use `server.ingress.hostname` (singular string) for the primary rule host. (2) `server.ingress.tls` (list) is ignored — the chart interprets any non-false value as "enable TLS" and generates a TLS entry pointing at its default secret `argocd-server-tls` (which doesn't exist → nginx fake cert). Use `server.ingress.extraTls` (list of `{hosts, secretName}`) for a custom TLS secret. (3) `server.ingress.ingressClassName` must be set explicitly — it doesn't inherit from a cluster default. Pattern that works: `hostname: argocd.yanatech.co.uk` + `extraTls: [{hosts: [argocd.yanatech.co.uk], secretName: wildcard-yanatech-tls}]`; no `hosts:` or `tls:` list
 - argo-cd ArgoCD Application must be an `argocd-app-argocd.yaml` wrapping the Helm chart with `valuesObject` — a standalone `values.yaml` cannot be `kubectl apply`'d directly (it has no `apiVersion`/`kind`). Use `valuesObject:` not `values: |` to avoid YAML indentation issues with multiline strings like `dex.config`
 - pgAdmin4 OAuth2 via Authentik: the chart has no `config_local.py` support in Helm values — mount it via `extraConfigmapMounts` from a manually-created ConfigMap. Client ID/secret must be literal values in `config_local.py` (no env-var substitution). Three required keys beyond the basics: `OAUTH2_SERVER_METADATA_URL` (slug-scoped discovery endpoint, e.g. `/application/o/pgadmin/.well-known/openid-configuration`), `OAUTH2_API_BASE_URL` (must be slug-scoped, e.g. `/application/o/pgadmin/`, NOT root Authentik URL), and `OAUTH2_JWKS_URI` (`/application/o/pgadmin/jwks/`). Without `OAUTH2_SERVER_METADATA_URL` pgAdmin fails with `Missing "jwks_uri" in metadata`

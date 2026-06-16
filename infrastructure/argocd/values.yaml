@@ -22,7 +22,7 @@ spec:
                   id: authentik
                   name: Authentik
                   config:
-                    issuer: https://authentik.yanatech.co.uk/application/o/argo-cd/
+                    issuer: https://auth.yanatech.co.uk/application/o/argo-cd/
                     clientID: PWfZkdoaHZvMaPuyUTD8oH4HFmnaC4dUBro9WOmZ
                     clientSecret: $dex.authentik.clientSecret
                     insecureEnableGroups: true

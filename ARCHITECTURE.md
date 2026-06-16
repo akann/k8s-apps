@@ -219,7 +219,7 @@ graph LR
     Browser --> CF["Cloudflare<br/>A → 192.168.22.200"]
     CF --> NX["ingress-nginx<br/>192.168.22.200:443"]
     NX --> Auth{"Authentik<br/>forward auth?"}
-    Auth -->|"Protected app"| AK["Authentik outpost<br/>authentik.yanatech.co.uk"]
+    Auth -->|"Protected app"| AK["Authentik outpost<br/>auth.yanatech.co.uk"]
     AK -->|"Authenticated"| App["Application Pod"]
     Auth -->|"Public app"| App
 ```
@@ -534,7 +534,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | Service       | URL                                  | Auth              | Notes                    |
 | ------------- | ------------------------------------ | ----------------- | ------------------------ |
 | ArgoCD        | https://argocd.yanatech.co.uk        | Native            | GitOps UI                |
-| Authentik     | https://authentik.yanatech.co.uk          | Native            | SSO IdP                  |
+| Authentik     | https://auth.yanatech.co.uk          | Native            | SSO IdP                  |
 | Grafana       | https://grafana.yanatech.co.uk       | Authentik OIDC    | Metrics dashboards       |
 | Immich        | https://photos.yanatech.co.uk        | Native            | Photo management         |
 | Infisical     | https://infisical.yanatech.co.uk     | Native            | Secrets manager          |

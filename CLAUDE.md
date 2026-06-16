@@ -119,7 +119,7 @@ spec:
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
 
 ### SSO
-- **Authentik:** `https://authentik.yanatech.co.uk` — SSO for all services
+- **Authentik:** `https://auth.yanatech.co.uk` — SSO for all services
 - **Forward auth pattern** (for apps without native OIDC):
   1. Create Authentik provider (Proxy, Forward auth, single application)
   2. Create Authentik application → auto-deploys `ak-outpost-<name>` pod in `authentik` namespace
@@ -408,7 +408,7 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | Service | URL |
 |---|---|
 | ArgoCD | https://argocd.yanatech.co.uk |
-| Authentik | https://authentik.yanatech.co.uk |
+| Authentik | https://auth.yanatech.co.uk |
 | Grafana | https://grafana.yanatech.co.uk |
 | Immich | https://photos.yanatech.co.uk |
 | Infisical | https://infisical.yanatech.co.uk |
