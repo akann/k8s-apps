@@ -12,10 +12,17 @@ spec:
     chart: authentik
     targetRevision: "*"
     helm:
-      values: |
+      valuesObject:
         authentik:
           existingSecret:
             secretName: authentik-secret
+          email:
+            host: smtppro.zoho.eu
+            port: 465
+            use_tls: false
+            use_ssl: true
+            from: akan@yanatech.org
+            username: akan@yanatech.org
         postgresql:
           enabled: false
         redis:
@@ -24,6 +31,12 @@ spec:
             persistence:
               storageClass: ceph-rbd
         server:
+          env:
+            - name: AUTHENTIK_EMAIL__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secret
+                  key: AUTHENTIK_EMAIL__PASSWORD
           ingress:
             enabled: true
             ingressClassName: nginx
@@ -33,6 +46,13 @@ spec:
               - hosts:
                   - authentik.yanatech.co.uk
                 secretName: wildcard-yanatech-tls
+        worker:
+          env:
+            - name: AUTHENTIK_EMAIL__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-secret
+                  key: AUTHENTIK_EMAIL__PASSWORD
   destination:
     server: https://kubernetes.default.svc
     namespace: authentik
