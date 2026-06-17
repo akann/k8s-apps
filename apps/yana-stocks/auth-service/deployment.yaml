@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: auth-service
-          image: harbor.yanatech.co.uk/yana-stocks/auth-service:latest
+          image: harbor.yanatech.co.uk/yana-stocks/auth-service:16ba1670dac05693d026cd595cb148a9b821e87f
           ports:
             - containerPort: 3000
           envFrom:
@@ -76,3 +76,7 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
+  template:
+    spec:
+      containers:
+        - image: harbor.yanatech.co.uk/yana-stocks/auth-service:16ba1670dac05693d026cd595cb148a9b821e87f
