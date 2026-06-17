@@ -1,10 +1,10 @@
 apiVersion: configuration.konghq.com/v1
 kind: KongConsumer
 metadata:
-  name: authentik
+  name: user-service
   namespace: yana-stocks
   annotations:
     kubernetes.io/ingress.class: kong
-username: authentik
+username: user-service
 credentials:
-  - authentik-jwt-credential
+  - user-service-jwt-credential

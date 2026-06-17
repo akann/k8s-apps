@@ -1,5 +1,6 @@
-# POST /api/auth/register → user-service  (no JWT — public)
-# Login, refresh, logout are handled directly by Authentik (not proxied through Kong)
+# Auth routes — all public except /api/auth/me which requires JWT
+---
+# POST /api/auth/register → user-service (public)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -21,7 +22,95 @@ spec:
                 port:
                   number: 3000
 ---
-# GET /api/auth/me → user-service  (JWT required — lazy-creates profile row)
+# POST /api/auth/verify → user-service (public)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-verify
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/verify
+            pathType: Exact
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 3000
+---
+# POST /api/auth/login → user-service (public)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-login
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/login
+            pathType: Exact
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 3000
+---
+# POST /api/auth/refresh → user-service (public — authenticates via opaque refresh token in body)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-refresh
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/refresh
+            pathType: Exact
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 3000
+---
+# POST /api/auth/logout → user-service (public — invalidates refresh token in body)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-logout
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/logout
+            pathType: Exact
+            backend:
+              service:
+                name: user-service
+                port:
+                  number: 3000
+---
+# GET /api/auth/me → user-service (JWT required)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
