@@ -25,12 +25,6 @@ spec:
               value: production
             - name: NEXT_PUBLIC_API_URL
               value: "https://api-gateway.yanatech.co.uk/api"
-            - name: NEXT_PUBLIC_AUTHENTIK_URL
-              value: "https://authentik.yanatech.co.uk"
-            - name: NEXT_PUBLIC_AUTHENTIK_CLIENT_ID
-              value: "yana-stocks"
-            - name: NEXT_PUBLIC_REDIRECT_URI
-              value: "https://stocks.yanatech.co.uk/callback"
             - name: OTEL_SERVICE_NAME
               value: "frontend"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
