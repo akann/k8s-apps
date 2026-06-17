@@ -13,6 +13,7 @@ spec:
   bootstrap:
     initdb:
       postInitSQL:
+        - CREATE SCHEMA IF NOT EXISTS auth
         - ALTER ROLE app SET search_path = auth
   storage:
     size: 10Gi
