@@ -1,0 +1,45 @@
+# Profile routes
+---
+# GET/PUT /api/profile/me → profile-service (JWT required)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-profile-me
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/profile/me
+            pathType: Exact
+            backend:
+              service:
+                name: profile-service
+                port:
+                  number: 3000
+---
+# GET /api/profile/:userId → profile-service (public — displayName + avatar only)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-profile-public
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/profile/
+            pathType: Prefix
+            backend:
+              service:
+                name: profile-service
+                port:
+                  number: 3000

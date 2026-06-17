@@ -3,6 +3,8 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - harbor-pull-secret.yaml
+  - auth-service
+  - profile-service
   - user-service
   - price-processor
   - portfolio-service

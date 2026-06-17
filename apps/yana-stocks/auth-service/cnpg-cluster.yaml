@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: auth-service-pg
+  namespace: yana-stocks
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+  bootstrap:
+    initdb:
+      postInitSQL:
+        - ALTER ROLE app SET search_path = auth
+  storage:
+    size: 10Gi
+    storageClass: ceph-rbd
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

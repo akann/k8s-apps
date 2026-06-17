@@ -1,6 +1,6 @@
 # Auth routes — all public except /api/auth/me which requires JWT
 ---
-# POST /api/auth/register → user-service (public)
+# POST /api/auth/register → auth-service (public)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -18,11 +18,11 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080
 ---
-# POST /api/auth/verify → user-service (public)
+# POST /api/auth/verify → auth-service (public)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -40,11 +40,11 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080
 ---
-# POST /api/auth/login → user-service (public)
+# POST /api/auth/login → auth-service (public)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -62,11 +62,11 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080
 ---
-# POST /api/auth/refresh → user-service (public — authenticates via opaque refresh token in body)
+# POST /api/auth/refresh → auth-service (public — authenticates via opaque refresh token in body)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -84,11 +84,11 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080
 ---
-# POST /api/auth/logout → user-service (public — invalidates refresh token in body)
+# POST /api/auth/logout → auth-service (public — invalidates refresh token in body)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -106,11 +106,11 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080
 ---
-# GET /api/auth/me → user-service (JWT required)
+# GET /api/auth/me → auth-service (JWT required)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -128,6 +128,6 @@ spec:
             pathType: Exact
             backend:
               service:
-                name: user-service
+                name: auth-service
                 port:
-                  number: 3000
+                  number: 8080

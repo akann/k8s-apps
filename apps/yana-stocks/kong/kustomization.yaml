@@ -7,3 +7,4 @@ resources:
   - kongconsumer.yaml
   - ingress-auth.yaml
   - ingress-api.yaml
+  - ingress-profile.yaml
