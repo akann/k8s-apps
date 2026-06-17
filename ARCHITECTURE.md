@@ -230,12 +230,13 @@ graph LR
 graph LR
     Client["Browser / App"] --> CF["Cloudflare<br/>A → 192.168.22.202"]
     CF --> Kong["Kong Gateway<br/>192.168.22.202:80"]
-    Kong --> JWT{"JWT<br/>validation"}
-    JWT -->|"/api/auth/*<br/>no JWT"| US["user-service:3000"]
-    JWT -->|"/api/stocks/*<br/>JWT required"| PA["portfolio-api:3000"]
-    JWT -->|"/api/portfolio/*<br/>JWT required"| PS["portfolio-service:3000"]
+    Kong --> JWT{"JWT plugin<br/>(iss claim → HS256)"}
+    JWT -->|"/api/auth/register|verify|login|refresh|logout<br/>no JWT"| US["user-service:3000"]
+    JWT -->|"/api/auth/me<br/>JWT required"| US
+    JWT -->|"/api/market/*<br/>no JWT"| PA["portfolio-api:3000"]
+    JWT -->|"/api/stocks|signals|portfolio|news/*<br/>JWT required"| PA
     JWT -->|"/api/predict/*<br/>JWT required"| ML["ml-predictor:8000"]
-    Kong -->|"/*"| FE["frontend:3000"]
+    Kong -->|"/* (nginx, not Kong)"| FE["frontend:3000"]
 ```
 
 ### 4.7 SSO — Authentik Forward Auth
@@ -610,8 +611,7 @@ graph TB
     Kafka -->|"stocks.signals.sentiment\nstocks.signals.prediction"| PAPI["portfolio-api\n(NestJS, 2 replicas)"]
     Redis -->|"cached prices TTL 10s"| PAPI
 
-    US["user-service\n(NestJS, 2 replicas)"] -->|"JWT validation"| PAPI
-    US --- PG[("CNPG PostgreSQL\nuser-service-pg")]
+    US["user-service\n(NestJS, 2 replicas)"] --- PG[("CNPG PostgreSQL\nuser-service-pg")]
     US --- Redis
 
     PAPI --> PS["portfolio-service\n(NestJS, 2 replicas)"]
@@ -620,10 +620,8 @@ graph TB
 
     FE["frontend\n(Next.js 14, 2 replicas)"] --> PAPI
     Browser["🌐 Browser"] --> Kong["Kong API Gateway\n192.168.22.202"]
-    Kong --> FE
-    Kong --> US
+    Kong -->|"iss:yana-stocks HS256"| US
     Kong --> PAPI
-    Kong --> PS
     Kong --> MLP
 ```
 
@@ -635,37 +633,51 @@ sequenceDiagram
     participant Kong as Kong Gateway
     participant US as user-service
     participant Redis as Redis
+    participant PA as portfolio-api
+
+    C->>Kong: POST /api/auth/register
+    Kong->>US: Forward (no JWT check)
+    US-->>C: { message } + sends verification email (SMTP2GO)
+
+    C->>Kong: POST /api/auth/verify { token }
+    Kong->>US: Forward (no JWT check)
+    US-->>C: { message } (account activated)
 
     C->>Kong: POST /api/auth/login
     Kong->>US: Forward (no JWT check)
-    US->>Redis: Store refreshToken (7d TTL)
-    US-->>C: accessToken (JWT 15m)\nrefreshToken (opaque 7d)
+    US->>Redis: Store refresh:<token> → userId (7d TTL)
+    US-->>C: accessToken (HS256 JWT 15m, iss:'yana-stocks')\nrefreshToken (opaque 7d)
 
     C->>Kong: GET /api/stocks/AAPL\nAuthorization: Bearer accessToken
-    Kong->>Kong: Validate JWT signature
-    Kong->>US: Forward with user context
-    US-->>C: Stock data
+    Kong->>Kong: JWT plugin reads iss claim → finds HS256 credential\nVerifies signature with JWT_SECRET
+    Kong->>PA: Forward (JWT valid)
+    PA-->>C: Stock data
 
-    C->>Kong: POST /api/auth/refresh
-    Kong->>US: Forward refreshToken
-    US->>Redis: Validate + delete old token
-    US->>Redis: Store new refreshToken
-    US-->>C: New accessToken\nNew refreshToken
+    C->>Kong: POST /api/auth/refresh { refreshToken }
+    Kong->>US: Forward (no JWT check)
+    US->>Redis: Validate + delete old refresh token
+    US->>Redis: Store new refresh token
+    US-->>C: New accessToken + New refreshToken
 ```
 
 ### 10.4 Kong API Routes
 
-| Route              | Method | Target                   | JWT Required |
-| ------------------ | ------ | ------------------------ | ------------ |
-| `/api/auth/*`      | ALL    | `user-service:3000`      | No           |
-| `/api/stocks/*`    | GET    | `portfolio-api:3000`     | Yes          |
-| `/api/portfolio/*` | ALL    | `portfolio-service:3000` | Yes          |
-| `/api/predict/*`   | GET    | `ml-predictor:8000`      | Yes          |
-| `/api/market/*`    | GET    | `portfolio-api:3000`     | Yes          |
-| `/api/signals/*`   | GET    | `portfolio-api:3000`     | Yes          |
-| `/api/news/*`      | GET    | `portfolio-api:3000`     | Yes          |
-| `/api/health`      | GET    | `portfolio-api:3000`     | No           |
-| `/*`               | ALL    | `frontend:3000`          | No           |
+All routes have `cors` plugin. JWT-required routes additionally have `jwt-auth` plugin (validates HS256 signature using `iss: 'yana-stocks'` credential).
+
+| Route                                                           | PathType | Target               | JWT Required |
+| --------------------------------------------------------------- | -------- | -------------------- | ------------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`     | Exact    | `user-service:3000`  | No           |
+| `/api/auth/refresh`, `/api/auth/logout`                         | Exact    | `user-service:3000`  | No           |
+| `/api/auth/me`                                                  | Exact    | `user-service:3000`  | Yes          |
+| `/api/market/*`                                                 | Prefix   | `portfolio-api:3000` | No           |
+| `/api/stocks/*`                                                 | Prefix   | `portfolio-api:3000` | Yes          |
+| `/api/signals/*`                                                | Prefix   | `portfolio-api:3000` | Yes          |
+| `/api/portfolio/*`                                              | Prefix   | `portfolio-api:3000` | Yes          |
+| `/api/news/*`                                                   | Prefix   | `portfolio-api:3000` | Yes          |
+| `/api/predict/*`                                                | Prefix   | `ml-predictor:8000`  | Yes          |
+| `/*`                                                            | Prefix   | `frontend:3000`      | No (nginx)   |
+
+**Note:** `/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to `portfolio-service`. Kong never routes directly to `portfolio-service`. The `/*` frontend route uses ingress-nginx (not Kong).
 
 ### 10.5 KEDA Autoscaling
 
