@@ -277,7 +277,7 @@ Every namespace has `default-deny-all`. Key policy files:
 | Raw capacity  | 8.4 TiB                                |
 | OSDs          | 6 (2 per Proxmox host)                 |
 | Monitors      | 192.168.22.11-13:6789                  |
-| Cluster ID    | `92197a62-7cf9-49eb-a0cb-5e0b9bbff52a` |
+| Cluster ID    | `&lt;see Vaultwarden&gt;` |
 | Access mode   | RWO (ReadWriteOnce)                    |
 | CSI namespace | `ceph-csi-rbd`                         |
 
@@ -332,7 +332,7 @@ graph LR
     Vaultwarden["Vaultwarden<br/>vault.yanatech.co.uk<br/>(bootstrap source)"] -->|"manual entry"| Infisical
 
     subgraph Infisical["Infisical — infisical.yanatech.co.uk"]
-        Project["Project: k8s-homelab<br/>ID: 69b39965-b778-47a7-ba52-2cd66a7aad0a<br/>Env: prod"]
+        Project["Project: k8s-homelab<br/>ID: &lt;see Vaultwarden&gt;<br/>Env: prod"]
     end
 
     Infisical -->|"API pull"| ESO

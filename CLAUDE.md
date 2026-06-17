@@ -80,14 +80,14 @@ k8s-apps/
 ### Storage
 - **Ceph RBD** (`ceph-rbd` StorageClass) — default StorageClass
 - **Ceph cluster:** 8.4TiB raw, 6 OSDs, monitors at 192.168.22.11-13:6789
-- **Cluster ID:** `92197a62-7cf9-49eb-a0cb-5e0b9bbff52a`
+- **Cluster ID:** `&lt;see Vaultwarden&gt;`
 - **CRITICAL:** Ceph CSI egress to OSD ports (6802-6809) requires `CiliumNetworkPolicy` with `toCIDR` — standard `NetworkPolicy` does NOT work in Cilium native routing mode. See `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`
 
 ### Secrets
 - **ESO:** External Secrets Operator syncs from Infisical
   - Webhook disabled (`webhook.create: false`, `certController.create: false`) — Cilium native routing blocks kube-apiserver node IP connections to in-cluster services
   - ClusterSecretStore: `infisical`
-  - Project: `k8s-homelab` (ID `69b39965-b778-47a7-ba52-2cd66a7aad0a`)
+  - Project: `k8s-homelab` (ID `&lt;see Vaultwarden&gt;`)
   - Environment: `prod`
 - **ExternalSecret format:**
 ```yaml
