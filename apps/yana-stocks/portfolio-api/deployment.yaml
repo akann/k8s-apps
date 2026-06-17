@@ -37,8 +37,8 @@ spec:
               value: "3000"
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
-            - name: USER_SERVICE_URL
-              value: "http://user-service.yana-stocks.svc.cluster.local:3000"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service.yana-stocks.svc.cluster.local:3000"
             - name: PORTFOLIO_SERVICE_URL
               value: "http://portfolio-service.yana-stocks.svc.cluster.local:3000"
             - name: PRICE_PROCESSOR_URL
