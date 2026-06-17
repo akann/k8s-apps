@@ -477,4 +477,6 @@ spec:
       ports:
         - port: 4318  # Tempo OTLP HTTP
     - ports:
+        - port: 2525  # SMTP2GO (user-service email verification, STARTTLS)
+    - ports:
         - port: 443  # Alpaca, NewsAPI, HuggingFace
