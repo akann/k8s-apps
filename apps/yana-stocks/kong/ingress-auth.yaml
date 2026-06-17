@@ -20,7 +20,7 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
 ---
 # POST /api/auth/verify → auth-service (public)
 apiVersion: networking.k8s.io/v1
@@ -42,7 +42,7 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
 ---
 # POST /api/auth/login → auth-service (public)
 apiVersion: networking.k8s.io/v1
@@ -64,7 +64,7 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
 ---
 # POST /api/auth/refresh → auth-service (public — authenticates via opaque refresh token in body)
 apiVersion: networking.k8s.io/v1
@@ -86,7 +86,7 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
 ---
 # POST /api/auth/logout → auth-service (public — invalidates refresh token in body)
 apiVersion: networking.k8s.io/v1
@@ -108,7 +108,7 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
 ---
 # GET /api/auth/me → auth-service (JWT required)
 apiVersion: networking.k8s.io/v1
@@ -130,4 +130,4 @@ spec:
               service:
                 name: auth-service
                 port:
-                  number: 8080
+                  number: 3000
