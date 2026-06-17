@@ -32,19 +32,15 @@ spec:
           image: harbor.yanatech.co.uk/yana-stocks/user-service:92ae50bfec496a41d2c270036eb9fc31f3a8a978
           ports:
             - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: user-service-secret
           env:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: user-service-pg-app
                   key: uri
-            - name: AUTHENTIK_API_URL
-              value: "https://authentik.yanatech.co.uk"
-            - name: AUTHENTIK_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: user-service-secret
-                  key: AUTHENTIK_API_TOKEN
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: OTEL_SERVICE_NAME
