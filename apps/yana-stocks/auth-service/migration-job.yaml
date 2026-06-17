@@ -1,0 +1,87 @@
+---
+# One-shot data migration: user-service-pg → auth-service-pg
+# Apply once after auth-service is running and its schema is created.
+# After verifying row counts, delete this job and file.
+#
+# Apply: kubectl apply -f migration-job.yaml -n yana-stocks
+# Logs:  kubectl logs -n yana-stocks -l job-name=auth-data-migration
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: auth-data-migration
+  namespace: yana-stocks
+spec:
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16
+          command:
+            - /bin/bash
+            - -euxc
+            - |
+              echo "=== Exporting from user-service-pg ==="
+              psql "$USER_DB_URI" -t -A -c "
+                COPY (
+                  SELECT
+                    id::text,
+                    email,
+                    \"isVerified\",
+                    COALESCE(\"verificationToken\", ''),
+                    \"createdAt\"::text,
+                    \"updatedAt\"::text,
+                    COALESCE(\"passwordHash\", '')
+                  FROM user_profiles
+                ) TO STDOUT WITH (FORMAT csv, NULL '')
+              " > /tmp/users.csv
+
+              echo "Exported $(wc -l < /tmp/users.csv) rows"
+
+              echo "=== Writing migration script ==="
+              cat > /tmp/migrate.sql << 'EOSQL'
+              SET search_path = auth;
+
+              CREATE TEMP TABLE _migration (
+                id          uuid,
+                email       text,
+                is_verified boolean,
+                ver_token   text,
+                created_at  timestamptz,
+                updated_at  timestamptz,
+                passwd_hash text
+              );
+
+              \copy _migration FROM '/tmp/users.csv' WITH (FORMAT csv, NULL '');
+
+              INSERT INTO users (id, email, is_verified, verification_token, created_at, updated_at)
+              SELECT id, email, is_verified, NULLIF(ver_token, ''), created_at, updated_at
+              FROM _migration
+              ON CONFLICT (email) DO NOTHING;
+
+              INSERT INTO user_credentials (user_id, password_hash, created_at, updated_at)
+              SELECT id, passwd_hash, created_at, updated_at
+              FROM _migration
+              WHERE passwd_hash != ''
+              ON CONFLICT DO NOTHING;
+
+              SELECT 'users migrated: ' || COUNT(*) FROM users;
+              SELECT 'credentials migrated: ' || COUNT(*) FROM user_credentials;
+              EOSQL
+
+              echo "=== Importing into auth-service-pg ==="
+              psql "$AUTH_DB_URI" -f /tmp/migrate.sql
+
+              echo "=== Migration complete ==="
+          env:
+            - name: USER_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: user-service-pg-app
+                  key: uri
+            - name: AUTH_DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: auth-service-pg-app
+                  key: uri
