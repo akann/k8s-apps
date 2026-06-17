@@ -232,8 +232,9 @@ graph LR
     Client["Browser / App"] --> CF["Cloudflare<br/>A → 192.168.22.202"]
     CF --> Kong["Kong Gateway<br/>192.168.22.202:80"]
     Kong --> JWT{"JWT plugin<br/>(iss claim → HS256)"}
-    JWT -->|"/api/auth/register|verify|login|refresh|logout<br/>no JWT"| US["user-service:3000"]
-    JWT -->|"/api/auth/me<br/>JWT required"| US
+    JWT -->|"/api/auth/register|verify|login|refresh|logout<br/>no JWT"| AS["auth-service:3000"]
+    JWT -->|"/api/auth/me<br/>JWT required"| AS
+    JWT -->|"/api/profile/*<br/>JWT required"| PFS["profile-service:3000"]
     JWT -->|"/api/market/*<br/>no JWT"| PA["portfolio-api:3000"]
     JWT -->|"/api/stocks|signals|portfolio|news/*<br/>JWT required"| PA
     JWT -->|"/api/predict/*<br/>JWT required"| ML["ml-predictor:8000"]
@@ -317,7 +318,7 @@ graph TB
 | `monitoring`    | storage-tempo-0                      | 20 Gi        | Tempo trace storage         |
 | `nextcloud`     | nextcloud-nextcloud                  | 100 Gi       | Nextcloud data              |
 | `redis`         | redis-data-redis-master-0            | 5 Gi         | Redis AOF/RDB               |
-| `yana-stocks`   | user-service-pg-1                    | 10 Gi        | yana-stocks PostgreSQL      |
+| `yana-stocks`   | auth-service-pg-1                    | 10 Gi        | yana-stocks auth-service PostgreSQL |
 | `vaultwarden`   | vaultwarden-data                     | 5 Gi         | Vault data                  |
 | `uptime-kuma`   | uptime-kuma-pvc                      | 5 Gi         | Kuma database               |
 
@@ -456,11 +457,11 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 #### CloudNativePG (CNPG) — PostgreSQL
 
-| Cluster           | Namespace       | Instances | Primary           | Size      | Consumers                                              |
-| ----------------- | --------------- | --------- | ----------------- | --------- | ------------------------------------------------------ |
-| `pg-main`         | `cnpg-clusters` | 3         | pg-main-1         | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
-| `immich-postgres` | `immich`        | 1         | immich-postgres-1 | 20 Gi     | Immich (pgvector/VectorChord)                          |
-| `user-service-pg` | `yana-stocks`   | 1         | user-service-pg-1 | 10 Gi     | yana-stocks user-service                               |
+| Cluster            | Namespace       | Instances | Primary            | Size      | Consumers                                              |
+| ------------------ | --------------- | --------- | ------------------ | --------- | ------------------------------------------------------ |
+| `pg-main`          | `cnpg-clusters` | 3         | pg-main-1          | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
+| `immich-postgres`  | `immich`        | 1         | immich-postgres-1  | 20 Gi     | Immich (pgvector/VectorChord)                          |
+| `auth-service-pg`  | `yana-stocks`   | 1         | auth-service-pg-1  | 10 Gi     | yana-stocks auth-service                               |
 
 **pg-main connection:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`  
 **Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)
@@ -576,16 +577,17 @@ A production-grade, event-driven microservices application for real-time stock d
 
 ### 10.1 Service Overview
 
-| Service              | Language                | Pattern                | Replicas | Dependencies                                                          |
-| -------------------- | ----------------------- | ---------------------- | -------- | --------------------------------------------------------------------- |
-| `frontend`           | Next.js 14 (App Router) | Deployment             | 2        | portfolio-api                                                         |
-| `portfolio-api`      | NestJS                  | Deployment             | 2        | user-service, portfolio-service, price-processor, ml-predictor, Redis |
-| `portfolio-service`  | NestJS                  | Deployment             | 2        | MongoDB, Kafka                                                        |
-| `price-processor`    | NestJS                  | Deployment             | 2        | MongoDB, Redis, Kafka                                                 |
-| `user-service`       | NestJS                  | Deployment             | 2        | CNPG PostgreSQL, Redis, Kafka                                         |
-| `price-ingestor`     | Python                  | Deployment + KEDA      | 0–3      | Alpaca API, Kafka                                                     |
-| `sentiment-analyzer` | Python                  | Deployment + KEDA      | 0–3      | NewsAPI, MongoDB, Kafka                                               |
-| `ml-predictor`       | Python                  | Argo Rollouts (canary) | 1        | MongoDB, MinIO, Kafka                                                 |
+| Service              | Language                | Pattern                | Replicas | Dependencies                                                             |
+| -------------------- | ----------------------- | ---------------------- | -------- | ------------------------------------------------------------------------ |
+| `frontend`           | Next.js 14 (App Router) | Deployment             | 2        | portfolio-api                                                            |
+| `auth-service`       | Go (Chi)                | Deployment             | 2        | CNPG PostgreSQL (auth-service-pg), Redis, Kafka                         |
+| `profile-service`    | NestJS                  | Deployment             | 2        | MongoDB, Kafka (users.registered consumer)                               |
+| `portfolio-api`      | NestJS                  | Deployment             | 2        | auth-service, profile-service, portfolio-service, price-processor, Redis |
+| `portfolio-service`  | NestJS                  | Deployment             | 2        | MongoDB, Kafka                                                           |
+| `price-processor`    | NestJS                  | Deployment             | 2        | MongoDB, Redis, Kafka                                                    |
+| `price-ingestor`     | Python                  | Deployment + KEDA      | 0–3      | Alpaca API, Kafka                                                        |
+| `sentiment-analyzer` | Python                  | Deployment + KEDA      | 0–3      | NewsAPI, MongoDB, Kafka                                                  |
+| `ml-predictor`       | Python                  | Argo Rollouts (canary) | 1        | MongoDB, MinIO, Kafka                                                    |
 
 ### 10.2 Data Flow
 
@@ -612,8 +614,12 @@ graph TB
     Kafka -->|"stocks.signals.sentiment\nstocks.signals.prediction"| PAPI["portfolio-api\n(NestJS, 2 replicas)"]
     Redis -->|"cached prices TTL 10s"| PAPI
 
-    US["user-service\n(NestJS, 2 replicas)"] --- PG[("CNPG PostgreSQL\nuser-service-pg")]
-    US --- Redis
+    AS["auth-service\n(Go, 2 replicas)"] --- PG[("CNPG PostgreSQL\nauth-service-pg")]
+    AS --- Redis
+    AS -->|"users.registered"| Kafka
+
+    Kafka -->|"users.registered"| PFS["profile-service\n(NestJS, 2 replicas)"]
+    PFS --- Mongo
 
     PAPI --> PS["portfolio-service\n(NestJS, 2 replicas)"]
     PS --- Mongo
@@ -621,7 +627,8 @@ graph TB
 
     FE["frontend\n(Next.js 14, 2 replicas)"] --> PAPI
     Browser["🌐 Browser"] --> Kong["Kong API Gateway\n192.168.22.202"]
-    Kong -->|"iss:yana-stocks HS256"| US
+    Kong -->|"iss:yana-stocks HS256"| AS
+    Kong -->|"/api/profile/*"| PFS
     Kong --> PAPI
     Kong --> MLP
 ```
@@ -632,22 +639,23 @@ graph TB
 sequenceDiagram
     participant C as Client
     participant Kong as Kong Gateway
-    participant US as user-service
+    participant AS as auth-service
     participant Redis as Redis
     participant PA as portfolio-api
 
     C->>Kong: POST /api/auth/register
-    Kong->>US: Forward (no JWT check)
-    US-->>C: { message } + sends verification email (SMTP2GO)
+    Kong->>AS: Forward (no JWT check)
+    AS-->>C: { message } + sends verification email (SMTP2GO)
+    AS->>AS: publish users.registered → Kafka (profile-service creates profile)
 
     C->>Kong: POST /api/auth/verify { token }
-    Kong->>US: Forward (no JWT check)
-    US-->>C: { message } (account activated)
+    Kong->>AS: Forward (no JWT check)
+    AS-->>C: { message } (account activated)
 
     C->>Kong: POST /api/auth/login
-    Kong->>US: Forward (no JWT check)
-    US->>Redis: Store refresh:<token> → userId (7d TTL)
-    US-->>C: accessToken (HS256 JWT 15m, iss:'yana-stocks')\nrefreshToken (opaque 7d)
+    Kong->>AS: Forward (no JWT check)
+    AS->>Redis: Store refresh:<token> → userId (7d TTL)
+    AS-->>C: accessToken (HS256 JWT 15m, iss:'yana-stocks')\nrefreshToken (opaque 7d)
 
     C->>Kong: GET /api/stocks/AAPL\nAuthorization: Bearer accessToken
     Kong->>Kong: JWT plugin reads iss claim → finds HS256 credential\nVerifies signature with JWT_SECRET
@@ -655,28 +663,29 @@ sequenceDiagram
     PA-->>C: Stock data
 
     C->>Kong: POST /api/auth/refresh { refreshToken }
-    Kong->>US: Forward (no JWT check)
-    US->>Redis: Validate + delete old refresh token
-    US->>Redis: Store new refresh token
-    US-->>C: New accessToken + New refreshToken
+    Kong->>AS: Forward (no JWT check)
+    AS->>Redis: Validate + delete old refresh token
+    AS->>Redis: Store new refresh token
+    AS-->>C: New accessToken + New refreshToken
 ```
 
 ### 10.4 Kong API Routes
 
 All routes have `cors` plugin. JWT-required routes additionally have `jwt-auth` plugin (validates HS256 signature using `iss: 'yana-stocks'` credential).
 
-| Route                                                           | PathType | Target               | JWT Required |
-| --------------------------------------------------------------- | -------- | -------------------- | ------------ |
-| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`     | Exact    | `user-service:3000`  | No           |
-| `/api/auth/refresh`, `/api/auth/logout`                         | Exact    | `user-service:3000`  | No           |
-| `/api/auth/me`                                                  | Exact    | `user-service:3000`  | Yes          |
-| `/api/market/*`                                                 | Prefix   | `portfolio-api:3000` | No           |
-| `/api/stocks/*`                                                 | Prefix   | `portfolio-api:3000` | Yes          |
-| `/api/signals/*`                                                | Prefix   | `portfolio-api:3000` | Yes          |
-| `/api/portfolio/*`                                              | Prefix   | `portfolio-api:3000` | Yes          |
-| `/api/news/*`                                                   | Prefix   | `portfolio-api:3000` | Yes          |
-| `/api/predict/*`                                                | Prefix   | `ml-predictor:8000`  | Yes          |
-| `/*`                                                            | Prefix   | `frontend:3000`      | No (nginx)   |
+| Route                                                           | PathType | Target                | JWT Required |
+| --------------------------------------------------------------- | -------- | --------------------- | ------------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`     | Exact    | `auth-service:3000`   | No           |
+| `/api/auth/refresh`, `/api/auth/logout`                         | Exact    | `auth-service:3000`   | No           |
+| `/api/auth/me`                                                  | Exact    | `auth-service:3000`   | Yes          |
+| `/api/profile/*`                                                | Prefix   | `profile-service:3000`| Yes          |
+| `/api/market/*`                                                 | Prefix   | `portfolio-api:3000`  | No           |
+| `/api/stocks/*`                                                 | Prefix   | `portfolio-api:3000`  | Yes          |
+| `/api/signals/*`                                                | Prefix   | `portfolio-api:3000`  | Yes          |
+| `/api/portfolio/*`                                              | Prefix   | `portfolio-api:3000`  | Yes          |
+| `/api/news/*`                                                   | Prefix   | `portfolio-api:3000`  | Yes          |
+| `/api/predict/*`                                                | Prefix   | `ml-predictor:8000`   | Yes          |
+| `/*`                                                            | Prefix   | `frontend:3000`       | No (nginx)   |
 
 **Note:** `/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to `portfolio-service`. Kong never routes directly to `portfolio-service`. The `/*` frontend route uses ingress-nginx (not Kong).
 
@@ -744,10 +753,11 @@ graph LR
 yana-stocks/                    # github.com/akann/yana-stocks
 ├── apps/
 │   ├── frontend/               # Next.js 14 (App Router), TailwindCSS, Recharts
+│   ├── auth-service/           # Go (Chi), pgx, golang-migrate, JWT, SMTP2GO
+│   ├── profile-service/        # NestJS, Mongoose, KafkaJS (users.registered consumer)
 │   ├── price-processor/        # NestJS, Mongoose, ioredis, KafkaJS
-│   ├── user-service/           # NestJS, Prisma, JWT, KafkaJS
 │   ├── portfolio-service/      # NestJS, Mongoose, KafkaJS
-│   ├── portfolio-api/          # NestJS, aggregator + auth proxy
+│   ├── portfolio-api/          # NestJS, aggregator + auth/profile proxy (dev)
 │   └── e2e/                    # Playwright (Chromium + iPhone 14)
 ├── services/
 │   ├── price-ingestor/         # Python 3.12, confluent-kafka, alpaca-py, uv

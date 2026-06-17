@@ -280,11 +280,13 @@ spec:
 apps/yana-stocks/
 ├── namespace.yaml
 ├── argocd-app-yana-stocks.yaml    # app-of-apps
+├── kong/                          # KongConsumer (auth-service), JWT/CORS plugins, ingress routes
+├── auth-service/                  # Go, CNPG cluster (auth-service-pg), golang-migrate at startup
+├── profile-service/               # NestJS, MongoDB, consumes users.registered Kafka topic
 ├── price-ingestor/                # Python, KEDA ScaledObject
 ├── price-processor/               # NestJS
 ├── sentiment-analyzer/            # Python, KEDA ScaledObject
 ├── ml-predictor/                  # Python, Argo Rollouts canary
-├── user-service/                  # NestJS, CNPG cluster
 ├── portfolio-service/             # NestJS
 ├── portfolio-api/                 # NestJS
 └── frontend/                      # Next.js, ingress stocks.yanatech.co.uk
@@ -293,13 +295,15 @@ apps/yana-stocks/
 ### Images
 All pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 
-### CNPG for user-service
-Separate CNPG cluster in `yana-stocks` namespace (not shared with pg-main):
+### CNPG for auth-service
+Separate CNPG cluster `auth-service-pg` in `yana-stocks` namespace (not shared with pg-main).
+Migrations run at pod startup via golang-migrate (no initContainer needed).
+
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: yana-stocks-postgres
+  name: auth-service-pg
   namespace: yana-stocks
 spec:
   instances: 1
@@ -309,7 +313,7 @@ spec:
       database: yana_stocks
       owner: yana_stocks
       secret:
-        name: yana-stocks-db-credentials
+        name: auth-service-pg-credentials
   storage:
     size: 10Gi
     storageClass: ceph-rbd
@@ -317,6 +321,7 @@ spec:
 
 ### Kafka topics (already created)
 ```
+users.registered
 stocks.prices.raw
 stocks.prices.processed
 stocks.signals.sentiment
