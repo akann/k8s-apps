@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - external-secret.yaml
   - deployment.yaml
+  - network-policy.yaml
