@@ -26,6 +26,8 @@ spec:
             - secretRef:
                 name: auth-service-secret
           env:
+            - name: PORT
+              value: "3000"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -76,7 +78,3 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
-  template:
-    spec:
-      containers:
-        - image: harbor.yanatech.co.uk/yana-stocks/auth-service:16ba1670dac05693d026cd595cb148a9b821e87f
