@@ -193,6 +193,12 @@ spec:
               kubernetes.io/metadata.name: immich
       ports:
         - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: uptime-kuma
+      ports:
+        - port: 5432
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
