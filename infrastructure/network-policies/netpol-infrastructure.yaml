@@ -633,6 +633,12 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: uptime-kuma
+      ports:
+        - port: 3000
   egress:
     - ports:
         - port: 53
