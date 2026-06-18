@@ -176,7 +176,7 @@ MetalLB provides `LoadBalancer` type services in bare-metal mode.
 | 192.168.22.201 | infisical bundled nginx (scaled to 0, do not use) |
 | 192.168.22.202 | Kong API Gateway (`kong-gateway-proxy`)           |
 
-Pool: `192.168.22.200–249`
+Pool: `192.168.22.200–249` (active range: .200–.202 in use; .203–.249 reserved)
 
 ### 4.3 Ingress Controllers
 
@@ -504,6 +504,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 | Topic                       | Partitions | Replication | Retention | Producer           | Consumer(s)                 |
 | --------------------------- | ---------- | ----------- | --------- | ------------------ | --------------------------- |
+| `users.registered`          | 3          | 3           | 7d        | auth-service       | profile-service             |
 | `stocks.prices.raw`         | 3          | 3           | 24h       | price-ingestor     | price-processor             |
 | `stocks.prices.processed`   | 3          | 3           | 7d        | price-processor    | ml-predictor, portfolio-api |
 | `stocks.signals.sentiment`  | 3          | 3           | 7d        | sentiment-analyzer | portfolio-api               |

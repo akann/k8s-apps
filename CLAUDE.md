@@ -425,7 +425,7 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | Redis UI | https://redis.yanatech.co.uk |
 | Headlamp | https://headlamp.yanatech.co.uk |
 | Uptime Kuma | https://status.yanatech.co.uk |
-| Kafka UI | https://kafka.yanatech.co.uk |
+| Kafka UI | https://kafka-ui.yanatech.co.uk |
 | Argo Rollouts | https://rollouts.yanatech.co.uk |
 | pgAdmin | https://pgadmin.yanatech.co.uk |
 | Apicurio | https://apicurio.yanatech.co.uk |
