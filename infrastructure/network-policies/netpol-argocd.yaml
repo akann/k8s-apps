@@ -1,16 +1,4 @@
 ---
-# default-deny-all for argocd namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-  namespace: argocd
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
----
 # Allow all intra-namespace traffic (server↔repo-server↔app-controller↔redis↔dex↔applicationset)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
