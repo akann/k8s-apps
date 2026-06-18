@@ -76,7 +76,7 @@ resources:
   - apps/nextcloud/argocd-app-nextcloud.yaml
   - apps/gotify/argocd-app-gotify.yaml
   - apps/apicurio/argocd-app-apicurio.yaml
-  - apps/kubernetes-dashboard/argocd-app-kubernetes-dashboard.yaml
+  # kubernetes-dashboard excluded — chart repo moved, fix URL before re-enabling
   - apps/immich/argocd-app-immich.yaml
   - apps/immich/argocd-app-immich-helm.yaml
   - apps/yana-stocks/argocd-app-yana-stocks.yaml
