@@ -190,7 +190,6 @@ helm:
 - `actions-runner-controller` — OCI registry limitation
 - `argo-rollouts` — cluster-scoped CRDs tracked twice
 - `infisical` — bundled nginx chart mutation
-- `kafka` — Strimzi bootstrap Service patch timeout (known upstream issue)
 - `immich` — SharedResourceWarning (ingress shared between immich + immich-app apps)
 - `yana-stocks` / `ml-predictor` Rollout — cosmetic OutOfSync after SSA field-manager migration; diff is always empty, Rollout is Healthy
 
@@ -250,6 +249,13 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 - **External URL:** `https://api-gateway.yanatech.co.uk`
 - **Mode:** DB-less — routes defined via Kubernetes Ingress with `ingressClassName: kong` or KongIngress CRDs
 - **No admin UI** in OSS mode
+
+### Webhook timeout (IMPORTANT)
+The `kong-controller-kong-validations` ValidatingWebhookConfiguration intercepts all Service CREATE/UPDATE cluster-wide. Due to Cilium native routing, the kube-apiserver→webhook call takes ~10s, which exceeds Strimzi's fabric8 HTTP client timeout and causes the operator to crash-loop.
+
+**Fix applied:** `timeoutSeconds` patched to `5` on the services webhook so it fails-open (failurePolicy: Ignore) before Strimzi times out. `ignoreDifferences` in `argocd-app-kong.yaml` prevents ArgoCD from reverting this.
+
+**Do not increase `timeoutSeconds` back to 10** — it will break the Strimzi operator again.
 
 ### Adding a Kong route
 ```yaml
