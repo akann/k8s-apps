@@ -12,4 +12,5 @@ resources:
   - sentiment-analyzer
   - ml-predictor
   - frontend
+  - api-docs
   - kong
