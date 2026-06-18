@@ -69,7 +69,3 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
-  template:
-    spec:
-      containers:
-        - image: harbor.yanatech.co.uk/yana-stocks/profile-service:19e7e5ddaf7cb45a80ba9a456bcb37fc151fabed

@@ -6,7 +6,6 @@ metadata:
   annotations:
     secret.reloader.stakater.com/reload: "ml-predictor-secret"
     argocd.argoproj.io/compare-options: IgnoreExtraneous
-    argocd.argoproj.io/sync-options: ServerSideApply=false
 spec:
   replicas: 1
   selector:
