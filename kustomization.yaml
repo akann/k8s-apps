@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# All ArgoCD Application CRDs managed by the bootstrap app.
+# bootstrap Application applies these to the argocd namespace so that
+# git changes to any argocd-app-*.yaml auto-sync without manual kubectl apply.
+#
+# When adding a new app: commit argocd-app-<name>.yaml, then add it here.
+resources:
+  # ArgoCD self-management
+  - infrastructure/argocd/values.yaml
+
+  # Wave 0 — storage/network foundation
+  - infrastructure/metallb/argocd-app-metallb.yaml
+  - infrastructure/ceph-csi/argocd-app-ceph-csi.yaml
+
+  # Wave 1 — CNI, ingress, TLS
+  - infrastructure/cilium/argocd-app-cilium.yaml
+  - infrastructure/cert-manager/argocd-app-cert-manager.yaml
+  - infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
+
+  # Wave 2 — CRD-dependent config
+  - infrastructure/metallb/argocd-app-metallb-config.yaml
+  - infrastructure/cert-manager/argocd-app-cert-manager-config.yaml
+
+  # Wave 3 — cluster operations
+  - infrastructure/reflector/argocd-app-reflector.yaml
+  - infrastructure/reloader/argocd-app-reloader.yaml
+  - infrastructure/kured/argocd-app-kured.yaml
+  - infrastructure/descheduler/argocd-app-descheduler.yaml
+  - infrastructure/keda/argocd-app-keda.yaml
+  - infrastructure/argo-rollouts/argocd-app-argo-rollouts.yaml
+  - infrastructure/network-policies/argocd-app-network-policies.yaml
+
+  # Wave 4 — platform services
+  - infrastructure/authentik/argocd-app-authentik.yaml
+  - infrastructure/monitoring/argocd-app-monitoring.yaml
+  - infrastructure/tempo/argocd-app-tempo.yaml
+  - infrastructure/velero/argocd-app-velero.yaml
+
+  # Wave 5 — observability and cluster UI
+  - infrastructure/loki/argocd-app-loki.yaml
+  - infrastructure/loki/argocd-app-promtail.yaml
+  - infrastructure/headlamp/argocd-app-headlamp.yaml
+  - infrastructure/goldilocks/argocd-app-goldilocks.yaml
+  - infrastructure/redis/argocd-app-redis.yaml
+  - infrastructure/mongodb/argocd-app-mongodb.yaml
+  - infrastructure/minio/argocd-app-minio.yaml
+  - infrastructure/kong/argocd-app-kong.yaml
+
+  # Wave 6 — secrets management
+  - infrastructure/eso/argocd-app-eso.yaml
+  - infrastructure/infisical/argocd-app-infisical.yaml
+  - infrastructure/redis-insight/argocd-app-redis-insight.yaml
+  - infrastructure/mongo-express/argocd-app-mongo-express.yaml
+
+  # Wave 7 — CNPG
+  - infrastructure/cnpg/argocd-app-cnpg.yaml
+  - infrastructure/cnpg-clusters/argocd-app-cnpg-clusters.yaml
+
+  # Wave 8 — harbor and CI runners
+  - infrastructure/harbor/argocd-app-harbor.yaml
+  - infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
+  - infrastructure/actions-runner/argocd-app-actions-runner-apps.yaml
+  - infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
+  - infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
+  - infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
+
+  # Apps
+  - apps/vaultwarden/argocd-app-vaultwarden.yaml
+  - apps/kafka/argocd-app-strimzi.yaml
+  - apps/kafka/argocd-app-kafka.yaml
+  - apps/kafka-ui/argocd-app-kafka-ui.yaml
+  - apps/uptime-kuma/argocd-app-uptime-kuma.yaml
+  - apps/pgadmin/argocd-app-pgadmin.yaml
+  - apps/nextcloud/argocd-app-nextcloud.yaml
+  - apps/gotify/argocd-app-gotify.yaml
+  - apps/apicurio/argocd-app-apicurio.yaml
+  - apps/kubernetes-dashboard/argocd-app-kubernetes-dashboard.yaml
+  - apps/immich/argocd-app-immich.yaml
+  - apps/immich/argocd-app-immich-helm.yaml
+  - apps/yana-stocks/argocd-app-yana-stocks.yaml

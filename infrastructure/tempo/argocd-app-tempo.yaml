@@ -17,7 +17,7 @@ spec:
           storage:
             trace:
               backend: local
-          retention: 336h  # 14 days
+          retention: 336h
           resources:
             requests:
               cpu: 200m
@@ -25,6 +25,9 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          metricsGenerator:
+            enabled: true
+            remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring:9090/api/v1/write
 
         persistence:
           enabled: true
@@ -35,11 +38,6 @@ spec:
           enabled: true
           additionalLabels:
             release: kube-prometheus-stack
-
-        tempo:
-          metricsGenerator:
-            enabled: true
-            remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring:9090/api/v1/write
 
         gateway:
           enabled: false
