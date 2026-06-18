@@ -58,6 +58,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kong
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: kong-controller-kong-validations
+      jsonPointers:
+        - /webhooks/2/timeoutSeconds
   syncPolicy:
     automated:
       prune: true
