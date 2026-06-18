@@ -23,6 +23,12 @@ spec:
                   args:
                     ignorePvcPods: true
                     evictLocalStoragePods: false
+                - name: RemovePodsViolatingInterPodAntiAffinity
+                  args: {}
+                - name: RemovePodsViolatingNodeAffinity
+                  args:
+                    nodeAffinityType:
+                      - requiredDuringSchedulingIgnoredDuringExecution
               plugins:
                 balance:
                   enabled:

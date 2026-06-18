@@ -28,6 +28,8 @@ spec:
                 secretKeyRef:
                   name: portfolio-service-secret
                   key: MONGODB_URI
+            - name: PORT
+              value: "3000"
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: OTEL_SERVICE_NAME
