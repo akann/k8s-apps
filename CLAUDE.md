@@ -192,6 +192,11 @@ helm:
 - `infisical` — bundled nginx chart mutation
 - `kafka` — Strimzi bootstrap Service patch timeout (known upstream issue)
 - `immich` — SharedResourceWarning (ingress shared between immich + immich-app apps)
+- `yana-stocks` / `ml-predictor` Rollout — cosmetic OutOfSync after SSA field-manager migration; diff is always empty, Rollout is Healthy
+
+### ArgoCD + Argo Rollouts pitfalls
+- **Never set `ServerSideApply=false` on a Rollout.** The Rollout CRD uses `x-kubernetes-preserve-unknown-fields` for `.spec.template`, so client-side structured merge diff fails with "field not declared in schema". The app-level `ServerSideApply=true` handles this correctly.
+- **Stray `spec.template` blocks in Service definitions** cause the same "field not declared in schema" error. Check multi-resource YAML files (Deployment + Service in one file) to ensure the Service section is not accidentally inheriting content from the Deployment's `spec.template`.
 
 ## Network Policies
 
