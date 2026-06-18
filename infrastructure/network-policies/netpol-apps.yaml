@@ -359,6 +359,25 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-nginx-api-docs
+  namespace: yana-stocks
+spec:
+  podSelector:
+    matchLabels:
+      app: api-docs
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-nginx-frontend
   namespace: yana-stocks
 spec:
