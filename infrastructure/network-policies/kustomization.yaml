@@ -9,4 +9,5 @@ resources:
   - netpol-kafka.yaml
   - netpol-monitoring.yaml
   - netpol-vaultwarden.yaml
+  - netpol-argocd.yaml
   - netpol-apiserver-egress.yaml

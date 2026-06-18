@@ -12,6 +12,9 @@ spec:
     helm:
       releaseName: argocd
       valuesObject:
+        global:
+          networkPolicy:
+            create: false
         configs:
           cm:
             admin.enabled: true
