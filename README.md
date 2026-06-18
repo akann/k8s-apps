@@ -441,13 +441,14 @@ graph LR
 
 These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
-| App                         | Reason                                                  |
-| --------------------------- | ------------------------------------------------------- |
-| `actions-runner-controller` | OCI registry limitation                                 |
-| `argo-rollouts`             | Cluster-scoped CRDs tracked twice                       |
-| `infisical`                 | Bundled nginx chart mutation                            |
-| `kafka`                     | Strimzi bootstrap Service patch timeout (upstream)      |
-| `immich`                    | SharedResourceWarning (ingress shared between two apps) |
+| App                         | Reason                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `actions-runner-controller` | OCI registry limitation                                                                                   |
+| `argo-rollouts`             | Cluster-scoped CRDs tracked twice                                                                         |
+| `infisical`                 | Bundled nginx chart mutation                                                                               |
+| `kafka`                     | Strimzi bootstrap Service patch timeout (upstream)                                                        |
+| `immich`                    | SharedResourceWarning (ingress shared between two apps)                                                   |
+| `yana-stocks` (ml-predictor Rollout) | Cosmetic OutOfSync after SSA field-manager migration — `argocd app diff` is empty, Rollout is Healthy |
 
 ---
 
@@ -559,6 +560,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | Goldilocks    | https://goldilocks.yanatech.co.uk    | Authentik forward | Resource recommendations |
 | Gotify        | https://gotify.yanatech.co.uk        | Native            | Push notifications       |
 | yana-stocks   | https://stocks.yanatech.co.uk        | JWT (in-app)      | Stock market app         |
+| API Docs      | https://api-docs.yanatech.co.uk      | Authentik forward | yana-stocks Swagger hub  |
 | yanatech      | https://yanatech.co.uk               | Public            | Landing page             |
 
 **Note on Headlamp:** Authentik SSO is broken upstream; use a long-lived ServiceAccount token:
@@ -589,6 +591,7 @@ A production-grade, event-driven microservices application for real-time stock d
 | `price-ingestor`     | Python                  | Deployment + KEDA      | 0–3      | Alpaca API, Kafka                                                        |
 | `sentiment-analyzer` | Python                  | Deployment + KEDA      | 0–3      | NewsAPI, MongoDB, Kafka                                                  |
 | `ml-predictor`       | Python                  | Argo Rollouts (canary) | 1        | MongoDB, MinIO, Kafka                                                    |
+| `api-docs`           | nginx (static)          | Deployment             | 1        | None — static Swagger UI hub (Authentik-protected)                       |
 
 ### 10.2 Data Flow
 
@@ -759,6 +762,7 @@ yana-stocks/                    # github.com/akann/yana-stocks
 │   ├── price-processor/        # NestJS, Mongoose, ioredis, KafkaJS
 │   ├── portfolio-service/      # NestJS, Mongoose, KafkaJS
 │   ├── portfolio-api/          # NestJS, aggregator + auth/profile proxy (dev)
+│   ├── api-docs/               # Static nginx — Swagger UI hub (index.html + nginx.conf + Dockerfile)
 │   └── e2e/                    # Playwright (Chromium + iPhone 14)
 ├── services/
 │   ├── price-ingestor/         # Python 3.12, confluent-kafka, alpaca-py, uv
