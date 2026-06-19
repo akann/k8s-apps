@@ -50,6 +50,12 @@ spec:
               kubernetes.io/metadata.name: authentik
       ports:
         - port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: minio
+      ports:
+        - port: 9000
     - ports:
         - port: 443  # OIDC + external
 ---
