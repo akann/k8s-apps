@@ -44,6 +44,17 @@ spec:
             policy.csv: |
               g, authentik Admins, role:admin
             scopes: '[groups]'
+        dex:
+          initContainers:
+            - name: wait-for-authentik
+              image: alpine:3.20
+              command:
+                - sh
+                - -c
+                - |
+                  until wget -qO /dev/null https://authentik.yanatech.co.uk/application/o/argo-cd/.well-known/openid-configuration; do
+                    sleep 5
+                  done
         server:
           ingress:
             enabled: true
