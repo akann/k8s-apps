@@ -30,6 +30,8 @@ spec:
               provider: aws
               config:
                 region: eu-central-003
+          storeValidationFrequency: 1h
+          backupSyncPeriod: 1h
         initContainers:
           - name: velero-plugin-for-aws
             image: velero/velero-plugin-for-aws:v1.10.0
