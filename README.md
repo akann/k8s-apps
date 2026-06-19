@@ -271,16 +271,16 @@ Every namespace has `default-deny-all`. Key policy files:
 
 ### 5.1 Ceph RBD
 
-| Property      | Value                                  |
-| ------------- | -------------------------------------- |
-| Type          | Ceph RBD (block storage)               |
-| StorageClass  | `ceph-rbd` (default)                   |
-| Raw capacity  | 8.4 TiB                                |
-| OSDs          | 6 (2 per Proxmox host)                 |
-| Monitors      | 192.168.22.11-13:6789                  |
+| Property      | Value                     |
+| ------------- | ------------------------- |
+| Type          | Ceph RBD (block storage)  |
+| StorageClass  | `ceph-rbd` (default)      |
+| Raw capacity  | 8.4 TiB                   |
+| OSDs          | 6 (2 per Proxmox host)    |
+| Monitors      | 192.168.22.11-13:6789     |
 | Cluster ID    | `&lt;see Vaultwarden&gt;` |
-| Access mode   | RWO (ReadWriteOnce)                    |
-| CSI namespace | `ceph-csi-rbd`                         |
+| Access mode   | RWO (ReadWriteOnce)       |
+| CSI namespace | `ceph-csi-rbd`            |
 
 All PersistentVolumeClaims cluster-wide use `ceph-rbd`. There is no NFS or local-path storage.
 
@@ -301,26 +301,26 @@ graph TB
 
 ### 5.2 PVC Inventory
 
-| Namespace       | PVC                                  | Size         | Consumer                    |
-| --------------- | ------------------------------------ | ------------ | --------------------------- |
-| `cnpg-clusters` | pg-main-1/2/4                        | 50 Gi × 3    | Shared PostgreSQL (pg-main) |
-| `harbor`        | harbor-registry                      | 100 Gi       | Image layers                |
-| `harbor`        | harbor-database                      | 10 Gi        | Harbor PostgreSQL           |
-| `harbor`        | harbor-redis / trivy                 | 5 Gi / 10 Gi | Harbor cache/scanner        |
-| `immich`        | immich-library                       | 200 Gi       | Photo library               |
-| `immich`        | immich-postgres-1                    | 20 Gi        | Immich CNPG PostgreSQL      |
-| `kafka`         | data-kafka-cluster-dual-role-{0,1,2} | 20 Gi × 3    | Kafka log data              |
-| `minio`         | minio                                | 50 Gi        | Object storage              |
-| `mongodb`       | datadir-mongodb-{0,1}                | 10 Gi × 2    | MongoDB replicas            |
-| `monitoring`    | prometheus-db                        | 20 Gi × 2    | Prometheus TSDB             |
-| `monitoring`    | alertmanager-db                      | 5 Gi × 2     | Alertmanager state          |
-| `monitoring`    | storage-loki-0                       | 20 Gi        | Loki log storage            |
-| `monitoring`    | storage-tempo-0                      | 20 Gi        | Tempo trace storage         |
-| `nextcloud`     | nextcloud-nextcloud                  | 100 Gi       | Nextcloud data              |
-| `redis`         | redis-data-redis-master-0            | 5 Gi         | Redis AOF/RDB               |
+| Namespace       | PVC                                  | Size         | Consumer                            |
+| --------------- | ------------------------------------ | ------------ | ----------------------------------- |
+| `cnpg-clusters` | pg-main-1/2/4                        | 50 Gi × 3    | Shared PostgreSQL (pg-main)         |
+| `harbor`        | harbor-registry                      | 100 Gi       | Image layers                        |
+| `harbor`        | harbor-database                      | 10 Gi        | Harbor PostgreSQL                   |
+| `harbor`        | harbor-redis / trivy                 | 5 Gi / 10 Gi | Harbor cache/scanner                |
+| `immich`        | immich-library                       | 200 Gi       | Photo library                       |
+| `immich`        | immich-postgres-1                    | 20 Gi        | Immich CNPG PostgreSQL              |
+| `kafka`         | data-kafka-cluster-dual-role-{0,1,2} | 20 Gi × 3    | Kafka log data                      |
+| `minio`         | minio                                | 50 Gi        | Object storage                      |
+| `mongodb`       | datadir-mongodb-{0,1}                | 10 Gi × 2    | MongoDB replicas                    |
+| `monitoring`    | prometheus-db                        | 20 Gi × 2    | Prometheus TSDB                     |
+| `monitoring`    | alertmanager-db                      | 5 Gi × 2     | Alertmanager state                  |
+| `monitoring`    | storage-loki-0                       | 20 Gi        | Loki log storage                    |
+| `monitoring`    | storage-tempo-0                      | 20 Gi        | Tempo trace storage                 |
+| `nextcloud`     | nextcloud-nextcloud                  | 100 Gi       | Nextcloud data                      |
+| `redis`         | redis-data-redis-master-0            | 5 Gi         | Redis AOF/RDB                       |
 | `yana-stocks`   | auth-service-pg-1                    | 10 Gi        | yana-stocks auth-service PostgreSQL |
-| `vaultwarden`   | vaultwarden-data                     | 5 Gi         | Vault data                  |
-| `uptime-kuma`   | uptime-kuma-pvc                      | 5 Gi         | Kuma database               |
+| `vaultwarden`   | vaultwarden-data                     | 5 Gi         | Vault data                          |
+| `uptime-kuma`   | uptime-kuma-pvc                      | 5 Gi         | Kuma database                       |
 
 ---
 
@@ -441,13 +441,13 @@ graph LR
 
 These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
-| App                         | Reason                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `actions-runner-controller` | OCI registry limitation                                                                                   |
-| `argo-rollouts`             | Cluster-scoped CRDs tracked twice                                                                         |
-| `infisical`                 | Bundled nginx chart mutation                                                                               |
-| `kafka`                     | Strimzi bootstrap Service patch timeout (upstream)                                                        |
-| `immich`                    | SharedResourceWarning (ingress shared between two apps)                                                   |
+| App                                  | Reason                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `actions-runner-controller`          | OCI registry limitation                                                                               |
+| `argo-rollouts`                      | Cluster-scoped CRDs tracked twice                                                                     |
+| `infisical`                          | Bundled nginx chart mutation                                                                          |
+| `kafka`                              | Strimzi bootstrap Service patch timeout (upstream)                                                    |
+| `immich`                             | SharedResourceWarning (ingress shared between two apps)                                               |
 | `yana-stocks` (ml-predictor Rollout) | Cosmetic OutOfSync after SSA field-manager migration — `argocd app diff` is empty, Rollout is Healthy |
 
 ---
@@ -458,11 +458,11 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 #### CloudNativePG (CNPG) — PostgreSQL
 
-| Cluster            | Namespace       | Instances | Primary            | Size      | Consumers                                              |
-| ------------------ | --------------- | --------- | ------------------ | --------- | ------------------------------------------------------ |
-| `pg-main`          | `cnpg-clusters` | 3         | pg-main-1          | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
-| `immich-postgres`  | `immich`        | 1         | immich-postgres-1  | 20 Gi     | Immich (pgvector/VectorChord)                          |
-| `auth-service-pg`  | `yana-stocks`   | 1         | auth-service-pg-1  | 10 Gi     | yana-stocks auth-service                               |
+| Cluster           | Namespace       | Instances | Primary           | Size      | Consumers                                              |
+| ----------------- | --------------- | --------- | ----------------- | --------- | ------------------------------------------------------ |
+| `pg-main`         | `cnpg-clusters` | 3         | pg-main-1         | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
+| `immich-postgres` | `immich`        | 1         | immich-postgres-1 | 20 Gi     | Immich (pgvector/VectorChord)                          |
+| `auth-service-pg` | `yana-stocks`   | 1         | auth-service-pg-1 | 10 Gi     | yana-stocks auth-service                               |
 
 **pg-main connection:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`  
 **Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)
@@ -539,7 +539,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | Service       | URL                                  | Auth              | Notes                    |
 | ------------- | ------------------------------------ | ----------------- | ------------------------ |
 | ArgoCD        | https://argocd.yanatech.co.uk        | Native            | GitOps UI                |
-| Authentik     | https://authentik.yanatech.co.uk          | Native            | SSO IdP                  |
+| Authentik     | https://authentik.yanatech.co.uk     | Native            | SSO IdP                  |
 | Grafana       | https://grafana.yanatech.co.uk       | Authentik OIDC    | Metrics dashboards       |
 | Immich        | https://photos.yanatech.co.uk        | Native            | Photo management         |
 | Infisical     | https://infisical.yanatech.co.uk     | Native            | Secrets manager          |
@@ -583,7 +583,7 @@ A production-grade, event-driven microservices application for real-time stock d
 | Service              | Language                | Pattern                | Replicas | Dependencies                                                             |
 | -------------------- | ----------------------- | ---------------------- | -------- | ------------------------------------------------------------------------ |
 | `frontend`           | Next.js 14 (App Router) | Deployment             | 2        | portfolio-api                                                            |
-| `auth-service`       | Go (Chi)                | Deployment             | 2        | CNPG PostgreSQL (auth-service-pg), Redis, Kafka                         |
+| `auth-service`       | Go (Chi)                | Deployment             | 2        | CNPG PostgreSQL (auth-service-pg), Redis, Kafka                          |
 | `profile-service`    | NestJS                  | Deployment             | 2        | MongoDB, Kafka (users.registered consumer)                               |
 | `portfolio-api`      | NestJS                  | Deployment             | 2        | auth-service, profile-service, portfolio-service, price-processor, Redis |
 | `portfolio-service`  | NestJS                  | Deployment             | 2        | MongoDB, Kafka                                                           |
@@ -677,19 +677,19 @@ sequenceDiagram
 
 All routes have `cors` plugin. JWT-required routes additionally have `jwt-auth` plugin (validates HS256 signature using `iss: 'yana-stocks'` credential).
 
-| Route                                                           | PathType | Target                | JWT Required |
-| --------------------------------------------------------------- | -------- | --------------------- | ------------ |
-| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`     | Exact    | `auth-service:3000`   | No           |
-| `/api/auth/refresh`, `/api/auth/logout`                         | Exact    | `auth-service:3000`   | No           |
-| `/api/auth/me`                                                  | Exact    | `auth-service:3000`   | Yes          |
-| `/api/profile/*`                                                | Prefix   | `profile-service:3000`| Yes          |
-| `/api/market/*`                                                 | Prefix   | `portfolio-api:3000`  | No           |
-| `/api/stocks/*`                                                 | Prefix   | `portfolio-api:3000`  | Yes          |
-| `/api/signals/*`                                                | Prefix   | `portfolio-api:3000`  | Yes          |
-| `/api/portfolio/*`                                              | Prefix   | `portfolio-api:3000`  | Yes          |
-| `/api/news/*`                                                   | Prefix   | `portfolio-api:3000`  | Yes          |
-| `/api/predict/*`                                                | Prefix   | `ml-predictor:8000`   | Yes          |
-| `/*`                                                            | Prefix   | `frontend:3000`       | No (nginx)   |
+| Route                                                       | PathType | Target                 | JWT Required |
+| ----------------------------------------------------------- | -------- | ---------------------- | ------------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login` | Exact    | `auth-service:3000`    | No           |
+| `/api/auth/refresh`, `/api/auth/logout`                     | Exact    | `auth-service:3000`    | No           |
+| `/api/auth/me`                                              | Exact    | `auth-service:3000`    | Yes          |
+| `/api/profile/*`                                            | Prefix   | `profile-service:3000` | Yes          |
+| `/api/market/*`                                             | Prefix   | `portfolio-api:3000`   | No           |
+| `/api/stocks/*`                                             | Prefix   | `portfolio-api:3000`   | Yes          |
+| `/api/signals/*`                                            | Prefix   | `portfolio-api:3000`   | Yes          |
+| `/api/portfolio/*`                                          | Prefix   | `portfolio-api:3000`   | Yes          |
+| `/api/news/*`                                               | Prefix   | `portfolio-api:3000`   | Yes          |
+| `/api/predict/*`                                            | Prefix   | `ml-predictor:8000`    | Yes          |
+| `/*`                                                        | Prefix   | `frontend:3000`        | No (nginx)   |
 
 **Note:** `/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to `portfolio-service`. Kong never routes directly to `portfolio-service`. The `/*` frontend route uses ingress-nginx (not Kong).
 
