@@ -24,8 +24,33 @@ spec:
         - .spec.target.template.mergePolicy
     - group: postgresql.cnpg.io
       kind: Cluster
-      managedFieldsManagers:
-        - manager
+      jqPathExpressions:
+        - .spec.affinity
+        - .spec.enablePDB
+        - .spec.enableSuperuserAccess
+        - .spec.failoverDelay
+        - .spec.logLevel
+        - .spec.maxSyncReplicas
+        - .spec.minSyncReplicas
+        - .spec.monitoring
+        - .spec.postgresGID
+        - .spec.postgresUID
+        - .spec.primaryUpdateMethod
+        - .spec.primaryUpdateStrategy
+        - .spec.probes
+        - .spec.replicationSlots
+        - .spec.smartShutdownTimeout
+        - .spec.startDelay
+        - .spec.stopDelay
+        - .spec.switchoverDelay
+        - .spec.bootstrap.initdb.encoding
+        - .spec.bootstrap.initdb.localeCType
+        - .spec.bootstrap.initdb.localeCollate
+        - .spec.managed.roles[].connectionLimit
+        - .spec.managed.roles[].ensure
+        - .spec.managed.roles[].inherit
+        - .spec.backup.barmanObjectStore.target
+        - .spec.postgresql.parameters
   destination:
     server: https://kubernetes.default.svc
     namespace: immich
