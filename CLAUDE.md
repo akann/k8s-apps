@@ -190,8 +190,13 @@ helm:
 - `actions-runner-controller` — OCI registry limitation
 - `argo-rollouts` — cluster-scoped CRDs tracked twice
 - `infisical` — bundled nginx chart mutation
-- `immich` — SharedResourceWarning (ingress shared between immich + immich-app apps)
 - `yana-stocks` / `ml-predictor` Rollout — cosmetic OutOfSync after SSA field-manager migration; diff is always empty, Rollout is Healthy
+
+### immich ignoreDifferences pattern (SSA + ESO + CNPG)
+The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifferences`:
+- **ExternalSecret**: ESO injects default fields (`conversionStrategy`, `decodingStrategy`, `metadataPolicy`, `nullBytePolicy`, `deletionPolicy`, `engineVersion`, `mergePolicy`) — use `jqPathExpressions`
+- **CNPG Cluster**: The CNPG admission webhook injects ~20 default spec fields (affinity, enablePDB, logLevel, etc.) that aren't in the manifest — use `jqPathExpressions` listing each field. `managedFieldsManagers` does NOT work here because CNPG uses `Update` (not `Apply`) operation, so the injected fields are not tracked under any named field manager.
+- The `immich-app-server` Ingress is owned exclusively by the `immich-app` Helm chart — do not add an `immich-ingress.yaml` duplicate to the `immich` kustomization.
 
 ### ArgoCD + Argo Rollouts pitfalls
 - **Never set `ServerSideApply=false` on a Rollout.** The Rollout CRD uses `x-kubernetes-preserve-unknown-fields` for `.spec.template`, so client-side structured merge diff fails with "field not declared in schema". The app-level `ServerSideApply=true` handles this correctly.
