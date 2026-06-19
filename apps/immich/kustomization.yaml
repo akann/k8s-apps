@@ -3,7 +3,9 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - external-secret.yaml
+  - external-secret-minio.yaml
   - postgres-cluster.yaml
+  - scheduled-backup.yaml
   - library-pvc.yaml
   - netpol-immich.yaml
   - immich-ingress.yaml
