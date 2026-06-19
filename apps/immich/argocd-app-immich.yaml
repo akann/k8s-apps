@@ -14,14 +14,18 @@ spec:
   ignoreDifferences:
     - group: external-secrets.io
       kind: ExternalSecret
-      namespace: immich
-      jsonPointers:
-        - /metadata/annotations
+      jqPathExpressions:
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy
+        - .spec.target.deletionPolicy
+        - .spec.target.template.engineVersion
+        - .spec.target.template.mergePolicy
     - group: postgresql.cnpg.io
       kind: Cluster
-      namespace: immich
-      jsonPointers:
-        - /metadata/annotations
+      managedFieldsManagers:
+        - manager
   destination:
     server: https://kubernetes.default.svc
     namespace: immich
