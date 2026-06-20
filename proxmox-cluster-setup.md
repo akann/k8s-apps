@@ -1066,12 +1066,7 @@ ssh <node> reboot
 ha-manager status
 ```
 
-### Pending Tasks
+### Maintenance Notes
 
-| Task | Command |
-|---|---|
-| Enable PVE firewall | Datacenter → Firewall → Options → Enable |
-| ACME TLS for PVE web UI | `pvenode acme plugin add dns cloudflare-dns --api cf --data "CF_Token=<token>"` then `pvenode acme cert order` |
-| Update Gotify token if rotated | `pvesh set /cluster/notifications/endpoints/gotify/gotify --token <new-token>` |
-| Apply pending upgrades | `apt update && apt upgrade` (ZFS 2.3.4→2.4.2, libpve-storage-perl) |
-| Clean orphaned kernels | `proxmox-boot-tool kernel clean` |
+- **TLS for PVE web UI:** Handled via HAProxy — not using the built-in `pvenode acme` method.
+- **Gotify token rotation:** `pvesh set /cluster/notifications/endpoints/gotify/gotify --token <new-token>`
