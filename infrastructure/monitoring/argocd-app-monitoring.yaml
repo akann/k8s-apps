@@ -27,6 +27,14 @@ spec:
                 gnetId: 10347
                 revision: 4
                 datasource: Prometheus
+              ceph-cluster:
+                gnetId: 2842
+                revision: 18
+                datasource: Prometheus
+              ceph-osd:
+                gnetId: 5336
+                revision: 9
+                datasource: Prometheus
           env:
             GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
             GF_AUTH_GENERIC_OAUTH_NAME: Authentik
