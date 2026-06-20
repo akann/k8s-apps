@@ -17,6 +17,15 @@ spec:
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret
+          extraInitContainers:
+            - name: copy-downloaded-dashboards
+              image: busybox
+              command: ["sh", "-c", "cp /var/lib/grafana/dashboards/default/*.json /tmp/dashboards/"]
+              volumeMounts:
+                - name: storage
+                  mountPath: /var/lib/grafana
+                - name: sc-dashboard-volume
+                  mountPath: /tmp/dashboards
           dashboardProviders:
             dashboardproviders.yaml:
               apiVersion: 1
