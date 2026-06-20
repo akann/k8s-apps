@@ -12,22 +12,15 @@ data:
       "uid": "pve-nvme-temp",
       "timezone": "browser",
       "schemaVersion": 37,
-      "version": 1,
+      "version": 2,
       "refresh": "1m",
       "time": { "from": "now-3h", "to": "now" },
       "templating": {
         "list": [
           {
-            "name": "datasource",
-            "type": "datasource",
-            "pluginId": "prometheus",
-            "label": "Datasource",
-            "hide": 0
-          },
-          {
             "name": "node",
             "type": "query",
-            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
             "query": "label_values(nvme_temperature_celsius{job=\"pve-node-exporter\"}, node)",
             "multi": true,
             "includeAll": true,
@@ -44,7 +37,7 @@ data:
           "title": "Current Temperatures",
           "id": 1,
           "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
               "expr": "nvme_temperature_celsius{job=\"pve-node-exporter\", node=~\"$node\"}",
@@ -79,7 +72,7 @@ data:
           "title": "Temperature Over Time",
           "id": 2,
           "gridPos": { "h": 12, "w": 24, "x": 0, "y": 5 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
               "expr": "nvme_temperature_celsius{job=\"pve-node-exporter\", node=~\"$node\"}",
