@@ -12,7 +12,8 @@ data:
       "uid": "pve-nvme-temp",
       "timezone": "browser",
       "schemaVersion": 37,
-      "version": 4,
+      "version": 5,
+      "tags": ["Proxmox", "Prometheus"],
       "refresh": "1m",
       "time": { "from": "now-3h", "to": "now" },
       "templating": {
