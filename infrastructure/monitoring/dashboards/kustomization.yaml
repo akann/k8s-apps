@@ -5,3 +5,4 @@ resources:
   - cm-ceph-osd.yaml
   - cm-node-exporter-full.yaml
   - cm-proxmox-via-prometheus.yaml
+  - cm-nvme-temperatures.yaml
