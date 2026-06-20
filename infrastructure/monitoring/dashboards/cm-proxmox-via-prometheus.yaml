@@ -1,0 +1,718 @@
+apiVersion: v1
+data:
+  proxmox-via-prometheus.json: "{\n  \"__inputs\": [\n    {\n      \"name\": \"DS_PROMETHEUS\"\
+    ,\n      \"label\": \"Prometheus\",\n      \"description\": \"\",\n      \"type\"\
+    : \"datasource\",\n      \"pluginId\": \"prometheus\",\n      \"pluginName\":\
+    \ \"Prometheus\"\n    }\n  ],\n  \"__elements\": {},\n  \"__requires\": [\n  \
+    \  {\n      \"type\": \"panel\",\n      \"id\": \"bargauge\",\n      \"name\"\
+    : \"Bar gauge\",\n      \"version\": \"\"\n    },\n    {\n      \"type\": \"panel\"\
+    ,\n      \"id\": \"gauge\",\n      \"name\": \"Gauge\",\n      \"version\": \"\
+    \"\n    },\n    {\n      \"type\": \"grafana\",\n      \"id\": \"grafana\",\n\
+    \      \"name\": \"Grafana\",\n      \"version\": \"9.3.2\"\n    },\n    {\n \
+    \     \"type\": \"datasource\",\n      \"id\": \"prometheus\",\n      \"name\"\
+    : \"Prometheus\",\n      \"version\": \"1.0.0\"\n    },\n    {\n      \"type\"\
+    : \"panel\",\n      \"id\": \"stat\",\n      \"name\": \"Stat\",\n      \"version\"\
+    : \"\"\n    },\n    {\n      \"type\": \"panel\",\n      \"id\": \"table\",\n\
+    \      \"name\": \"Table\",\n      \"version\": \"\"\n    },\n    {\n      \"\
+    type\": \"panel\",\n      \"id\": \"timeseries\",\n      \"name\": \"Time series\"\
+    ,\n      \"version\": \"\"\n    }\n  ],\n  \"annotations\": {\n    \"list\": [\n\
+    \      {\n        \"$$hashKey\": \"object:215\",\n        \"builtIn\": 1,\n  \
+    \      \"datasource\": {\n          \"type\": \"datasource\",\n          \"uid\"\
+    : \"grafana\"\n        },\n        \"enable\": true,\n        \"hide\": true,\n\
+    \        \"iconColor\": \"rgba(0, 211, 255, 1)\",\n        \"limit\": 100,\n \
+    \       \"name\": \"Annotations & Alerts\",\n        \"showIn\": 0,\n        \"\
+    target\": {\n          \"limit\": 100,\n          \"matchAny\": false,\n     \
+    \     \"tags\": [],\n          \"type\": \"dashboard\"\n        },\n        \"\
+    type\": \"dashboard\"\n      }\n    ]\n  },\n  \"description\": \"Proxmox Virtual\
+    \ Environment Dashboard\",\n  \"editable\": true,\n  \"fiscalYearStartMonth\"\
+    : 0,\n  \"graphTooltip\": 0,\n  \"id\": null,\n  \"links\": [],\n  \"liveNow\"\
+    : false,\n  \"panels\": [\n    {\n      \"datasource\": {\n        \"type\": \"\
+    prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"description\"\
+    : \"\",\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
+    : {\n            \"mode\": \"thresholds\"\n          },\n          \"custom\"\
+    : {\n            \"align\": \"auto\",\n            \"displayMode\": \"auto\",\n\
+    \            \"inspect\": false\n          },\n          \"mappings\": [],\n \
+    \         \"thresholds\": {\n            \"mode\": \"absolute\",\n           \
+    \ \"steps\": [\n              {\n                \"color\": \"green\",\n     \
+    \           \"value\": null\n              }\n            ]\n          }\n   \
+    \     },\n        \"overrides\": [\n          {\n            \"matcher\": {\n\
+    \              \"id\": \"byName\",\n              \"options\": \"Status\"\n  \
+    \          },\n            \"properties\": [\n              {\n              \
+    \  \"id\": \"mappings\",\n                \"value\": [\n                  {\n\
+    \                    \"options\": {\n                      \"0\": {\n        \
+    \                \"color\": \"red\",\n                        \"index\": 1,\n\
+    \                        \"text\": \"stopped\"\n                      },\n   \
+    \                   \"1\": {\n                        \"color\": \"green\",\n\
+    \                        \"index\": 0,\n                        \"text\": \"running\"\
+    \n                      }\n                    },\n                    \"type\"\
+    : \"value\"\n                  }\n                ]\n              },\n      \
+    \        {\n                \"id\": \"custom.displayMode\",\n                \"\
+    value\": \"color-text\"\n              },\n              {\n                \"\
+    id\": \"custom.width\",\n                \"value\": 73\n              }\n    \
+    \        ]\n          },\n          {\n            \"matcher\": {\n          \
+    \    \"id\": \"byName\",\n              \"options\": \"Memory\"\n            },\n\
+    \            \"properties\": [\n              {\n                \"id\": \"unit\"\
+    ,\n                \"value\": \"bytes\"\n              },\n              {\n \
+    \               \"id\": \"custom.width\",\n                \"value\": 100\n  \
+    \            }\n            ]\n          },\n          {\n            \"matcher\"\
+    : {\n              \"id\": \"byName\",\n              \"options\": \"Disk\"\n\
+    \            },\n            \"properties\": [\n              {\n            \
+    \    \"id\": \"unit\",\n                \"value\": \"bytes\"\n              },\n\
+    \              {\n                \"id\": \"custom.width\",\n                \"\
+    value\": 82\n              }\n            ]\n          },\n          {\n     \
+    \       \"matcher\": {\n              \"id\": \"byName\",\n              \"options\"\
+    : \"Memory usage (%)\"\n            },\n            \"properties\": [\n      \
+    \        {\n                \"id\": \"unit\",\n                \"value\": \"percentunit\"\
+    \n              },\n              {\n                \"id\": \"custom.displayMode\"\
+    ,\n                \"value\": \"color-text\"\n              },\n             \
+    \ {\n                \"id\": \"mappings\",\n                \"value\": [\n   \
+    \               {\n                    \"options\": {\n                      \"\
+    from\": 0,\n                      \"result\": {\n                        \"color\"\
+    : \"green\",\n                        \"index\": 0\n                      },\n\
+    \                      \"to\": 0.75\n                    },\n                \
+    \    \"type\": \"range\"\n                  },\n                  {\n        \
+    \            \"options\": {\n                      \"from\": 0.75,\n         \
+    \             \"result\": {\n                        \"color\": \"orange\",\n\
+    \                        \"index\": 1\n                      },\n            \
+    \          \"to\": 0.9\n                    },\n                    \"type\":\
+    \ \"range\"\n                  },\n                  {\n                    \"\
+    options\": {\n                      \"from\": 0.9,\n                      \"result\"\
+    : {\n                        \"color\": \"dark-red\",\n                      \
+    \  \"index\": 2\n                      },\n                      \"to\": 2\n \
+    \                   },\n                    \"type\": \"range\"\n            \
+    \      },\n                  {\n                    \"options\": {\n         \
+    \             \"match\": \"null\",\n                      \"result\": {\n    \
+    \                    \"color\": \"#808080\",\n                        \"index\"\
+    : 3,\n                        \"text\": \"n/a\"\n                      }\n   \
+    \                 },\n                    \"type\": \"special\"\n            \
+    \      }\n                ]\n              },\n              {\n             \
+    \   \"id\": \"custom.width\",\n                \"value\": 143\n              }\n\
+    \            ]\n          },\n          {\n            \"matcher\": {\n      \
+    \        \"id\": \"byName\",\n              \"options\": \"Disk usage (%)\"\n\
+    \            },\n            \"properties\": [\n              {\n            \
+    \    \"id\": \"mappings\",\n                \"value\": [\n                  {\n\
+    \                    \"options\": {\n                      \"from\": 0,\n    \
+    \                  \"result\": {\n                        \"color\": \"green\"\
+    ,\n                        \"index\": 0\n                      },\n          \
+    \            \"to\": 0.7\n                    },\n                    \"type\"\
+    : \"range\"\n                  },\n                  {\n                    \"\
+    options\": {\n                      \"from\": 0.7,\n                      \"result\"\
+    : {\n                        \"color\": \"orange\",\n                        \"\
+    index\": 1\n                      },\n                      \"to\": 0.9\n    \
+    \                },\n                    \"type\": \"range\"\n               \
+    \   },\n                  {\n                    \"options\": {\n            \
+    \          \"from\": 0.9,\n                      \"result\": {\n             \
+    \           \"color\": \"red\",\n                        \"index\": 2\n      \
+    \                },\n                      \"to\": 2\n                    },\n\
+    \                    \"type\": \"range\"\n                  },\n             \
+    \     {\n                    \"options\": {\n                      \"match\":\
+    \ \"null\",\n                      \"result\": {\n                        \"color\"\
+    : \"#808080\",\n                        \"index\": 3,\n                      \
+    \  \"text\": \"n/a\"\n                      }\n                    },\n      \
+    \              \"type\": \"special\"\n                  }\n                ]\n\
+    \              },\n              {\n                \"id\": \"custom.displayMode\"\
+    ,\n                \"value\": \"color-text\"\n              },\n             \
+    \ {\n                \"id\": \"custom.width\",\n                \"value\": 120\n\
+    \              },\n              {\n                \"id\": \"unit\",\n      \
+    \          \"value\": \"percentunit\"\n              }\n            ]\n      \
+    \    },\n          {\n            \"matcher\": {\n              \"id\": \"byName\"\
+    ,\n              \"options\": \"vCPUs\"\n            },\n            \"properties\"\
+    : [\n              {\n                \"id\": \"custom.width\",\n            \
+    \    \"value\": 66\n              }\n            ]\n          },\n          {\n\
+    \            \"matcher\": {\n              \"id\": \"byName\",\n             \
+    \ \"options\": \"Type\"\n            },\n            \"properties\": [\n     \
+    \         {\n                \"id\": \"custom.width\",\n                \"value\"\
+    : 67\n              }\n            ]\n          },\n          {\n            \"\
+    matcher\": {\n              \"id\": \"byName\",\n              \"options\": \"\
+    ID\"\n            },\n            \"properties\": [\n              {\n       \
+    \         \"id\": \"custom.width\",\n                \"value\": 106\n        \
+    \      }\n            ]\n          }\n        ]\n      },\n      \"gridPos\":\
+    \ {\n        \"h\": 14,\n        \"w\": 14,\n        \"x\": 0,\n        \"y\"\
+    : 0\n      },\n      \"id\": 19,\n      \"options\": {\n        \"footer\": {\n\
+    \          \"fields\": \"\",\n          \"reducer\": [\n            \"sum\"\n\
+    \          ],\n          \"show\": false\n        },\n        \"frameIndex\":\
+    \ 0,\n        \"showHeader\": true,\n        \"sortBy\": [\n          {\n    \
+    \        \"desc\": false,\n            \"displayName\": \"ID\"\n          }\n\
+    \        ]\n      },\n      \"pluginVersion\": \"9.3.2\",\n      \"targets\":\
+    \ [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"sum by (id,\
+    \ name, type) (pve_guest_info{instance=\\\"$instance\\\"})\",\n          \"format\"\
+    : \"table\",\n          \"instant\": true,\n          \"interval\": \"\",\n  \
+    \        \"legendFormat\": \"\",\n          \"range\": false,\n          \"refId\"\
+    : \"id, name and type\"\n        },\n        {\n          \"datasource\": {\n\
+    \            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    \n          },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n\
+    \          \"expr\": \"sum by (id) (pve_up{instance=\\\"$instance\\\"} and on\
+    \ (id, instance) pve_guest_info)\",\n          \"format\": \"table\",\n      \
+    \    \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"\",\n          \"range\": false,\n          \"refId\": \"status\"\n      \
+    \  },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"sum by (id)\
+    \ (pve_cpu_usage_limit{instance=\\\"$instance\\\"} and on (id, instance) pve_guest_info)\"\
+    ,\n          \"format\": \"table\",\n          \"hide\": false,\n          \"\
+    instant\": true,\n          \"legendFormat\": \"\",\n          \"range\": false,\n\
+    \          \"refId\": \"vcpus\"\n        },\n        {\n          \"datasource\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    \n          },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n\
+    \          \"expr\": \"sum by (id) (pve_memory_size_bytes{instance=\\\"$instance\\\
+    \"} and on (id, instance) pve_guest_info)\",\n          \"format\": \"table\"\
+    ,\n          \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"\",\n          \"range\": false,\n          \"refId\": \"memsize\"\n     \
+    \   },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"sum by (id)\
+    \ (pve_memory_usage_bytes{instance=\\\"$instance\\\",template!=\\\"1\\\"} / pve_memory_size_bytes\
+    \ and on (id, instance) pve_guest_info and on (id) pve_up==1)\",\n          \"\
+    format\": \"table\",\n          \"hide\": false,\n          \"instant\": true,\n\
+    \          \"legendFormat\": \"\",\n          \"range\": false,\n          \"\
+    refId\": \"memusg_percent\"\n        },\n        {\n          \"datasource\":\
+    \ {\n            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    \n          },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n\
+    \          \"expr\": \"sum by (id) (pve_disk_size_bytes{instance=\\\"$instance\\\
+    \"} and on (id, instance) pve_guest_info)\",\n          \"format\": \"table\"\
+    ,\n          \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"\",\n          \"range\": false,\n          \"refId\": \"disksize\"\n    \
+    \    },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"sum by (id)\
+    \ (pve_disk_usage_bytes{instance=\\\"$instance\\\"} / pve_disk_size_bytes and\
+    \ on (id, instance) pve_guest_info{type=\\\"lxc\\\"})\",\n          \"format\"\
+    : \"table\",\n          \"hide\": false,\n          \"instant\": true,\n     \
+    \     \"legendFormat\": \"\",\n          \"range\": false,\n          \"refId\"\
+    : \"diskusg_percent\"\n        }\n      ],\n      \"title\": \"Resource allocation\
+    \ summary\",\n      \"transformations\": [\n        {\n          \"id\": \"joinByField\"\
+    ,\n          \"options\": {\n            \"byField\": \"id\",\n            \"\
+    mode\": \"outer\"\n          }\n        },\n        {\n          \"id\": \"organize\"\
+    ,\n          \"options\": {\n            \"excludeByName\": {\n              \"\
+    Time 1\": true,\n              \"Time 2\": true,\n              \"Time 3\": true,\n\
+    \              \"Time 4\": true,\n              \"Time 5\": true,\n          \
+    \    \"Time 6\": true,\n              \"Time 7\": true,\n              \"Value\
+    \ #id, name and type\": true\n            },\n            \"indexByName\": {},\n\
+    \            \"renameByName\": {\n              \"Time 5\": \"\",\n          \
+    \    \"Value #disksize\": \"Disk\",\n              \"Value #diskusg_percent\"\
+    : \"Disk usage (%)\",\n              \"Value #id, name and type\": \"\",\n   \
+    \           \"Value #memsize\": \"Memory\",\n              \"Value #memusg_percent\"\
+    : \"Memory usage (%)\",\n              \"Value #status\": \"Status\",\n      \
+    \        \"Value #vcpus\": \"vCPUs\",\n              \"id\": \"ID\",\n       \
+    \       \"name\": \"Name\",\n              \"type\": \"Type\"\n            }\n\
+    \          }\n        }\n      ],\n      \"type\": \"table\"\n    },\n    {\n\
+    \      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\":\
+    \ \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"color\": {\n            \"mode\": \"thresholds\"\n          },\n\
+    \          \"custom\": {\n            \"axisCenteredZero\": false,\n         \
+    \   \"axisColorMode\": \"text\",\n            \"axisLabel\": \"\",\n         \
+    \   \"axisPlacement\": \"auto\",\n            \"barAlignment\": 0,\n         \
+    \   \"drawStyle\": \"line\",\n            \"fillOpacity\": 0,\n            \"\
+    gradientMode\": \"scheme\",\n            \"hideFrom\": {\n              \"legend\"\
+    : false,\n              \"tooltip\": false,\n              \"viz\": false\n  \
+    \          },\n            \"lineInterpolation\": \"linear\",\n            \"\
+    lineWidth\": 2,\n            \"pointSize\": 5,\n            \"scaleDistribution\"\
+    : {\n              \"type\": \"linear\"\n            },\n            \"showPoints\"\
+    : \"auto\",\n            \"spanNulls\": false,\n            \"stacking\": {\n\
+    \              \"group\": \"A\",\n              \"mode\": \"none\"\n         \
+    \   },\n            \"thresholdsStyle\": {\n              \"mode\": \"area\"\n\
+    \            }\n          },\n          \"mappings\": [],\n          \"min\":\
+    \ 0,\n          \"thresholds\": {\n            \"mode\": \"percentage\",\n   \
+    \         \"steps\": [\n              {\n                \"color\": \"green\"\
+    ,\n                \"value\": null\n              },\n              {\n      \
+    \          \"color\": \"orange\",\n                \"value\": 70\n           \
+    \   },\n              {\n                \"color\": \"red\",\n               \
+    \ \"value\": 90\n              }\n            ]\n          }\n        },\n   \
+    \     \"overrides\": []\n      },\n      \"gridPos\": {\n        \"h\": 7,\n \
+    \       \"w\": 7,\n        \"x\": 14,\n        \"y\": 0\n      },\n      \"id\"\
+    : 23,\n      \"options\": {\n        \"legend\": {\n          \"calcs\": [],\n\
+    \          \"displayMode\": \"list\",\n          \"placement\": \"bottom\",\n\
+    \          \"showLegend\": false\n        },\n        \"tooltip\": {\n       \
+    \   \"mode\": \"single\",\n          \"sort\": \"none\"\n        }\n      },\n\
+    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
+    \ },\n          \"editorMode\": \"code\",\n          \"expr\": \"pve_cpu_usage_ratio{instance=\\\
+    \"$instance\\\"} and on(id) pve_node_info\",\n          \"legendFormat\": \"__auto\"\
+    ,\n          \"range\": true,\n          \"refId\": \"usage\"\n        },\n  \
+    \      {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n\
+    \            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"pve_cpu_usage_limit{instance=\\\
+    \"$instance\\\"} and on(id) pve_node_info\",\n          \"format\": \"table\"\
+    ,\n          \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"__auto\",\n          \"range\": false,\n          \"refId\": \"total\"\n \
+    \       }\n      ],\n      \"title\": \"CPU history\",\n      \"transformations\"\
+    : [\n        {\n          \"id\": \"configFromData\",\n          \"options\":\
+    \ {\n            \"configRefId\": \"total\",\n            \"mappings\": [\n  \
+    \            {\n                \"fieldName\": \"Value\",\n                \"\
+    handlerKey\": \"max\"\n              }\n            ]\n          }\n        }\n\
+    \      ],\n      \"type\": \"timeseries\"\n    },\n    {\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \      },\n      \"description\": \"\",\n      \"fieldConfig\": {\n        \"\
+    defaults\": {\n          \"color\": {\n            \"mode\": \"thresholds\"\n\
+    \          },\n          \"decimals\": 2,\n          \"mappings\": [\n       \
+    \     {\n              \"options\": {\n                \"match\": \"null\",\n\
+    \                \"result\": {\n                  \"text\": \"N/A\"\n        \
+    \        }\n              },\n              \"type\": \"special\"\n          \
+    \  }\n          ],\n          \"max\": 1,\n          \"min\": 0,\n          \"\
+    thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n\
+    \              {\n                \"color\": \"#299c46\",\n                \"\
+    value\": null\n              },\n              {\n                \"color\": \"\
+    rgba(237, 129, 40, 0.89)\",\n                \"value\": 0.7\n              },\n\
+    \              {\n                \"color\": \"#d44a3a\",\n                \"\
+    value\": 0.9\n              }\n            ]\n          },\n          \"unit\"\
+    : \"percentunit\"\n        },\n        \"overrides\": []\n      },\n      \"gridPos\"\
+    : {\n        \"h\": 5,\n        \"w\": 3,\n        \"x\": 21,\n        \"y\":\
+    \ 0\n      },\n      \"id\": 7,\n      \"interval\": \"\",\n      \"links\": [],\n\
+    \      \"maxDataPoints\": 100,\n      \"options\": {\n        \"orientation\"\
+    : \"horizontal\",\n        \"reduceOptions\": {\n          \"calcs\": [\n    \
+    \        \"lastNotNull\"\n          ],\n          \"fields\": \"\",\n        \
+    \  \"values\": false\n        },\n        \"showThresholdLabels\": false,\n  \
+    \      \"showThresholdMarkers\": true,\n        \"text\": {}\n      },\n     \
+    \ \"pluginVersion\": \"9.3.2\",\n      \"targets\": [\n        {\n          \"\
+    datasource\": {\n            \"type\": \"prometheus\",\n            \"uid\": \"\
+    ${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"pve_cpu_usage_ratio{instance=\\\
+    \"$instance\\\"} / pve_cpu_usage_limit and on(id) pve_node_info\",\n         \
+    \ \"format\": \"time_series\",\n          \"intervalFactor\": 1,\n          \"\
+    legendFormat\": \"\",\n          \"refId\": \"A\"\n        }\n      ],\n     \
+    \ \"title\": \"Current CPU\",\n      \"type\": \"gauge\"\n    },\n    {\n    \
+    \  \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\
+    \n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
+    : {\n            \"fixedColor\": \"text\",\n            \"mode\": \"fixed\"\n\
+    \          },\n          \"mappings\": [],\n          \"thresholds\": {\n    \
+    \        \"mode\": \"absolute\",\n            \"steps\": [\n              {\n\
+    \                \"color\": \"green\",\n                \"value\": null\n    \
+    \          },\n              {\n                \"color\": \"red\",\n        \
+    \        \"value\": 80\n              }\n            ]\n          }\n        },\n\
+    \        \"overrides\": [\n          {\n            \"matcher\": {\n         \
+    \     \"id\": \"byName\",\n              \"options\": \"Value\"\n            },\n\
+    \            \"properties\": [\n              {\n                \"id\": \"displayName\"\
+    ,\n                \"value\": \"CPUs\"\n              }\n            ]\n     \
+    \     }\n        ]\n      },\n      \"gridPos\": {\n        \"h\": 2,\n      \
+    \  \"w\": 3,\n        \"x\": 21,\n        \"y\": 5\n      },\n      \"id\": 22,\n\
+    \      \"options\": {\n        \"colorMode\": \"value\",\n        \"graphMode\"\
+    : \"none\",\n        \"justifyMode\": \"auto\",\n        \"orientation\": \"auto\"\
+    ,\n        \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\
+    \n          ],\n          \"fields\": \"\",\n          \"values\": false\n   \
+    \     },\n        \"textMode\": \"value_and_name\"\n      },\n      \"pluginVersion\"\
+    : \"9.3.2\",\n      \"targets\": [\n        {\n          \"datasource\": {\n \
+    \           \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    \n          },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n\
+    \          \"expr\": \"pve_cpu_usage_limit and on(id) pve_node_info\",\n     \
+    \     \"format\": \"table\",\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"__auto\",\n          \"range\": false,\n          \"refId\": \"A\"\n     \
+    \   }\n      ],\n      \"type\": \"stat\"\n    },\n    {\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
+    : {\n            \"mode\": \"thresholds\"\n          },\n          \"custom\"\
+    : {\n            \"axisCenteredZero\": false,\n            \"axisColorMode\":\
+    \ \"text\",\n            \"axisLabel\": \"\",\n            \"axisPlacement\":\
+    \ \"auto\",\n            \"barAlignment\": 0,\n            \"drawStyle\": \"line\"\
+    ,\n            \"fillOpacity\": 0,\n            \"gradientMode\": \"scheme\",\n\
+    \            \"hideFrom\": {\n              \"legend\": false,\n             \
+    \ \"tooltip\": false,\n              \"viz\": false\n            },\n        \
+    \    \"lineInterpolation\": \"linear\",\n            \"lineWidth\": 2,\n     \
+    \       \"pointSize\": 5,\n            \"scaleDistribution\": {\n            \
+    \  \"type\": \"linear\"\n            },\n            \"showPoints\": \"auto\"\
+    ,\n            \"spanNulls\": false,\n            \"stacking\": {\n          \
+    \    \"group\": \"A\",\n              \"mode\": \"none\"\n            },\n   \
+    \         \"thresholdsStyle\": {\n              \"mode\": \"area\"\n         \
+    \   }\n          },\n          \"mappings\": [],\n          \"min\": 0,\n    \
+    \      \"thresholds\": {\n            \"mode\": \"percentage\",\n            \"\
+    steps\": [\n              {\n                \"color\": \"green\",\n         \
+    \       \"value\": null\n              },\n              {\n                \"\
+    color\": \"orange\",\n                \"value\": 60\n              },\n      \
+    \        {\n                \"color\": \"red\",\n                \"value\": 90\n\
+    \              }\n            ]\n          },\n          \"unit\": \"bytes\"\n\
+    \        },\n        \"overrides\": []\n      },\n      \"gridPos\": {\n     \
+    \   \"h\": 7,\n        \"w\": 7,\n        \"x\": 14,\n        \"y\": 7\n     \
+    \ },\n      \"id\": 24,\n      \"options\": {\n        \"legend\": {\n       \
+    \   \"calcs\": [],\n          \"displayMode\": \"list\",\n          \"placement\"\
+    : \"bottom\",\n          \"showLegend\": false\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"single\",\n          \"sort\": \"none\"\n        }\n\
+    \      },\n      \"targets\": [\n        {\n          \"datasource\": {\n    \
+    \        \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \          },\n          \"editorMode\": \"code\",\n          \"expr\": \"pve_memory_usage_bytes{instance=\\\
+    \"$instance\\\"} and on(id) pve_node_info\",\n          \"legendFormat\": \"__auto\"\
+    ,\n          \"range\": true,\n          \"refId\": \"usage\"\n        },\n  \
+    \      {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n\
+    \            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"pve_memory_size_bytes{instance=\\\
+    \"$instance\\\"} and on(id) pve_node_info\",\n          \"format\": \"table\"\
+    ,\n          \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"__auto\",\n          \"range\": false,\n          \"refId\": \"total\"\n \
+    \       }\n      ],\n      \"title\": \"Memory history\",\n      \"transformations\"\
+    : [\n        {\n          \"id\": \"configFromData\",\n          \"options\":\
+    \ {\n            \"configRefId\": \"total\",\n            \"mappings\": [\n  \
+    \            {\n                \"fieldName\": \"Value\",\n                \"\
+    handlerKey\": \"max\"\n              }\n            ]\n          }\n        }\n\
+    \      ],\n      \"type\": \"timeseries\"\n    },\n    {\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \      },\n      \"description\": \"\",\n      \"fieldConfig\": {\n        \"\
+    defaults\": {\n          \"color\": {\n            \"mode\": \"thresholds\"\n\
+    \          },\n          \"decimals\": 0,\n          \"mappings\": [\n       \
+    \     {\n              \"options\": {\n                \"match\": \"null\",\n\
+    \                \"result\": {\n                  \"text\": \"N/A\"\n        \
+    \        }\n              },\n              \"type\": \"special\"\n          \
+    \  }\n          ],\n          \"max\": 1,\n          \"min\": 0,\n          \"\
+    thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n\
+    \              {\n                \"color\": \"#299c46\",\n                \"\
+    value\": null\n              },\n              {\n                \"color\": \"\
+    rgba(237, 129, 40, 0.89)\",\n                \"value\": 0.6\n              },\n\
+    \              {\n                \"color\": \"#d44a3a\",\n                \"\
+    value\": 0.8\n              }\n            ]\n          },\n          \"unit\"\
+    : \"percentunit\"\n        },\n        \"overrides\": []\n      },\n      \"gridPos\"\
+    : {\n        \"h\": 5,\n        \"w\": 3,\n        \"x\": 21,\n        \"y\":\
+    \ 7\n      },\n      \"id\": 8,\n      \"links\": [],\n      \"maxDataPoints\"\
+    : 100,\n      \"options\": {\n        \"orientation\": \"horizontal\",\n     \
+    \   \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\n\
+    \          ],\n          \"fields\": \"\",\n          \"values\": false\n    \
+    \    },\n        \"showThresholdLabels\": false,\n        \"showThresholdMarkers\"\
+    : true,\n        \"text\": {}\n      },\n      \"pluginVersion\": \"9.3.2\",\n\
+    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
+    \ },\n          \"expr\": \"pve_memory_usage_bytes{instance=\\\"$instance\\\"\
+    } / pve_memory_size_bytes and on(id) pve_node_info\",\n          \"format\": \"\
+    time_series\",\n          \"intervalFactor\": 1,\n          \"legendFormat\":\
+    \ \"\",\n          \"refId\": \"A\"\n        }\n      ],\n      \"title\": \"\
+    Current memory\",\n      \"type\": \"gauge\"\n    },\n    {\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \      },\n      \"description\": \"\",\n      \"fieldConfig\": {\n        \"\
+    defaults\": {\n          \"color\": {\n            \"mode\": \"thresholds\"\n\
+    \          },\n          \"mappings\": [],\n          \"min\": 0,\n          \"\
+    thresholds\": {\n            \"mode\": \"percentage\",\n            \"steps\"\
+    : [\n              {\n                \"color\": \"green\",\n                \"\
+    value\": null\n              },\n              {\n                \"color\": \"\
+    orange\",\n                \"value\": 60\n              },\n              {\n\
+    \                \"color\": \"red\",\n                \"value\": 80\n        \
+    \      }\n            ]\n          },\n          \"unit\": \"bytes\"\n       \
+    \ },\n        \"overrides\": [\n          {\n            \"matcher\": {\n    \
+    \          \"id\": \"byName\",\n              \"options\": \"Value #used\"\n \
+    \           },\n            \"properties\": [\n              {\n             \
+    \   \"id\": \"displayName\",\n                \"value\": \"used\"\n          \
+    \    }\n            ]\n          },\n          {\n            \"matcher\": {\n\
+    \              \"id\": \"byName\",\n              \"options\": \"Value #total\"\
+    \n            },\n            \"properties\": [\n              {\n           \
+    \     \"id\": \"displayName\",\n                \"value\": \"total\"\n       \
+    \       },\n              {\n                \"id\": \"color\",\n            \
+    \    \"value\": {\n                  \"fixedColor\": \"text\",\n             \
+    \     \"mode\": \"fixed\"\n                }\n              }\n            ]\n\
+    \          }\n        ]\n      },\n      \"gridPos\": {\n        \"h\": 2,\n \
+    \       \"w\": 3,\n        \"x\": 21,\n        \"y\": 12\n      },\n      \"id\"\
+    : 20,\n      \"options\": {\n        \"colorMode\": \"value\",\n        \"graphMode\"\
+    : \"none\",\n        \"justifyMode\": \"auto\",\n        \"orientation\": \"auto\"\
+    ,\n        \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\
+    \n          ],\n          \"fields\": \"\",\n          \"values\": false\n   \
+    \     },\n        \"text\": {\n          \"titleSize\": 20\n        },\n     \
+    \   \"textMode\": \"value_and_name\"\n      },\n      \"pluginVersion\": \"9.3.2\"\
+    ,\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
+    \ },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n  \
+    \        \"expr\": \"pve_memory_usage_bytes{instance=\\\"$instance\\\"} and on(id)\
+    \ pve_node_info\",\n          \"format\": \"table\",\n          \"instant\": true,\n\
+    \          \"legendFormat\": \"__auto\",\n          \"range\": false,\n      \
+    \    \"refId\": \"used\"\n        },\n        {\n          \"datasource\": {\n\
+    \            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    \n          },\n          \"editorMode\": \"code\",\n          \"exemplar\": false,\n\
+    \          \"expr\": \"pve_memory_size_bytes{instance=\\\"$instance\\\"} and on(id)\
+    \ pve_node_info\",\n          \"format\": \"table\",\n          \"hide\": false,\n\
+    \          \"instant\": true,\n          \"legendFormat\": \"__auto\",\n     \
+    \     \"range\": false,\n          \"refId\": \"total\"\n        },\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n        \
+    \    \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\": \"\
+    code\",\n          \"exemplar\": false,\n          \"expr\": \"pve_memory_size_bytes{instance=\\\
+    \"$instance\\\"} and on(id) pve_node_info\",\n          \"format\": \"table\"\
+    ,\n          \"hide\": false,\n          \"instant\": true,\n          \"legendFormat\"\
+    : \"__auto\",\n          \"range\": false,\n          \"refId\": \"total_for_max\"\
+    \n        }\n      ],\n      \"transformations\": [\n        {\n          \"id\"\
+    : \"configFromData\",\n          \"options\": {\n            \"configRefId\":\
+    \ \"total_for_max\",\n            \"mappings\": [\n              {\n         \
+    \       \"fieldName\": \"Value #total_for_max\",\n                \"handlerKey\"\
+    : \"max\"\n              }\n            ]\n          }\n        }\n      ],\n\
+    \      \"type\": \"stat\"\n    },\n    {\n      \"datasource\": {\n        \"\
+    type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n   \
+    \   \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n    \
+    \        \"mode\": \"palette-classic\"\n          },\n          \"custom\": {\n\
+    \            \"axisCenteredZero\": false,\n            \"axisColorMode\": \"text\"\
+    ,\n            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\",\n\
+    \            \"barAlignment\": 0,\n            \"drawStyle\": \"line\",\n    \
+    \        \"fillOpacity\": 0,\n            \"gradientMode\": \"none\",\n      \
+    \      \"hideFrom\": {\n              \"legend\": false,\n              \"tooltip\"\
+    : false,\n              \"viz\": false\n            },\n            \"lineInterpolation\"\
+    : \"linear\",\n            \"lineWidth\": 2,\n            \"pointSize\": 5,\n\
+    \            \"scaleDistribution\": {\n              \"type\": \"linear\"\n  \
+    \          },\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : false,\n            \"stacking\": {\n              \"group\": \"A\",\n     \
+    \         \"mode\": \"none\"\n            },\n            \"thresholdsStyle\"\
+    : {\n              \"mode\": \"area\"\n            }\n          },\n         \
+    \ \"decimals\": 1,\n          \"links\": [],\n          \"mappings\": [],\n  \
+    \        \"max\": 1,\n          \"min\": 0,\n          \"thresholds\": {\n   \
+    \         \"mode\": \"absolute\",\n            \"steps\": [\n              {\n\
+    \                \"color\": \"transparent\",\n                \"value\": null\n\
+    \              },\n              {\n                \"color\": \"red\",\n    \
+    \            \"value\": 1\n              }\n            ]\n          },\n    \
+    \      \"unit\": \"percentunit\"\n        },\n        \"overrides\": []\n    \
+    \  },\n      \"gridPos\": {\n        \"h\": 10,\n        \"w\": 12,\n        \"\
+    x\": 0,\n        \"y\": 14\n      },\n      \"id\": 2,\n      \"links\": [],\n\
+    \      \"options\": {\n        \"legend\": {\n          \"calcs\": [\n       \
+    \     \"max\",\n            \"mean\",\n            \"lastNotNull\"\n         \
+    \ ],\n          \"displayMode\": \"table\",\n          \"placement\": \"right\"\
+    ,\n          \"showLegend\": true\n        },\n        \"tooltip\": {\n      \
+    \    \"mode\": \"multi\",\n          \"sort\": \"asc\"\n        }\n      },\n\
+    \      \"pluginVersion\": \"9.3.2\",\n      \"targets\": [\n        {\n      \
+    \    \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"((pve_cpu_usage_ratio{instance=\\\
+    \"$instance\\\"} / pve_cpu_usage_limit) * on(id, instance) group_left(name, type)\
+    \ pve_guest_info) and on(id, instance) pve_up == 1\",\n          \"format\": \"\
+    time_series\",\n          \"interval\": \"\",\n          \"intervalFactor\": 4,\n\
+    \          \"legendFormat\": \"{{name}} ({{type}})\",\n          \"refId\": \"\
+    A\"\n        }\n      ],\n      \"title\": \"Guests CPU usage\",\n      \"type\"\
+    : \"timeseries\"\n    },\n    {\n      \"datasource\": {\n        \"type\": \"\
+    prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\"\
+    : {\n        \"defaults\": {\n          \"color\": {\n            \"mode\": \"\
+    palette-classic\"\n          },\n          \"custom\": {\n            \"axisCenteredZero\"\
+    : false,\n            \"axisColorMode\": \"text\",\n            \"axisLabel\"\
+    : \"\",\n            \"axisPlacement\": \"auto\",\n            \"barAlignment\"\
+    : 0,\n            \"drawStyle\": \"line\",\n            \"fillOpacity\": 0,\n\
+    \            \"gradientMode\": \"none\",\n            \"hideFrom\": {\n      \
+    \        \"legend\": false,\n              \"tooltip\": false,\n             \
+    \ \"viz\": false\n            },\n            \"lineInterpolation\": \"linear\"\
+    ,\n            \"lineWidth\": 2,\n            \"pointSize\": 5,\n            \"\
+    scaleDistribution\": {\n              \"type\": \"linear\"\n            },\n \
+    \           \"showPoints\": \"never\",\n            \"spanNulls\": false,\n  \
+    \          \"stacking\": {\n              \"group\": \"A\",\n              \"\
+    mode\": \"none\"\n            },\n            \"thresholdsStyle\": {\n       \
+    \       \"mode\": \"area\"\n            }\n          },\n          \"decimals\"\
+    : 1,\n          \"links\": [],\n          \"mappings\": [],\n          \"max\"\
+    : 1.1,\n          \"min\": 0,\n          \"thresholds\": {\n            \"mode\"\
+    : \"absolute\",\n            \"steps\": [\n              {\n                \"\
+    color\": \"transparent\",\n                \"value\": null\n              },\n\
+    \              {\n                \"color\": \"red\",\n                \"value\"\
+    : 0.9\n              }\n            ]\n          },\n          \"unit\": \"percentunit\"\
+    \n        },\n        \"overrides\": []\n      },\n      \"gridPos\": {\n    \
+    \    \"h\": 10,\n        \"w\": 12,\n        \"x\": 12,\n        \"y\": 14\n \
+    \     },\n      \"id\": 5,\n      \"links\": [],\n      \"options\": {\n     \
+    \   \"legend\": {\n          \"calcs\": [\n            \"max\",\n            \"\
+    mean\",\n            \"lastNotNull\"\n          ],\n          \"displayMode\"\
+    : \"table\",\n          \"placement\": \"right\",\n          \"showLegend\": true\n\
+    \        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n        \
+    \  \"sort\": \"desc\"\n        }\n      },\n      \"pluginVersion\": \"9.3.2\"\
+    ,\n      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
+    \ },\n          \"expr\": \"(pve_memory_usage_bytes{instance=\\\"$instance\\\"\
+    } / pve_memory_size_bytes * on(id, instance) group_left(name, type) pve_guest_info)\
+    \ and on(id, instance) pve_up == 1\",\n          \"format\": \"time_series\",\n\
+    \          \"interval\": \"\",\n          \"intervalFactor\": 4,\n          \"\
+    legendFormat\": \"{{name}} ({{type}})\",\n          \"refId\": \"A\"\n       \
+    \ }\n      ],\n      \"title\": \"Guests memory usage\",\n      \"type\": \"timeseries\"\
+    \n    },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\",\n\
+    \        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\": {\n \
+    \       \"defaults\": {\n          \"color\": {\n            \"mode\": \"thresholds\"\
+    \n          },\n          \"decimals\": 1,\n          \"mappings\": [\n      \
+    \      {\n              \"from\": \"\",\n              \"id\": 1,\n          \
+    \    \"operator\": \"\",\n              \"text\": \"\",\n              \"to\"\
+    : \"\",\n              \"type\": 1,\n              \"value\": \"\"\n         \
+    \   }\n          ],\n          \"max\": 1,\n          \"min\": 0,\n          \"\
+    thresholds\": {\n            \"mode\": \"absolute\",\n            \"steps\": [\n\
+    \              {\n                \"color\": \"green\",\n                \"value\"\
+    : null\n              },\n              {\n                \"color\": \"yellow\"\
+    ,\n                \"value\": 0.75\n              },\n              {\n      \
+    \          \"color\": \"red\",\n                \"value\": 0.9\n             \
+    \ }\n            ]\n          },\n          \"unit\": \"percentunit\"\n      \
+    \  },\n        \"overrides\": []\n      },\n      \"gridPos\": {\n        \"h\"\
+    : 11,\n        \"w\": 3,\n        \"x\": 0,\n        \"y\": 24\n      },\n   \
+    \   \"id\": 11,\n      \"links\": [],\n      \"options\": {\n        \"orientation\"\
+    : \"auto\",\n        \"reduceOptions\": {\n          \"calcs\": [\n          \
+    \  \"last\"\n          ],\n          \"fields\": \"\",\n          \"values\":\
+    \ false\n        },\n        \"showThresholdLabels\": false,\n        \"showThresholdMarkers\"\
+    : true,\n        \"text\": {}\n      },\n      \"pluginVersion\": \"9.3.2\",\n\
+    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
+    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
+    \ },\n          \"exemplar\": true,\n          \"expr\": \"pve_disk_usage_bytes{instance=\\\
+    \"$instance\\\", id=~\\\"storage/.+\\\"} / pve_disk_size_bytes * on (id, instance)\
+    \ group_left(storage) pve_storage_info\",\n          \"format\": \"time_series\"\
+    ,\n          \"instant\": true,\n          \"interval\": \"\",\n          \"intervalFactor\"\
+    : 1,\n          \"legendFormat\": \"{{storage}}\",\n          \"refId\": \"A\"\
+    \n        }\n      ],\n      \"title\": \"Storage usage\",\n      \"type\": \"\
+    gauge\"\n    },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\"\
+    ,\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"description\": \"\"\
+    ,\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n\
+    \            \"mode\": \"palette-classic\"\n          },\n          \"links\"\
+    : [],\n          \"mappings\": [],\n          \"min\": 0,\n          \"thresholds\"\
+    : {\n            \"mode\": \"absolute\",\n            \"steps\": [\n         \
+    \     {\n                \"color\": \"green\",\n                \"value\": null\n\
+    \              },\n              {\n                \"color\": \"red\",\n    \
+    \            \"value\": 80\n              }\n            ]\n          },\n   \
+    \       \"unit\": \"bytes\"\n        },\n        \"overrides\": []\n      },\n\
+    \      \"gridPos\": {\n        \"h\": 11,\n        \"w\": 4,\n        \"x\": 3,\n\
+    \        \"y\": 24\n      },\n      \"id\": 15,\n      \"links\": [],\n      \"\
+    options\": {\n        \"displayMode\": \"gradient\",\n        \"minVizHeight\"\
+    : 10,\n        \"minVizWidth\": 0,\n        \"orientation\": \"vertical\",\n \
+    \       \"reduceOptions\": {\n          \"calcs\": [\n            \"lastNotNull\"\
+    \n          ],\n          \"fields\": \"\",\n          \"values\": true\n    \
+    \    },\n        \"showUnfilled\": false,\n        \"text\": {\n          \"titleSize\"\
+    : 20\n        }\n      },\n      \"pluginVersion\": \"9.3.2\",\n      \"targets\"\
+    : [\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
+    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"exemplar\": false,\n          \"expr\": \"pve_disk_size_bytes{instance=\\\
+    \"$instance\\\", id=~\\\"storage/.+\\\"} * on (id, instance) group_left(storage)\
+    \ pve_storage_info\",\n          \"format\": \"table\",\n          \"instant\"\
+    : true,\n          \"interval\": \"\",\n          \"intervalFactor\": 1,\n   \
+    \       \"legendFormat\": \"{{storage}}\",\n          \"range\": false,\n    \
+    \      \"refId\": \"storage size\"\n        }\n      ],\n      \"title\": \"Space\
+    \ allocation\",\n      \"transformations\": [\n        {\n          \"id\": \"\
+    organize\",\n          \"options\": {\n            \"excludeByName\": {\n    \
+    \          \"Time\": false,\n              \"id\": true,\n              \"instance\"\
+    : true,\n              \"job\": true\n            },\n            \"indexByName\"\
+    : {},\n            \"renameByName\": {}\n          }\n        }\n      ],\n  \
+    \    \"type\": \"bargauge\"\n    },\n    {\n      \"datasource\": {\n        \"\
+    type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n   \
+    \   \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n    \
+    \        \"mode\": \"palette-classic\"\n          },\n          \"custom\": {\n\
+    \            \"axisCenteredZero\": false,\n            \"axisColorMode\": \"text\"\
+    ,\n            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\",\n\
+    \            \"barAlignment\": 0,\n            \"drawStyle\": \"line\",\n    \
+    \        \"fillOpacity\": 0,\n            \"gradientMode\": \"none\",\n      \
+    \      \"hideFrom\": {\n              \"legend\": false,\n              \"tooltip\"\
+    : false,\n              \"viz\": false\n            },\n            \"lineInterpolation\"\
+    : \"linear\",\n            \"lineWidth\": 2,\n            \"pointSize\": 5,\n\
+    \            \"scaleDistribution\": {\n              \"type\": \"linear\"\n  \
+    \          },\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : false,\n            \"stacking\": {\n              \"group\": \"A\",\n     \
+    \         \"mode\": \"none\"\n            },\n            \"thresholdsStyle\"\
+    : {\n              \"mode\": \"area\"\n            }\n          },\n         \
+    \ \"decimals\": 1,\n          \"links\": [],\n          \"mappings\": [],\n  \
+    \        \"max\": 1.1,\n          \"min\": 0,\n          \"thresholds\": {\n \
+    \           \"mode\": \"absolute\",\n            \"steps\": [\n              {\n\
+    \                \"color\": \"transparent\",\n                \"value\": null\n\
+    \              },\n              {\n                \"color\": \"orange\",\n \
+    \               \"value\": 0.75\n              },\n              {\n         \
+    \       \"color\": \"red\",\n                \"value\": 0.9\n              }\n\
+    \            ]\n          },\n          \"unit\": \"percentunit\"\n        },\n\
+    \        \"overrides\": []\n      },\n      \"gridPos\": {\n        \"h\": 11,\n\
+    \        \"w\": 17,\n        \"x\": 7,\n        \"y\": 24\n      },\n      \"\
+    hideTimeOverride\": false,\n      \"id\": 9,\n      \"links\": [],\n      \"options\"\
+    : {\n        \"legend\": {\n          \"calcs\": [\n            \"lastNotNull\"\
+    \n          ],\n          \"displayMode\": \"table\",\n          \"placement\"\
+    : \"right\",\n          \"showLegend\": true\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"single\",\n          \"sort\": \"none\"\n        }\n\
+    \      },\n      \"pluginVersion\": \"9.3.2\",\n      \"targets\": [\n       \
+    \ {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n    \
+    \        \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
+    : \"code\",\n          \"expr\": \"pve_disk_usage_bytes{instance=\\\"$instance\\\
+    \"} / pve_disk_size_bytes{instance=\\\"$instance\\\"} * on (id, instance) group_left(name,\
+    \ type) pve_guest_info{type=\\\"lxc\\\"}\",\n          \"format\": \"time_series\"\
+    ,\n          \"interval\": \"\",\n          \"intervalFactor\": 1,\n         \
+    \ \"legendFormat\": \"{{name}} ({{type}})\",\n          \"range\": true,\n   \
+    \       \"refId\": \"A\"\n        }\n      ],\n      \"title\": \"LXC guests Disk\
+    \ usage\",\n      \"type\": \"timeseries\"\n    },\n    {\n      \"datasource\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
+    \      },\n      \"description\": \"\",\n      \"fieldConfig\": {\n        \"\
+    defaults\": {\n          \"color\": {\n            \"mode\": \"palette-classic\"\
+    \n          },\n          \"custom\": {\n            \"axisCenteredZero\": false,\n\
+    \            \"axisColorMode\": \"text\",\n            \"axisLabel\": \"\",\n\
+    \            \"axisPlacement\": \"auto\",\n            \"barAlignment\": 0,\n\
+    \            \"drawStyle\": \"line\",\n            \"fillOpacity\": 0,\n     \
+    \       \"gradientMode\": \"none\",\n            \"hideFrom\": {\n           \
+    \   \"legend\": false,\n              \"tooltip\": false,\n              \"viz\"\
+    : false\n            },\n            \"lineInterpolation\": \"linear\",\n    \
+    \        \"lineWidth\": 2,\n            \"pointSize\": 5,\n            \"scaleDistribution\"\
+    : {\n              \"type\": \"linear\"\n            },\n            \"showPoints\"\
+    : \"never\",\n            \"spanNulls\": false,\n            \"stacking\": {\n\
+    \              \"group\": \"A\",\n              \"mode\": \"none\"\n         \
+    \   },\n            \"thresholdsStyle\": {\n              \"mode\": \"off\"\n\
+    \            }\n          },\n          \"decimals\": 0,\n          \"links\"\
+    : [],\n          \"mappings\": [],\n          \"thresholds\": {\n            \"\
+    mode\": \"absolute\",\n            \"steps\": [\n              {\n           \
+    \     \"color\": \"green\",\n                \"value\": null\n              },\n\
+    \              {\n                \"color\": \"red\",\n                \"value\"\
+    : 80\n              }\n            ]\n          },\n          \"unit\": \"Bps\"\
+    \n        },\n        \"overrides\": [\n          {\n            \"matcher\":\
+    \ {\n              \"id\": \"byRegexp\",\n              \"options\": \"/RECV/\"\
+    \n            },\n            \"properties\": [\n              {\n           \
+    \     \"id\": \"custom.transform\",\n                \"value\": \"negative-Y\"\
+    \n              }\n            ]\n          }\n        ]\n      },\n      \"gridPos\"\
+    : {\n        \"h\": 10,\n        \"w\": 24,\n        \"x\": 0,\n        \"y\"\
+    : 35\n      },\n      \"id\": 13,\n      \"interval\": \"\",\n      \"links\"\
+    : [],\n      \"options\": {\n        \"legend\": {\n          \"calcs\": [\n \
+    \           \"max\",\n            \"mean\",\n            \"lastNotNull\",\n  \
+    \          \"sum\"\n          ],\n          \"displayMode\": \"table\",\n    \
+    \      \"placement\": \"right\",\n          \"showLegend\": true\n        },\n\
+    \        \"tooltip\": {\n          \"mode\": \"single\",\n          \"sort\":\
+    \ \"none\"\n        }\n      },\n      \"pluginVersion\": \"9.3.2\",\n      \"\
+    targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"\
+    prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n     \
+    \     \"expr\": \"(rate(pve_network_receive_bytes{instance=\\\"$instance\\\"}[5m])\
+    \ * on(id, instance) group_left(name, type) pve_guest_info) and on(id, instance)\
+    \ pve_up == 1\",\n          \"format\": \"time_series\",\n          \"interval\"\
+    : \"\",\n          \"intervalFactor\": 3,\n          \"legendFormat\": \"{{name}}\
+    \ RECV ({{type}})\",\n          \"refId\": \"A\"\n        },\n        {\n    \
+    \      \"datasource\": {\n            \"type\": \"prometheus\",\n            \"\
+    uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"(rate(pve_network_transmit_bytes{instance=\\\
+    \"$instance\\\"}[5m])* on(id, instance) group_left(name, type) pve_guest_info)\
+    \ and on(id, instance) pve_up == 1\",\n          \"format\": \"time_series\",\n\
+    \          \"interval\": \"\",\n          \"intervalFactor\": 3,\n          \"\
+    legendFormat\": \"{{name}} SEND ({{type}})\",\n          \"refId\": \"B\"\n  \
+    \      }\n      ],\n      \"title\": \"Network IO/s\",\n      \"type\": \"timeseries\"\
+    \n    },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\",\n\
+    \        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"description\": \"\"\
+    ,\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n\
+    \            \"mode\": \"palette-classic\"\n          },\n          \"custom\"\
+    : {\n            \"axisCenteredZero\": false,\n            \"axisColorMode\":\
+    \ \"text\",\n            \"axisLabel\": \"\",\n            \"axisPlacement\":\
+    \ \"auto\",\n            \"barAlignment\": 0,\n            \"drawStyle\": \"line\"\
+    ,\n            \"fillOpacity\": 0,\n            \"gradientMode\": \"none\",\n\
+    \            \"hideFrom\": {\n              \"legend\": false,\n             \
+    \ \"tooltip\": false,\n              \"viz\": false\n            },\n        \
+    \    \"lineInterpolation\": \"linear\",\n            \"lineWidth\": 2,\n     \
+    \       \"pointSize\": 5,\n            \"scaleDistribution\": {\n            \
+    \  \"type\": \"linear\"\n            },\n            \"showPoints\": \"never\"\
+    ,\n            \"spanNulls\": false,\n            \"stacking\": {\n          \
+    \    \"group\": \"A\",\n              \"mode\": \"none\"\n            },\n   \
+    \         \"thresholdsStyle\": {\n              \"mode\": \"off\"\n          \
+    \  }\n          },\n          \"decimals\": 0,\n          \"links\": [],\n   \
+    \       \"mappings\": [],\n          \"min\": 0,\n          \"thresholds\": {\n\
+    \            \"mode\": \"absolute\",\n            \"steps\": [\n             \
+    \ {\n                \"color\": \"green\",\n                \"value\": null\n\
+    \              },\n              {\n                \"color\": \"red\",\n    \
+    \            \"value\": 80\n              }\n            ]\n          },\n   \
+    \       \"unit\": \"Bps\"\n        },\n        \"overrides\": []\n      },\n \
+    \     \"gridPos\": {\n        \"h\": 8,\n        \"w\": 24,\n        \"x\": 0,\n\
+    \        \"y\": 45\n      },\n      \"id\": 12,\n      \"interval\": \"\",\n \
+    \     \"links\": [],\n      \"options\": {\n        \"legend\": {\n          \"\
+    calcs\": [\n            \"max\",\n            \"mean\",\n            \"lastNotNull\"\
+    \n          ],\n          \"displayMode\": \"table\",\n          \"placement\"\
+    : \"right\",\n          \"showLegend\": true\n        },\n        \"tooltip\"\
+    : {\n          \"mode\": \"multi\",\n          \"sort\": \"desc\"\n        }\n\
+    \      },\n      \"pluginVersion\": \"9.3.2\",\n      \"targets\": [\n       \
+    \ {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n    \
+    \        \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"((rate(pve_disk_write_bytes{instance=\\\
+    \"$instance\\\"}[5m]) + rate(pve_disk_read_bytes[5m])) * on(id, instance) group_left(name,\
+    \ type) pve_guest_info) and on(id, instance) pve_up == 1\",\n          \"format\"\
+    : \"time_series\",\n          \"interval\": \"\",\n          \"intervalFactor\"\
+    : 2,\n          \"legendFormat\": \"{{name}} ({{type}})\",\n          \"refId\"\
+    : \"A\"\n        }\n      ],\n      \"title\": \"Disk IO/s\",\n      \"type\"\
+    : \"timeseries\"\n    }\n  ],\n  \"refresh\": \"10s\",\n  \"schemaVersion\": 37,\n\
+    \  \"style\": \"dark\",\n  \"tags\": [\n    \"Proxmox\",\n    \"Prometheus\"\n\
+    \  ],\n  \"templating\": {\n    \"list\": [\n      {\n        \"current\": {},\n\
+    \        \"datasource\": {\n          \"type\": \"prometheus\",\n          \"\
+    uid\": \"${DS_PROMETHEUS}\"\n        },\n        \"definition\": \"label_values(pve_node_info,\
+    \ instance)\",\n        \"hide\": 0,\n        \"includeAll\": false,\n       \
+    \ \"multi\": false,\n        \"name\": \"instance\",\n        \"options\": [],\n\
+    \        \"query\": {\n          \"query\": \"label_values(pve_node_info, instance)\"\
+    ,\n          \"refId\": \"Prometheus-instance-Variable-Query\"\n        },\n \
+    \       \"refresh\": 2,\n        \"regex\": \"\",\n        \"skipUrlSync\": false,\n\
+    \        \"sort\": 1,\n        \"tagValuesQuery\": \"\",\n        \"tagsQuery\"\
+    : \"\",\n        \"type\": \"query\",\n        \"useTags\": false\n      }\n \
+    \   ]\n  },\n  \"time\": {\n    \"from\": \"now-6h\",\n    \"to\": \"now\"\n \
+    \ },\n  \"timepicker\": {\n    \"refresh_intervals\": [\n      \"5s\",\n     \
+    \ \"10s\",\n      \"30s\",\n      \"1m\",\n      \"5m\",\n      \"15m\",\n   \
+    \   \"30m\",\n      \"1h\",\n      \"2h\",\n      \"1d\"\n    ],\n    \"time_options\"\
+    : [\n      \"5m\",\n      \"15m\",\n      \"1h\",\n      \"6h\",\n      \"12h\"\
+    ,\n      \"24h\",\n      \"2d\",\n      \"7d\",\n      \"30d\"\n    ]\n  },\n\
+    \  \"timezone\": \"\",\n  \"title\": \"Proxmox via Prometheus\",\n  \"uid\": \"\
+    Dp7Cd57Zza\",\n  \"version\": 4,\n  \"weekStart\": \"\",\n  \"gnetId\": 10347\n\
+    }"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    grafana_dashboard: '1'
+  name: grafana-dashboard-proxmox-via-prometheus
+  namespace: monitoring

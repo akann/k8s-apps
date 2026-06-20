@@ -1,0 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cm-ceph-cluster.yaml
+  - cm-ceph-osd.yaml
+  - cm-node-exporter-full.yaml
+  - cm-proxmox-via-prometheus.yaml
