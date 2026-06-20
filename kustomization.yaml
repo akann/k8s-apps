@@ -16,6 +16,7 @@ resources:
 
   # Wave 1 — CNI, ingress, TLS
   - infrastructure/cilium/argocd-app-cilium.yaml
+  - infrastructure/cilium/argocd-app-cilium-policies.yaml
   - infrastructure/cert-manager/argocd-app-cert-manager.yaml
   - infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
 
