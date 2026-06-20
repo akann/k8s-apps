@@ -17,6 +17,16 @@ spec:
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret
+          dashboards:
+            default:
+              node-exporter-full:
+                gnetId: 1860
+                revision: 37
+                datasource: Prometheus
+              proxmox-via-prometheus:
+                gnetId: 10347
+                revision: 4
+                datasource: Prometheus
           env:
             GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
             GF_AUTH_GENERIC_OAUTH_NAME: Authentik
