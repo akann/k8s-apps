@@ -12,7 +12,7 @@ data:
       "uid": "pve-nvme-temp",
       "timezone": "browser",
       "schemaVersion": 37,
-      "version": 2,
+      "version": 3,
       "refresh": "1m",
       "time": { "from": "now-3h", "to": "now" },
       "templating": {
@@ -42,8 +42,7 @@ data:
             {
               "expr": "nvme_temperature_celsius{job=\"pve-node-exporter\", node=~\"$node\"}",
               "legendFormat": "{{node}} / {{device}}",
-              "refId": "A",
-              "instant": true
+              "refId": "A"
             }
           ],
           "fieldConfig": {
