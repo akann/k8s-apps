@@ -17,6 +17,17 @@ spec:
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret
+          dashboardProviders:
+            dashboardproviders.yaml:
+              apiVersion: 1
+              providers:
+                - name: default
+                  orgId: 1
+                  folder: ""
+                  type: file
+                  disableDeletion: false
+                  options:
+                    path: /var/lib/grafana/dashboards/default
           dashboards:
             default:
               node-exporter-full:
