@@ -86,6 +86,31 @@ spec:
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: instance
+              - job_name: pve-node-exporter
+                static_configs:
+                  - targets: ["192.168.22.11:9100"]
+                    labels: {node: pve1}
+                  - targets: ["192.168.22.12:9100"]
+                    labels: {node: pve2}
+                  - targets: ["192.168.22.13:9100"]
+                    labels: {node: pve3}
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
+              - job_name: pve-exporter
+                metrics_path: /pve
+                params:
+                  target: [localhost]
+                static_configs:
+                  - targets: ["192.168.22.11:9221"]
+                    labels: {node: pve1}
+                  - targets: ["192.168.22.12:9221"]
+                    labels: {node: pve2}
+                  - targets: ["192.168.22.13:9221"]
+                    labels: {node: pve3}
+                relabel_configs:
+                  - source_labels: [__address__]
+                    target_label: instance
             storageSpec:
               volumeClaimTemplate:
                 spec:

@@ -1,0 +1,18 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-to-pve-exporters
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  egress:
+    - toCIDRSet:
+        - cidr: 192.168.22.0/24
+      toPorts:
+        - ports:
+            - port: "9100"
+              protocol: TCP
+            - port: "9221"
+              protocol: TCP
