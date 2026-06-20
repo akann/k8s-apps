@@ -22,13 +22,13 @@ data:
     gnetId\": 5336,\n  \"graphTooltip\": 0,\n  \"id\": null,\n  \"links\": [],\n \
     \ \"liveNow\": false,\n  \"panels\": [\n    {\n      \"collapsed\": false,\n \
     \     \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"\
-    ${DS_PROMETHEUS}\"\n      },\n      \"gridPos\": {\n        \"h\": 1,\n      \
-    \  \"w\": 24,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"id\": 11,\n\
-    \      \"panels\": [],\n      \"targets\": [\n        {\n          \"datasource\"\
-    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 1,\n        \"w\"\
+    : 24,\n        \"x\": 0,\n        \"y\": 0\n      },\n      \"id\": 11,\n    \
+    \  \"panels\": [],\n      \"targets\": [\n        {\n          \"datasource\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
     \n          },\n          \"refId\": \"A\"\n        }\n      ],\n      \"title\"\
     : \"OSD Status / Total OSDs\",\n      \"type\": \"row\"\n    },\n    {\n     \
-    \ \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\
+    \ \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\
     \n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"mappings\"\
     : [\n            {\n              \"options\": {\n                \"from\": 0,\n\
     \                \"result\": {\n                  \"index\": 0,\n            \
@@ -58,24 +58,24 @@ data:
     : \"\",\n          \"values\": false\n        },\n        \"textMode\": \"auto\"\
     \n      },\n      \"pluginVersion\": \"9.0.5\",\n      \"targets\": [\n      \
     \  {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n   \
-    \         \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"editorMode\"\
-    : \"code\",\n          \"expr\": \"sum without (instance) (ceph_osd_up{ceph_daemon=\\\
+    \         \"uid\": \"prometheus\"\n          },\n          \"editorMode\": \"\
+    code\",\n          \"expr\": \"sum without (instance) (ceph_osd_up{ceph_daemon=\\\
     \"$osd\\\"})\",\n          \"format\": \"time_series\",\n          \"interval\"\
     : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"\",\n          \"range\": true,\n          \"refId\": \"A\",\n          \"\
     step\": 60\n        }\n      ],\n      \"title\": \"Status\",\n      \"type\"\
     : \"stat\"\n    },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\"\
-    ,\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\": {\n\
-    \        \"defaults\": {\n          \"mappings\": [\n            {\n         \
-    \     \"options\": {\n                \"from\": 0,\n                \"result\"\
-    : {\n                  \"index\": 0,\n                  \"text\": \"N/A\"\n  \
-    \              },\n                \"to\": 0\n              },\n             \
-    \ \"type\": \"range\"\n            },\n            {\n              \"options\"\
-    : {\n                \"from\": 0,\n                \"result\": {\n           \
-    \       \"index\": 1,\n                  \"text\": \"OUT\"\n                },\n\
-    \                \"to\": 0.99\n              },\n              \"type\": \"range\"\
-    \n            },\n            {\n              \"options\": {\n              \
-    \  \"from\": 0.99,\n                \"result\": {\n                  \"index\"\
+    ,\n        \"uid\": \"prometheus\"\n      },\n      \"fieldConfig\": {\n     \
+    \   \"defaults\": {\n          \"mappings\": [\n            {\n              \"\
+    options\": {\n                \"from\": 0,\n                \"result\": {\n  \
+    \                \"index\": 0,\n                  \"text\": \"N/A\"\n        \
+    \        },\n                \"to\": 0\n              },\n              \"type\"\
+    : \"range\"\n            },\n            {\n              \"options\": {\n   \
+    \             \"from\": 0,\n                \"result\": {\n                  \"\
+    index\": 1,\n                  \"text\": \"OUT\"\n                },\n       \
+    \         \"to\": 0.99\n              },\n              \"type\": \"range\"\n\
+    \            },\n            {\n              \"options\": {\n               \
+    \ \"from\": 0.99,\n                \"result\": {\n                  \"index\"\
     : 2,\n                  \"text\": \"IN\"\n                },\n               \
     \ \"to\": 1\n              },\n              \"type\": \"range\"\n           \
     \ }\n          ],\n          \"thresholds\": {\n            \"mode\": \"absolute\"\
@@ -94,20 +94,20 @@ data:
     \n          ],\n          \"fields\": \"\",\n          \"values\": false\n   \
     \     },\n        \"textMode\": \"auto\"\n      },\n      \"pluginVersion\": \"\
     9.0.5\",\n      \"targets\": [\n        {\n          \"datasource\": {\n     \
-    \       \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \          },\n          \"expr\": \"sum without (instance) (ceph_osd_in{ceph_daemon=\\\
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n     \
+    \     },\n          \"expr\": \"sum without (instance) (ceph_osd_in{ceph_daemon=\\\
     \"$osd\\\"})\",\n          \"format\": \"time_series\",\n          \"interval\"\
     : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"\",\n          \"refId\": \"A\",\n          \"step\": 60\n        }\n    \
     \  ],\n      \"title\": \"Available\",\n      \"type\": \"stat\"\n    },\n   \
     \ {\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
-    : \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
-    : {\n          \"mappings\": [\n            {\n              \"options\": {\n\
-    \                \"from\": 0,\n                \"result\": {\n               \
-    \   \"index\": 0,\n                  \"text\": \"N/A\"\n                },\n \
-    \               \"to\": 0\n              },\n              \"type\": \"range\"\
-    \n            }\n          ],\n          \"thresholds\": {\n            \"mode\"\
-    : \"absolute\",\n            \"steps\": [\n              {\n                \"\
+    : \"prometheus\"\n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n\
+    \          \"mappings\": [\n            {\n              \"options\": {\n    \
+    \            \"from\": 0,\n                \"result\": {\n                  \"\
+    index\": 0,\n                  \"text\": \"N/A\"\n                },\n       \
+    \         \"to\": 0\n              },\n              \"type\": \"range\"\n   \
+    \         }\n          ],\n          \"thresholds\": {\n            \"mode\":\
+    \ \"absolute\",\n            \"steps\": [\n              {\n                \"\
     color\": \"rgba(255, 255, 255, 0.9)\",\n                \"value\": null\n    \
     \          }\n            ]\n          },\n          \"unit\": \"none\"\n    \
     \    },\n        \"overrides\": []\n      },\n      \"gridPos\": {\n        \"\
@@ -119,8 +119,8 @@ data:
     \n          ],\n          \"fields\": \"\",\n          \"values\": false\n   \
     \     },\n        \"textMode\": \"auto\"\n      },\n      \"pluginVersion\": \"\
     9.0.5\",\n      \"targets\": [\n        {\n          \"datasource\": {\n     \
-    \       \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \          },\n          \"expr\": \"count without (instance, ceph_daemon) (ceph_osd_up)\"\
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n     \
+    \     },\n          \"expr\": \"count without (instance, ceph_daemon) (ceph_osd_up)\"\
     ,\n          \"format\": \"time_series\",\n          \"interval\": \"$interval\"\
     ,\n          \"intervalFactor\": 1,\n          \"legendFormat\": \"\",\n     \
     \     \"refId\": \"A\",\n          \"step\": 60\n        }\n      ],\n      \"\
@@ -133,8 +133,8 @@ data:
     uid\": \"PBFA97CFB590B2093\"\n          },\n          \"refId\": \"A\"\n     \
     \   }\n      ],\n      \"title\": \"OSD: $osd\",\n      \"type\": \"row\"\n  \
     \  },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\",\n   \
-    \     \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"fieldConfig\": {\n    \
-    \    \"defaults\": {\n          \"color\": {\n            \"mode\": \"palette-classic\"\
+    \     \"uid\": \"prometheus\"\n      },\n      \"fieldConfig\": {\n        \"\
+    defaults\": {\n          \"color\": {\n            \"mode\": \"palette-classic\"\
     \n          },\n          \"custom\": {\n            \"axisLabel\": \"\",\n  \
     \          \"axisPlacement\": \"auto\",\n            \"barAlignment\": 0,\n  \
     \          \"drawStyle\": \"line\",\n            \"fillOpacity\": 10,\n      \
@@ -170,19 +170,19 @@ data:
     \ true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n \
     \         \"sort\": \"none\"\n        }\n      },\n      \"pluginVersion\": \"\
     9.1.3\",\n      \"targets\": [\n        {\n          \"datasource\": {\n     \
-    \       \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \          },\n          \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_numpg{ceph_daemon=~\\\
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n     \
+    \     },\n          \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_numpg{ceph_daemon=~\\\
     \"$osd\\\"})\",\n          \"format\": \"time_series\",\n          \"interval\"\
     : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"Number of PGs\",\n          \"refId\": \"A\",\n          \"step\": 60\n  \
     \      },\n        {\n          \"datasource\": {\n            \"type\": \"prometheus\"\
-    ,\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\"\
-    : \"avg without (instance, ceph_daemon) (ceph_osd_numpg)\",\n          \"format\"\
-    : \"time_series\",\n          \"interval\": \"$interval\",\n          \"intervalFactor\"\
+    ,\n            \"uid\": \"prometheus\"\n          },\n          \"expr\": \"avg\
+    \ without (instance, ceph_daemon) (ceph_osd_numpg)\",\n          \"format\": \"\
+    time_series\",\n          \"interval\": \"$interval\",\n          \"intervalFactor\"\
     : 1,\n          \"legendFormat\": \"Average Number of PGs in the Cluster\",\n\
     \          \"refId\": \"B\",\n          \"step\": 60\n        }\n      ],\n  \
     \    \"title\": \"PGs\",\n      \"type\": \"timeseries\"\n    },\n    {\n    \
-    \  \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\
+    \  \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\
     \n      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
     : {\n            \"mode\": \"palette-classic\"\n          },\n          \"custom\"\
     : {\n            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\"\
@@ -211,22 +211,22 @@ data:
     \  },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n          \"sort\"\
     : \"none\"\n        }\n      },\n      \"pluginVersion\": \"9.1.3\",\n      \"\
     targets\": [\n        {\n          \"datasource\": {\n            \"type\": \"\
-    prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n     \
-    \     \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_stat_bytes{ceph_daemon=\\\
+    prometheus\",\n            \"uid\": \"prometheus\"\n          },\n          \"\
+    expr\": \"sum without (instance, ceph_daemon) (ceph_osd_stat_bytes{ceph_daemon=\\\
     \"osd.0\\\"}-ceph_osd_stat_bytes_used{ceph_daemon=\\\"osd.0\\\"})\",\n       \
     \   \"format\": \"time_series\",\n          \"hide\": false,\n          \"interval\"\
     : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"Available\",\n          \"metric\": \"ceph_osd_avail_bytes\",\n          \"\
     refId\": \"A\",\n          \"step\": 60\n        },\n        {\n          \"datasource\"\
-    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
     \n          },\n          \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_stat_bytes_used{ceph_daemon=~\\\
     \"$osd\\\"})\",\n          \"format\": \"time_series\",\n          \"interval\"\
     : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"Used\",\n          \"metric\": \"ceph_osd_avail_bytes\",\n          \"refId\"\
     : \"B\",\n          \"step\": 60\n        }\n      ],\n      \"title\": \"OSD\
     \ Storage\",\n      \"type\": \"timeseries\"\n    },\n    {\n      \"datasource\"\
-    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
+    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n    \
+    \  },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
     : {\n            \"mode\": \"thresholds\"\n          },\n          \"mappings\"\
     : [\n            {\n              \"options\": {\n                \"match\": \"\
     null\",\n                \"result\": {\n                  \"text\": \"N/A\"\n\
@@ -247,8 +247,8 @@ data:
     \ \"fields\": \"\",\n          \"values\": false\n        },\n        \"showThresholdLabels\"\
     : false,\n        \"showThresholdMarkers\": true\n      },\n      \"pluginVersion\"\
     : \"9.0.5\",\n      \"targets\": [\n        {\n          \"datasource\": {\n \
-    \           \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
-    \n          },\n          \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_stat_bytes_used{ceph_daemon=\\\
+    \           \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n \
+    \         },\n          \"expr\": \"sum without (instance, ceph_daemon) (ceph_osd_stat_bytes_used{ceph_daemon=\\\
     \"osd.0\\\"}/ceph_osd_stat_bytes{ceph_daemon=\\\"osd.0\\\"})\",\n          \"\
     format\": \"time_series\",\n          \"interval\": \"$interval\",\n         \
     \ \"intervalFactor\": 1,\n          \"legendFormat\": \"\",\n          \"refId\"\
@@ -265,7 +265,7 @@ data:
     ,\n        \"colorScale\": \"sqrt\",\n        \"colorScheme\": \"interpolateOranges\"\
     ,\n        \"exponent\": 0.5,\n        \"mode\": \"opacity\"\n      },\n     \
     \ \"dataFormat\": \"timeseries\",\n      \"datasource\": {\n        \"type\":\
-    \ \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n      \"gridPos\"\
+    \ \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n      \"gridPos\"\
     : {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n        \"y\":\
     \ 13\n      },\n      \"heatmap\": {},\n      \"hideZeroBuckets\": false,\n  \
     \    \"highlightCards\": true,\n      \"id\": 83,\n      \"legend\": {\n     \
@@ -286,8 +286,8 @@ data:
     ,\n          \"min\": \"0\",\n          \"reverse\": false,\n          \"unit\"\
     : \"ms\"\n        }\n      },\n      \"pluginVersion\": \"9.1.3\",\n      \"reverseYBuckets\"\
     : false,\n      \"targets\": [\n        {\n          \"datasource\": {\n     \
-    \       \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \          },\n          \"expr\": \"sum without (instance) (ceph_osd_apply_latency_ms{ceph_daemon='$osd'})\"\
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n     \
+    \     },\n          \"expr\": \"sum without (instance) (ceph_osd_apply_latency_ms{ceph_daemon='$osd'})\"\
     ,\n          \"format\": \"time_series\",\n          \"instant\": false,\n   \
     \       \"interval\": \"$interval\",\n          \"intervalFactor\": 1,\n     \
     \     \"legendFormat\": \"\",\n          \"refId\": \"A\"\n        }\n      ],\n\
@@ -302,9 +302,9 @@ data:
     \        \"colorScheme\": \"interpolateOranges\",\n        \"exponent\": 0.5,\n\
     \        \"mode\": \"opacity\"\n      },\n      \"dataFormat\": \"timeseries\"\
     ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
-    : \"${DS_PROMETHEUS}\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n  \
-    \      \"w\": 12,\n        \"x\": 12,\n        \"y\": 13\n      },\n      \"heatmap\"\
-    : {},\n      \"hideZeroBuckets\": false,\n      \"highlightCards\": true,\n  \
+    : \"prometheus\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n        \"\
+    w\": 12,\n        \"x\": 12,\n        \"y\": 13\n      },\n      \"heatmap\":\
+    \ {},\n      \"hideZeroBuckets\": false,\n      \"highlightCards\": true,\n  \
     \    \"id\": 84,\n      \"legend\": {\n        \"show\": true\n      },\n    \
     \  \"links\": [],\n      \"options\": {\n        \"calculate\": true,\n      \
     \  \"calculation\": {\n          \"yBuckets\": {\n            \"mode\": \"count\"\
@@ -323,144 +323,143 @@ data:
     : false,\n          \"unit\": \"ms\"\n        }\n      },\n      \"pluginVersion\"\
     : \"9.1.3\",\n      \"reverseYBuckets\": false,\n      \"targets\": [\n      \
     \  {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n   \
-    \         \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"\
-    sum without (instance) (ceph_osd_commit_latency_ms{ceph_daemon='$osd'})\",\n \
-    \         \"format\": \"time_series\",\n          \"instant\": false,\n      \
-    \    \"interval\": \"$interval\",\n          \"intervalFactor\": 1,\n        \
-    \  \"legendFormat\": \"\",\n          \"refId\": \"A\"\n        }\n      ],\n\
-    \      \"title\": \"OSD Commit Latency Distribution\",\n      \"tooltip\": {\n\
-    \        \"show\": true,\n        \"showHistogram\": false\n      },\n      \"\
-    type\": \"heatmap\",\n      \"xAxis\": {\n        \"show\": true\n      },\n \
-    \     \"xBucketSize\": \"\",\n      \"yAxis\": {\n        \"format\": \"ms\",\n\
-    \        \"logBase\": 2,\n        \"min\": \"0\",\n        \"show\": true\n  \
-    \    },\n      \"yBucketBound\": \"auto\"\n    },\n    {\n      \"cards\": {},\n\
-    \      \"color\": {\n        \"cardColor\": \"#806eb7\",\n        \"colorScale\"\
-    : \"sqrt\",\n        \"colorScheme\": \"interpolateOranges\",\n        \"exponent\"\
-    : 0.5,\n        \"mode\": \"opacity\"\n      },\n      \"dataFormat\": \"timeseries\"\
-    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
-    : \"${DS_PROMETHEUS}\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n  \
-    \      \"w\": 12,\n        \"x\": 0,\n        \"y\": 21\n      },\n      \"heatmap\"\
-    : {},\n      \"hideZeroBuckets\": false,\n      \"highlightCards\": true,\n  \
-    \    \"id\": 85,\n      \"legend\": {\n        \"show\": true\n      },\n    \
-    \  \"links\": [],\n      \"options\": {\n        \"calculate\": true,\n      \
-    \  \"calculation\": {\n          \"yBuckets\": {\n            \"mode\": \"count\"\
-    ,\n            \"scale\": {\n              \"log\": 2,\n              \"type\"\
-    : \"log\"\n            }\n          }\n        },\n        \"cellGap\": 2,\n \
-    \       \"cellValues\": {},\n        \"color\": {\n          \"exponent\": 0.5,\n\
-    \          \"fill\": \"#806eb7\",\n          \"mode\": \"opacity\",\n        \
-    \  \"scale\": \"exponential\",\n          \"scheme\": \"Oranges\",\n         \
-    \ \"steps\": 128\n        },\n        \"exemplars\": {\n          \"color\": \"\
-    rgba(255,0,255,0.7)\"\n        },\n        \"filterValues\": {\n          \"le\"\
-    : 1e-9\n        },\n        \"legend\": {\n          \"show\": true\n        },\n\
-    \        \"rowsFrame\": {\n          \"layout\": \"auto\"\n        },\n      \
-    \  \"showValue\": \"never\",\n        \"tooltip\": {\n          \"show\": true,\n\
-    \          \"yHistogram\": false\n        },\n        \"yAxis\": {\n         \
-    \ \"axisPlacement\": \"left\",\n          \"decimals\": 2,\n          \"min\"\
-    : \"0\",\n          \"reverse\": false,\n          \"unit\": \"ms\"\n        }\n\
-    \      },\n      \"pluginVersion\": \"9.1.3\",\n      \"reverseYBuckets\": false,\n\
-    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
-    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
-    \ },\n          \"expr\": \"sum without (instance) (rate(ceph_osd_op_r_latency_sum{ceph_daemon='$osd'}[5m])\
-    \ / rate(ceph_osd_op_r_latency_count{ceph_daemon='$osd'}[5m]) >= 0)\",\n     \
-    \     \"format\": \"time_series\",\n          \"instant\": false,\n          \"\
-    interval\": \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
+    \         \"uid\": \"prometheus\"\n          },\n          \"expr\": \"sum without\
+    \ (instance) (ceph_osd_commit_latency_ms{ceph_daemon='$osd'})\",\n          \"\
+    format\": \"time_series\",\n          \"instant\": false,\n          \"interval\"\
+    : \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
     : \"\",\n          \"refId\": \"A\"\n        }\n      ],\n      \"title\": \"\
-    OSD Read Op Latency Distribution\",\n      \"tooltip\": {\n        \"show\": true,\n\
+    OSD Commit Latency Distribution\",\n      \"tooltip\": {\n        \"show\": true,\n\
     \        \"showHistogram\": false\n      },\n      \"type\": \"heatmap\",\n  \
     \    \"xAxis\": {\n        \"show\": true\n      },\n      \"xBucketSize\": \"\
-    \",\n      \"yAxis\": {\n        \"decimals\": 2,\n        \"format\": \"ms\"\
-    ,\n        \"logBase\": 2,\n        \"min\": \"0\",\n        \"show\": true\n\
-    \      },\n      \"yBucketBound\": \"auto\"\n    },\n    {\n      \"cards\": {},\n\
-    \      \"color\": {\n        \"cardColor\": \"#f9934e\",\n        \"colorScale\"\
-    : \"sqrt\",\n        \"colorScheme\": \"interpolateOranges\",\n        \"exponent\"\
-    : 0.5,\n        \"mode\": \"opacity\"\n      },\n      \"dataFormat\": \"timeseries\"\
-    ,\n      \"datasource\": {\n        \"type\": \"prometheus\",\n        \"uid\"\
-    : \"${DS_PROMETHEUS}\"\n      },\n      \"gridPos\": {\n        \"h\": 8,\n  \
-    \      \"w\": 12,\n        \"x\": 12,\n        \"y\": 21\n      },\n      \"heatmap\"\
-    : {},\n      \"hideZeroBuckets\": false,\n      \"highlightCards\": true,\n  \
-    \    \"id\": 86,\n      \"legend\": {\n        \"show\": true\n      },\n    \
-    \  \"links\": [],\n      \"options\": {\n        \"calculate\": true,\n      \
-    \  \"calculation\": {\n          \"yBuckets\": {\n            \"mode\": \"count\"\
-    ,\n            \"scale\": {\n              \"log\": 2,\n              \"type\"\
-    : \"log\"\n            }\n          }\n        },\n        \"cellGap\": 2,\n \
-    \       \"cellValues\": {},\n        \"color\": {\n          \"exponent\": 0.5,\n\
-    \          \"fill\": \"#f9934e\",\n          \"mode\": \"opacity\",\n        \
-    \  \"scale\": \"exponential\",\n          \"scheme\": \"Oranges\",\n         \
-    \ \"steps\": 128\n        },\n        \"exemplars\": {\n          \"color\": \"\
-    rgba(255,0,255,0.7)\"\n        },\n        \"filterValues\": {\n          \"le\"\
-    : 1e-9\n        },\n        \"legend\": {\n          \"show\": true\n        },\n\
-    \        \"rowsFrame\": {\n          \"layout\": \"auto\"\n        },\n      \
-    \  \"showValue\": \"never\",\n        \"tooltip\": {\n          \"show\": true,\n\
-    \          \"yHistogram\": false\n        },\n        \"yAxis\": {\n         \
-    \ \"axisPlacement\": \"left\",\n          \"decimals\": 2,\n          \"min\"\
-    : \"0\",\n          \"reverse\": false,\n          \"unit\": \"ms\"\n        }\n\
-    \      },\n      \"pluginVersion\": \"9.1.3\",\n      \"reverseYBuckets\": false,\n\
-    \      \"targets\": [\n        {\n          \"datasource\": {\n            \"\
-    type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n         \
-    \ },\n          \"expr\": \"sum without (instance) (rate(ceph_osd_op_w_latency_sum{ceph_daemon='$osd'}[5m])\
-    \ / rate(ceph_osd_op_w_latency_count{ceph_daemon='$osd'}[5m]) >= 0)\",\n     \
-    \     \"format\": \"time_series\",\n          \"instant\": false,\n          \"\
-    interval\": \"$interval\",\n          \"intervalFactor\": 1,\n          \"legendFormat\"\
-    : \"\",\n          \"refId\": \"A\"\n        }\n      ],\n      \"title\": \"\
-    OSD Write Op Latency Distribution\",\n      \"tooltip\": {\n        \"show\":\
-    \ true,\n        \"showHistogram\": false\n      },\n      \"type\": \"heatmap\"\
-    ,\n      \"xAxis\": {\n        \"show\": true\n      },\n      \"xBucketSize\"\
-    : \"\",\n      \"yAxis\": {\n        \"decimals\": 2,\n        \"format\": \"\
-    ms\",\n        \"logBase\": 2,\n        \"min\": \"0\",\n        \"show\": true\n\
-    \      },\n      \"yBucketBound\": \"auto\"\n    },\n    {\n      \"datasource\"\
-    : {\n        \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n\
-    \      },\n      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\"\
-    : {\n            \"mode\": \"palette-classic\"\n          },\n          \"custom\"\
-    : {\n            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\"\
-    ,\n            \"barAlignment\": 0,\n            \"drawStyle\": \"line\",\n  \
-    \          \"fillOpacity\": 10,\n            \"gradientMode\": \"none\",\n   \
-    \         \"hideFrom\": {\n              \"legend\": false,\n              \"\
-    tooltip\": false,\n              \"viz\": false\n            },\n            \"\
-    lineInterpolation\": \"linear\",\n            \"lineWidth\": 1,\n            \"\
-    pointSize\": 5,\n            \"scaleDistribution\": {\n              \"type\"\
-    : \"linear\"\n            },\n            \"showPoints\": \"never\",\n       \
-    \     \"spanNulls\": false,\n            \"stacking\": {\n              \"group\"\
-    : \"A\",\n              \"mode\": \"none\"\n            },\n            \"thresholdsStyle\"\
-    : {\n              \"mode\": \"off\"\n            }\n          },\n          \"\
-    mappings\": [],\n          \"thresholds\": {\n            \"mode\": \"absolute\"\
-    ,\n            \"steps\": [\n              {\n                \"color\": \"green\"\
-    ,\n                \"value\": null\n              },\n              {\n      \
-    \          \"color\": \"red\",\n                \"value\": 80\n              }\n\
-    \            ]\n          },\n          \"unit\": \"ms\"\n        },\n       \
-    \ \"overrides\": []\n      },\n      \"gridPos\": {\n        \"h\": 7,\n     \
-    \   \"w\": 12,\n        \"x\": 0,\n        \"y\": 29\n      },\n      \"id\":\
-    \ 44,\n      \"links\": [],\n      \"options\": {\n        \"legend\": {\n   \
-    \       \"calcs\": [],\n          \"displayMode\": \"table\",\n          \"placement\"\
-    : \"bottom\",\n          \"showLegend\": true\n        },\n        \"tooltip\"\
-    : {\n          \"mode\": \"multi\",\n          \"sort\": \"none\"\n        }\n\
-    \      },\n      \"pluginVersion\": \"9.1.3\",\n      \"targets\": [\n       \
-    \ {\n          \"datasource\": {\n            \"type\": \"prometheus\",\n    \
-    \        \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"avg\
-    \ without (instance, ceph_daemon) (rate(ceph_osd_op_r_latency_sum{ceph_daemon='$osd'}[5m])\
+    \",\n      \"yAxis\": {\n        \"format\": \"ms\",\n        \"logBase\": 2,\n\
+    \        \"min\": \"0\",\n        \"show\": true\n      },\n      \"yBucketBound\"\
+    : \"auto\"\n    },\n    {\n      \"cards\": {},\n      \"color\": {\n        \"\
+    cardColor\": \"#806eb7\",\n        \"colorScale\": \"sqrt\",\n        \"colorScheme\"\
+    : \"interpolateOranges\",\n        \"exponent\": 0.5,\n        \"mode\": \"opacity\"\
+    \n      },\n      \"dataFormat\": \"timeseries\",\n      \"datasource\": {\n \
+    \       \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n\
+    \      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 0,\n\
+    \        \"y\": 21\n      },\n      \"heatmap\": {},\n      \"hideZeroBuckets\"\
+    : false,\n      \"highlightCards\": true,\n      \"id\": 85,\n      \"legend\"\
+    : {\n        \"show\": true\n      },\n      \"links\": [],\n      \"options\"\
+    : {\n        \"calculate\": true,\n        \"calculation\": {\n          \"yBuckets\"\
+    : {\n            \"mode\": \"count\",\n            \"scale\": {\n            \
+    \  \"log\": 2,\n              \"type\": \"log\"\n            }\n          }\n\
+    \        },\n        \"cellGap\": 2,\n        \"cellValues\": {},\n        \"\
+    color\": {\n          \"exponent\": 0.5,\n          \"fill\": \"#806eb7\",\n \
+    \         \"mode\": \"opacity\",\n          \"scale\": \"exponential\",\n    \
+    \      \"scheme\": \"Oranges\",\n          \"steps\": 128\n        },\n      \
+    \  \"exemplars\": {\n          \"color\": \"rgba(255,0,255,0.7)\"\n        },\n\
+    \        \"filterValues\": {\n          \"le\": 1e-9\n        },\n        \"legend\"\
+    : {\n          \"show\": true\n        },\n        \"rowsFrame\": {\n        \
+    \  \"layout\": \"auto\"\n        },\n        \"showValue\": \"never\",\n     \
+    \   \"tooltip\": {\n          \"show\": true,\n          \"yHistogram\": false\n\
+    \        },\n        \"yAxis\": {\n          \"axisPlacement\": \"left\",\n  \
+    \        \"decimals\": 2,\n          \"min\": \"0\",\n          \"reverse\": false,\n\
+    \          \"unit\": \"ms\"\n        }\n      },\n      \"pluginVersion\": \"\
+    9.1.3\",\n      \"reverseYBuckets\": false,\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n        \
+    \    \"uid\": \"prometheus\"\n          },\n          \"expr\": \"sum without\
+    \ (instance) (rate(ceph_osd_op_r_latency_sum{ceph_daemon='$osd'}[5m]) / rate(ceph_osd_op_r_latency_count{ceph_daemon='$osd'}[5m])\
+    \ >= 0)\",\n          \"format\": \"time_series\",\n          \"instant\": false,\n\
+    \          \"interval\": \"$interval\",\n          \"intervalFactor\": 1,\n  \
+    \        \"legendFormat\": \"\",\n          \"refId\": \"A\"\n        }\n    \
+    \  ],\n      \"title\": \"OSD Read Op Latency Distribution\",\n      \"tooltip\"\
+    : {\n        \"show\": true,\n        \"showHistogram\": false\n      },\n   \
+    \   \"type\": \"heatmap\",\n      \"xAxis\": {\n        \"show\": true\n     \
+    \ },\n      \"xBucketSize\": \"\",\n      \"yAxis\": {\n        \"decimals\":\
+    \ 2,\n        \"format\": \"ms\",\n        \"logBase\": 2,\n        \"min\": \"\
+    0\",\n        \"show\": true\n      },\n      \"yBucketBound\": \"auto\"\n   \
+    \ },\n    {\n      \"cards\": {},\n      \"color\": {\n        \"cardColor\":\
+    \ \"#f9934e\",\n        \"colorScale\": \"sqrt\",\n        \"colorScheme\": \"\
+    interpolateOranges\",\n        \"exponent\": 0.5,\n        \"mode\": \"opacity\"\
+    \n      },\n      \"dataFormat\": \"timeseries\",\n      \"datasource\": {\n \
+    \       \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n\
+    \      \"gridPos\": {\n        \"h\": 8,\n        \"w\": 12,\n        \"x\": 12,\n\
+    \        \"y\": 21\n      },\n      \"heatmap\": {},\n      \"hideZeroBuckets\"\
+    : false,\n      \"highlightCards\": true,\n      \"id\": 86,\n      \"legend\"\
+    : {\n        \"show\": true\n      },\n      \"links\": [],\n      \"options\"\
+    : {\n        \"calculate\": true,\n        \"calculation\": {\n          \"yBuckets\"\
+    : {\n            \"mode\": \"count\",\n            \"scale\": {\n            \
+    \  \"log\": 2,\n              \"type\": \"log\"\n            }\n          }\n\
+    \        },\n        \"cellGap\": 2,\n        \"cellValues\": {},\n        \"\
+    color\": {\n          \"exponent\": 0.5,\n          \"fill\": \"#f9934e\",\n \
+    \         \"mode\": \"opacity\",\n          \"scale\": \"exponential\",\n    \
+    \      \"scheme\": \"Oranges\",\n          \"steps\": 128\n        },\n      \
+    \  \"exemplars\": {\n          \"color\": \"rgba(255,0,255,0.7)\"\n        },\n\
+    \        \"filterValues\": {\n          \"le\": 1e-9\n        },\n        \"legend\"\
+    : {\n          \"show\": true\n        },\n        \"rowsFrame\": {\n        \
+    \  \"layout\": \"auto\"\n        },\n        \"showValue\": \"never\",\n     \
+    \   \"tooltip\": {\n          \"show\": true,\n          \"yHistogram\": false\n\
+    \        },\n        \"yAxis\": {\n          \"axisPlacement\": \"left\",\n  \
+    \        \"decimals\": 2,\n          \"min\": \"0\",\n          \"reverse\": false,\n\
+    \          \"unit\": \"ms\"\n        }\n      },\n      \"pluginVersion\": \"\
+    9.1.3\",\n      \"reverseYBuckets\": false,\n      \"targets\": [\n        {\n\
+    \          \"datasource\": {\n            \"type\": \"prometheus\",\n        \
+    \    \"uid\": \"prometheus\"\n          },\n          \"expr\": \"sum without\
+    \ (instance) (rate(ceph_osd_op_w_latency_sum{ceph_daemon='$osd'}[5m]) / rate(ceph_osd_op_w_latency_count{ceph_daemon='$osd'}[5m])\
+    \ >= 0)\",\n          \"format\": \"time_series\",\n          \"instant\": false,\n\
+    \          \"interval\": \"$interval\",\n          \"intervalFactor\": 1,\n  \
+    \        \"legendFormat\": \"\",\n          \"refId\": \"A\"\n        }\n    \
+    \  ],\n      \"title\": \"OSD Write Op Latency Distribution\",\n      \"tooltip\"\
+    : {\n        \"show\": true,\n        \"showHistogram\": false\n      },\n   \
+    \   \"type\": \"heatmap\",\n      \"xAxis\": {\n        \"show\": true\n     \
+    \ },\n      \"xBucketSize\": \"\",\n      \"yAxis\": {\n        \"decimals\":\
+    \ 2,\n        \"format\": \"ms\",\n        \"logBase\": 2,\n        \"min\": \"\
+    0\",\n        \"show\": true\n      },\n      \"yBucketBound\": \"auto\"\n   \
+    \ },\n    {\n      \"datasource\": {\n        \"type\": \"prometheus\",\n    \
+    \    \"uid\": \"prometheus\"\n      },\n      \"fieldConfig\": {\n        \"defaults\"\
+    : {\n          \"color\": {\n            \"mode\": \"palette-classic\"\n     \
+    \     },\n          \"custom\": {\n            \"axisLabel\": \"\",\n        \
+    \    \"axisPlacement\": \"auto\",\n            \"barAlignment\": 0,\n        \
+    \    \"drawStyle\": \"line\",\n            \"fillOpacity\": 10,\n            \"\
+    gradientMode\": \"none\",\n            \"hideFrom\": {\n              \"legend\"\
+    : false,\n              \"tooltip\": false,\n              \"viz\": false\n  \
+    \          },\n            \"lineInterpolation\": \"linear\",\n            \"\
+    lineWidth\": 1,\n            \"pointSize\": 5,\n            \"scaleDistribution\"\
+    : {\n              \"type\": \"linear\"\n            },\n            \"showPoints\"\
+    : \"never\",\n            \"spanNulls\": false,\n            \"stacking\": {\n\
+    \              \"group\": \"A\",\n              \"mode\": \"none\"\n         \
+    \   },\n            \"thresholdsStyle\": {\n              \"mode\": \"off\"\n\
+    \            }\n          },\n          \"mappings\": [],\n          \"thresholds\"\
+    : {\n            \"mode\": \"absolute\",\n            \"steps\": [\n         \
+    \     {\n                \"color\": \"green\",\n                \"value\": null\n\
+    \              },\n              {\n                \"color\": \"red\",\n    \
+    \            \"value\": 80\n              }\n            ]\n          },\n   \
+    \       \"unit\": \"ms\"\n        },\n        \"overrides\": []\n      },\n  \
+    \    \"gridPos\": {\n        \"h\": 7,\n        \"w\": 12,\n        \"x\": 0,\n\
+    \        \"y\": 29\n      },\n      \"id\": 44,\n      \"links\": [],\n      \"\
+    options\": {\n        \"legend\": {\n          \"calcs\": [],\n          \"displayMode\"\
+    : \"table\",\n          \"placement\": \"bottom\",\n          \"showLegend\":\
+    \ true\n        },\n        \"tooltip\": {\n          \"mode\": \"multi\",\n \
+    \         \"sort\": \"none\"\n        }\n      },\n      \"pluginVersion\": \"\
+    9.1.3\",\n      \"targets\": [\n        {\n          \"datasource\": {\n     \
+    \       \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\n     \
+    \     },\n          \"expr\": \"avg without (instance, ceph_daemon) (rate(ceph_osd_op_r_latency_sum{ceph_daemon='$osd'}[5m])\
     \ / rate(ceph_osd_op_r_latency_count{ceph_daemon='$osd'}[5m]) >= 0)\",\n     \
     \     \"format\": \"time_series\",\n          \"interval\": \"\",\n          \"\
     intervalFactor\": 1,\n          \"legendFormat\": \"read\",\n          \"refId\"\
     : \"A\"\n        },\n        {\n          \"datasource\": {\n            \"type\"\
-    : \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\n          },\n \
-    \         \"expr\": \"avg without (instance, ceph_daemon) (rate(ceph_osd_op_w_latency_sum{ceph_daemon='$osd'}[5m])\
+    : \"prometheus\",\n            \"uid\": \"prometheus\"\n          },\n       \
+    \   \"expr\": \"avg without (instance, ceph_daemon) (rate(ceph_osd_op_w_latency_sum{ceph_daemon='$osd'}[5m])\
     \ / rate(ceph_osd_op_w_latency_count{ceph_daemon='$osd'}[5m]) >= 0)\",\n     \
     \     \"format\": \"time_series\",\n          \"interval\": \"\",\n          \"\
     intervalFactor\": 1,\n          \"legendFormat\": \"write\",\n          \"refId\"\
     : \"B\"\n        }\n      ],\n      \"title\": \"Avg OSD  Op  Latency\",\n   \
     \   \"type\": \"timeseries\"\n    },\n    {\n      \"datasource\": {\n       \
-    \ \"type\": \"prometheus\",\n        \"uid\": \"${DS_PROMETHEUS}\"\n      },\n\
-    \      \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n \
-    \           \"mode\": \"palette-classic\"\n          },\n          \"custom\"\
-    : {\n            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\"\
-    ,\n            \"barAlignment\": 0,\n            \"drawStyle\": \"line\",\n  \
-    \          \"fillOpacity\": 10,\n            \"gradientMode\": \"none\",\n   \
-    \         \"hideFrom\": {\n              \"legend\": false,\n              \"\
-    tooltip\": false,\n              \"viz\": false\n            },\n            \"\
-    lineInterpolation\": \"linear\",\n            \"lineWidth\": 1,\n            \"\
-    pointSize\": 5,\n            \"scaleDistribution\": {\n              \"type\"\
-    : \"linear\"\n            },\n            \"showPoints\": \"never\",\n       \
-    \     \"spanNulls\": false,\n            \"stacking\": {\n              \"group\"\
-    : \"A\",\n              \"mode\": \"none\"\n            },\n            \"thresholdsStyle\"\
+    \ \"type\": \"prometheus\",\n        \"uid\": \"prometheus\"\n      },\n     \
+    \ \"fieldConfig\": {\n        \"defaults\": {\n          \"color\": {\n      \
+    \      \"mode\": \"palette-classic\"\n          },\n          \"custom\": {\n\
+    \            \"axisLabel\": \"\",\n            \"axisPlacement\": \"auto\",\n\
+    \            \"barAlignment\": 0,\n            \"drawStyle\": \"line\",\n    \
+    \        \"fillOpacity\": 10,\n            \"gradientMode\": \"none\",\n     \
+    \       \"hideFrom\": {\n              \"legend\": false,\n              \"tooltip\"\
+    : false,\n              \"viz\": false\n            },\n            \"lineInterpolation\"\
+    : \"linear\",\n            \"lineWidth\": 1,\n            \"pointSize\": 5,\n\
+    \            \"scaleDistribution\": {\n              \"type\": \"linear\"\n  \
+    \          },\n            \"showPoints\": \"never\",\n            \"spanNulls\"\
+    : false,\n            \"stacking\": {\n              \"group\": \"A\",\n     \
+    \         \"mode\": \"none\"\n            },\n            \"thresholdsStyle\"\
     : {\n              \"mode\": \"off\"\n            }\n          },\n          \"\
     mappings\": [],\n          \"thresholds\": {\n            \"mode\": \"absolute\"\
     ,\n            \"steps\": [\n              {\n                \"color\": \"green\"\
@@ -476,13 +475,13 @@ data:
     \          \"mode\": \"multi\",\n          \"sort\": \"none\"\n        }\n   \
     \   },\n      \"pluginVersion\": \"9.1.3\",\n      \"targets\": [\n        {\n\
     \          \"datasource\": {\n            \"type\": \"prometheus\",\n        \
-    \    \"uid\": \"${DS_PROMETHEUS}\"\n          },\n          \"expr\": \"avg without\
+    \    \"uid\": \"prometheus\"\n          },\n          \"expr\": \"avg without\
     \ (instance, ceph_daemon) (ceph_osd_apply_latency_ms{ceph_daemon='$osd'})\",\n\
     \          \"format\": \"time_series\",\n          \"interval\": \"$interval\"\
     ,\n          \"intervalFactor\": 1,\n          \"legendFormat\": \"apply\",\n\
     \          \"metric\": \"ceph_osd_perf_apply_latency_seconds\",\n          \"\
     refId\": \"A\",\n          \"step\": 4\n        },\n        {\n          \"datasource\"\
-    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"${DS_PROMETHEUS}\"\
+    : {\n            \"type\": \"prometheus\",\n            \"uid\": \"prometheus\"\
     \n          },\n          \"expr\": \"avg without (instance, ceph_daemon)(ceph_osd_commit_latency_ms{ceph_daemon='$osd'})\"\
     ,\n          \"format\": \"time_series\",\n          \"interval\": \"$interval\"\
     ,\n          \"intervalFactor\": 1,\n          \"legendFormat\": \"commit\",\n\
@@ -527,7 +526,7 @@ data:
     query\": \"10s,30s,1m,10m,30m,1h,6h,12h,1d,7d,14d,30d\",\n        \"queryValue\"\
     : \"\",\n        \"refresh\": 2,\n        \"skipUrlSync\": false,\n        \"\
     type\": \"interval\"\n      },\n      {\n        \"current\": {},\n        \"\
-    datasource\": {\n          \"type\": \"prometheus\",\n          \"uid\": \"${DS_PROMETHEUS}\"\
+    datasource\": {\n          \"type\": \"prometheus\",\n          \"uid\": \"prometheus\"\
     \n        },\n        \"definition\": \"label_values(ceph_osd_up, ceph_daemon)\"\
     ,\n        \"hide\": 0,\n        \"includeAll\": false,\n        \"label\": \"\
     OSD\",\n        \"multi\": false,\n        \"name\": \"osd\",\n        \"options\"\
