@@ -132,7 +132,10 @@ spec:
             - name: GOTIFY_ENDPOINT
               value: http://gotify.gotify.svc.cluster.local/message
             - name: GOTIFY_TOKEN
-              value: AvMQK99JPxH2tYh
+              valueFrom:
+                secretKeyRef:
+                  name: gotify-secret
+                  key: alertmanager-token
           resources:
             requests:
               cpu: 10m
