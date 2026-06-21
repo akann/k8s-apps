@@ -51,7 +51,18 @@ spec:
               secretKeyRef:
                 name: grafana-smtp-secret
                 key: smtp_from
+          plugins:
+            - yesoreyeram-infinity-datasource
           additionalDataSources:
+            - name: Alertmanager
+              type: alertmanager
+              url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
+              access: proxy
+              jsonData:
+                implementation: prometheus
+            - name: Infinity
+              type: yesoreyeram-infinity-datasource
+              access: proxy
             - name: Loki
               type: loki
               url: http://loki.monitoring.svc.cluster.local:3100
