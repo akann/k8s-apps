@@ -153,3 +153,25 @@ spec:
                 name: auth-service
                 port:
                   number: 3000
+---
+# DELETE /api/auth/account → auth-service (JWT required)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-account
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/account
+            pathType: Exact
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 3000
