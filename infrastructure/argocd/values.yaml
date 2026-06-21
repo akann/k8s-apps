@@ -43,6 +43,7 @@ spec:
                 type: core/v1/PodTemplateSpec
           params:
             server.insecure: true
+            controller.diff.server.side: "true"
           rbac:
             policy.csv: |
               g, authentik Admins, role:admin
