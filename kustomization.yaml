@@ -37,6 +37,7 @@ resources:
   - infrastructure/authentik/argocd-app-authentik.yaml
   - infrastructure/monitoring/argocd-app-monitoring.yaml
   - infrastructure/monitoring/argocd-app-grafana-dashboards.yaml
+  - infrastructure/monitoring/argocd-app-monitoring-rules.yaml
   - infrastructure/tempo/argocd-app-tempo.yaml
   - infrastructure/velero/argocd-app-velero.yaml
 

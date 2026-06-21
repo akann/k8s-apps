@@ -1,0 +1,29 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nvme-temperature
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: nvme.temperature
+      interval: 1m
+      rules:
+        - alert: NVMeTemperatureWarning
+          expr: nvme_temperature_celsius{job="pve-node-exporter", device=~"nvme[0-9]+"} >= 70
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "NVMe temperature warning on {{ $labels.node }}"
+            description: "{{ $labels.node }} / {{ $labels.device }} is {{ $value }}°C (threshold: 70°C)"
+
+        - alert: NVMeTemperatureCritical
+          expr: nvme_temperature_celsius{job="pve-node-exporter", device=~"nvme[0-9]+"} >= 85
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "NVMe temperature critical on {{ $labels.node }}"
+            description: "{{ $labels.node }} / {{ $labels.device }} is {{ $value }}°C (threshold: 85°C)"
