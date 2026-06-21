@@ -124,7 +124,7 @@ data:
           "type": "timeseries",
           "title": "Temperature Over Time",
           "id": 2,
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 3 },
+          "gridPos": { "h": 20, "w": 24, "x": 0, "y": 3 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
