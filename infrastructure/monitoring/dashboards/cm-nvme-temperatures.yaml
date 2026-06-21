@@ -121,44 +121,10 @@ data:
           "options": { "footer": { "show": false } }
         },
         {
-          "type": "stat",
-          "title": "Current Temperatures",
-          "id": 1,
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 3 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            {
-              "expr": "nvme_temperature_celsius{job=\"pve-node-exporter\", node=~\"$node\", device=~\"nvme[0-9]+\"}",
-              "legendFormat": "{{node}} / {{device}}",
-              "refId": "A"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "celsius",
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "orange", "value": 70 },
-                  { "color": "red", "value": 85 }
-                ]
-              },
-              "color": { "mode": "thresholds" }
-            }
-          },
-          "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
-            "orientation": "horizontal",
-            "textMode": "auto",
-            "colorMode": "background"
-          }
-        },
-        {
           "type": "timeseries",
           "title": "Temperature Over Time",
           "id": 2,
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 13 },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 3 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
