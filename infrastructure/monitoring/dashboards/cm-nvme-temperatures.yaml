@@ -12,7 +12,7 @@ data:
       "uid": "pve-nvme-temp",
       "timezone": "browser",
       "schemaVersion": 37,
-      "version": 5,
+      "version": 6,
       "tags": ["Proxmox", "Prometheus"],
       "refresh": "1m",
       "time": { "from": "now-3h", "to": "now" },
@@ -35,9 +35,96 @@ data:
       "panels": [
         {
           "type": "stat",
+          "title": "Alert Status",
+          "id": 3,
+          "gridPos": { "h": 3, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "count(ALERTS{alertname=~\"NVMeTemperature.*\", alertstate=\"firing\"}) or vector(0)",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "All Clear", "color": "green" } } },
+                { "type": "range", "options": { "from": 1, "to": 100, "result": { "text": "Firing", "color": "red" } } }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "color": { "mode": "thresholds" }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "background",
+            "textMode": "auto",
+            "graphMode": "none"
+          }
+        },
+        {
+          "type": "table",
+          "title": "Active Alerts",
+          "id": 4,
+          "gridPos": { "h": 3, "w": 18, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "expr": "ALERTS{alertname=~\"NVMeTemperature.*\", alertstate=\"firing\"}",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true, "Value": true, "__name__": true,
+                  "job": true, "instance": true, "prometheus": true
+                },
+                "renameByName": {
+                  "alertname": "Alert",
+                  "alertstate": "State",
+                  "node": "Node",
+                  "device": "Device",
+                  "severity": "Severity"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": { "displayMode": "auto" }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Severity" },
+                "properties": [
+                  {
+                    "id": "custom.displayMode",
+                    "value": "color-background"
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      { "type": "value", "options": { "warning": { "color": "orange", "text": "warning" } } },
+                      { "type": "value", "options": { "critical": { "color": "red", "text": "critical" } } }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": { "footer": { "show": false } }
+        },
+        {
+          "type": "stat",
           "title": "Current Temperatures",
           "id": 1,
-          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 3 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -71,7 +158,7 @@ data:
           "type": "timeseries",
           "title": "Temperature Over Time",
           "id": 2,
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 10 },
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 13 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
