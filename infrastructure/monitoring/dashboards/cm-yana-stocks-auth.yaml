@@ -1,0 +1,292 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-yana-stocks-auth
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  yana-stocks-auth.json: |
+    {
+      "title": "yana-stocks — User Activity",
+      "uid": "yana-stocks-auth-users",
+      "description": "User registrations, verification funnel, and auth methods from auth-service PostgreSQL",
+      "tags": ["yana-stocks", "auth", "postgres"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "5m",
+      "time": { "from": "now-30d", "to": "now" },
+      "templating": { "list": [] },
+      "annotations": { "list": [] },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Total Users",
+          "gridPos": { "x": 0, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT COUNT(*) AS \"Total Users\" FROM auth.users",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "blue" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Verified",
+          "gridPos": { "x": 5, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT COUNT(*) AS \"Verified\" FROM auth.users WHERE is_verified = true",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "green" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Awaiting Verification",
+          "gridPos": { "x": 10, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT COUNT(*) AS \"Awaiting\" FROM auth.users WHERE is_verified = false",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "orange" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "New Today",
+          "gridPos": { "x": 15, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT COUNT(*) AS \"New Today\" FROM auth.users WHERE created_at >= date_trunc('day', NOW())",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "purple" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Verification Rate",
+          "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE is_verified) / NULLIF(COUNT(*), 0), 1) AS \"Rate\" FROM auth.users",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "orientation": "auto",
+            "textMode": "auto",
+            "colorMode": "background",
+            "graphMode": "none"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "green", "value": 80 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Registrations per Day",
+          "gridPos": { "x": 0, "y": 4, "w": 16, "h": 9 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(*) AS \"Registrations\"\nFROM auth.users\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+              "format": "time_series",
+              "refId": "A"
+            },
+            {
+              "rawSql": "SELECT\n  date_trunc('day', created_at) AS time,\n  COUNT(*) FILTER (WHERE is_verified) AS \"Verified same day\"\nFROM auth.users\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+              "format": "time_series",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 75,
+                "lineWidth": 1,
+                "barAlignment": 0,
+                "gradientMode": "none"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Verified same day" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Registrations" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi", "sort": "none" },
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }
+          }
+        },
+        {
+          "id": 7,
+          "type": "piechart",
+          "title": "Auth Method Split",
+          "gridPos": { "x": 16, "y": 4, "w": 8, "h": 9 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE uc.user_id IS NOT NULL AND COALESCE(uo.cnt, 0) = 0) AS \"Password only\",\n  COUNT(*) FILTER (WHERE uc.user_id IS NULL AND COALESCE(uo.cnt, 0) > 0) AS \"OAuth only\",\n  COUNT(*) FILTER (WHERE uc.user_id IS NOT NULL AND COALESCE(uo.cnt, 0) > 0) AS \"Password + OAuth\"\nFROM auth.users u\nLEFT JOIN auth.user_credentials uc ON u.id = uc.user_id\nLEFT JOIN (\n  SELECT user_id, COUNT(*) AS cnt FROM auth.user_oauth GROUP BY user_id\n) uo ON u.id = uo.user_id",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "pieType": "donut",
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
+        },
+        {
+          "id": 8,
+          "type": "table",
+          "title": "Recent Registrations",
+          "gridPos": { "x": 0, "y": 13, "w": 24, "h": 8 },
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "PD69B7A4C82681419" },
+          "targets": [
+            {
+              "rawSql": "SELECT\n  u.created_at AS \"Registered\",\n  u.email AS \"Email\",\n  u.is_verified AS \"Verified\",\n  CASE\n    WHEN uc.user_id IS NOT NULL AND uo_agg.providers IS NULL THEN 'Password'\n    WHEN uc.user_id IS NULL AND uo_agg.providers IS NOT NULL THEN 'OAuth (' || uo_agg.providers || ')'\n    WHEN uc.user_id IS NOT NULL AND uo_agg.providers IS NOT NULL THEN 'Password + OAuth (' || uo_agg.providers || ')'\n    ELSE '—'\n  END AS \"Auth Method\"\nFROM auth.users u\nLEFT JOIN auth.user_credentials uc ON u.id = uc.user_id\nLEFT JOIN (\n  SELECT user_id, STRING_AGG(DISTINCT provider, ', ' ORDER BY provider) AS providers\n  FROM auth.user_oauth\n  GROUP BY user_id\n) uo_agg ON u.id = uo_agg.user_id\nORDER BY u.created_at DESC\nLIMIT 20",
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "footer": { "show": false },
+            "frameIndex": 0,
+            "showHeader": true
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Registered" },
+                "properties": [
+                  { "id": "unit", "value": "dateTimeAsIso" },
+                  { "id": "custom.width", "value": 200 }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Verified" },
+                "properties": [
+                  { "id": "custom.width", "value": 100 },
+                  { "id": "custom.displayMode", "value": "color-background" },
+                  { "id": "mappings", "value": [
+                    {
+                      "type": "value",
+                      "options": {
+                        "true":  { "text": "Yes",     "color": "green",  "index": 0 },
+                        "false": { "text": "Pending", "color": "orange", "index": 1 }
+                      }
+                    }
+                  ]}
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Auth Method" },
+                "properties": [
+                  { "id": "custom.width", "value": 200 }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }

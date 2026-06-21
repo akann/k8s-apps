@@ -6,3 +6,4 @@ resources:
   - cm-node-exporter-full.yaml
   - cm-proxmox-via-prometheus.yaml
   - cm-nvme-temperatures.yaml
+  - cm-yana-stocks-auth.yaml
