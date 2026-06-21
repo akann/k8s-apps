@@ -38,6 +38,9 @@ spec:
               jqPathExpressions:
                 - '.metadata.annotations["rollout.argoproj.io/revision"]'
                 - '.spec.restartAt'
+            "resource.customizations.knownTypeFields.argoproj.io_Rollout": |
+              - field: spec.template
+                type: core/v1/PodTemplateSpec
           params:
             server.insecure: true
           rbac:
