@@ -6,3 +6,4 @@ resources:
   - ciliumnetpol-eso-webhook.yaml
   - ciliumnetpol-grafana-prometheus.yaml
   - ciliumnetpol-pve-scrape.yaml
+  - ciliumnetpol-grafana-pg.yaml

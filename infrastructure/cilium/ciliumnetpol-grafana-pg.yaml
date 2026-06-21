@@ -1,0 +1,20 @@
+# CiliumNetworkPolicy required for Grafana to reach PostgreSQL (auth-service-pg) in yana-stocks
+# Standard NetworkPolicy cross-namespace ClusterIP routing fails in Cilium native routing mode
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-grafana-to-pg
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: yana-stocks
+            cnpg.io/cluster: auth-service-pg
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
