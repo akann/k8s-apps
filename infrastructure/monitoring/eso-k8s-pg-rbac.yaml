@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: eso-pg-reader
+  namespace: monitoring
+---
+# Grants ESO permission to read the CNPG-generated app secret from yana-stocks.
+# resourceNames restriction limits this to exactly one secret.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eso-pg-reader
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["auth-service-pg-app"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eso-pg-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eso-pg-reader
+subjects:
+  - kind: ServiceAccount
+    name: eso-pg-reader
+    namespace: monitoring

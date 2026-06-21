@@ -1,0 +1,18 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: k8s-yana-stocks
+spec:
+  provider:
+    kubernetes:
+      remoteNamespace: yana-stocks
+      auth:
+        serviceAccount:
+          name: eso-pg-reader
+          namespace: monitoring
+      server:
+        caProvider:
+          type: ConfigMap
+          name: kube-root-ca.crt
+          key: ca.crt
+          namespace: kube-public

@@ -51,9 +51,23 @@ spec:
               secretKeyRef:
                 name: grafana-smtp-secret
                 key: smtp_from
+            GRAFANA_PG_PASSWORD:
+              secretKeyRef:
+                name: grafana-pg-secret
+                key: password
           plugins:
             - yesoreyeram-infinity-datasource
           additionalDataSources:
+            - name: PostgreSQL (auth-service)
+              type: postgres
+              url: auth-service-pg-rw.yana-stocks.svc.cluster.local:5432
+              user: app
+              jsonData:
+                database: app
+                sslmode: require
+                postgresVersion: 1600
+              secureJsonData:
+                password: $GRAFANA_PG_PASSWORD
             - name: Alertmanager
               type: alertmanager
               url: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
