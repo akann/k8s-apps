@@ -86,7 +86,8 @@ k8s-apps/
 ### Secrets
 - **ESO:** External Secrets Operator syncs from Infisical
   - Webhook disabled (`webhook.create: false`, `certController.create: false`) — Cilium native routing blocks kube-apiserver node IP connections to in-cluster services
-  - ClusterSecretStore: `infisical`
+  - ClusterSecretStore: `infisical` (Infisical provider — main store for all app secrets)
+  - ClusterSecretStore: `k8s-yana-stocks` (Kubernetes provider — syncs `auth-service-pg-app` secret from yana-stocks namespace into monitoring namespace for the Grafana PostgreSQL datasource). Auth via `eso-pg-reader` ServiceAccount in monitoring.
   - Project: `k8s-homelab` (ID `&lt;see Vaultwarden&gt;`)
   - Environment: `prod`
 - **ExternalSecret format:**
@@ -186,6 +187,13 @@ helm:
     key: value
 ```
 
+### infrastructure/monitoring/ bootstrap caveat
+Files in `infrastructure/monitoring/` are applied once during the initial bootstrap (when the monitoring ArgoCD app first synced from the directory before converting itself to a Helm chart source). New files added to that directory are **not auto-synced** by any running ArgoCD app — apply them manually:
+```bash
+kubectl apply -f infrastructure/monitoring/<file>.yaml
+```
+The child apps `argocd-app-monitoring-rules.yaml` and `argocd-app-grafana-dashboards.yaml` are exceptions — they create their own persistent child ArgoCD apps that do continuously sync. For new persistent extras (ExternalSecrets, ClusterSecretStores, RBAC), either apply manually or create a dedicated `monitoring-extras` ArgoCD Application.
+
 ### Known permanent OutOfSync (cosmetic, all Healthy — do not fix)
 - `actions-runner-controller` — OCI registry limitation
 - `argo-rollouts` — cluster-scoped CRDs tracked twice
@@ -208,7 +216,7 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 1. **Every namespace** gets `default-deny-all` NetworkPolicy
 2. **Every operator/controller namespace** needs `allow-kube-apiserver-egress` (ports 443+6443+53)
 3. **Ceph CSI OSD egress** requires `CiliumNetworkPolicy` with `toCIDR` — NOT standard NetworkPolicy
-4. **Grafana → Prometheus** requires `CiliumNetworkPolicy` — standard NetworkPolicy ClusterIP routing fails in Cilium native routing
+4. **Cross-namespace ClusterIP routing** requires `CiliumNetworkPolicy` in Cilium native routing mode — standard NetworkPolicy doesn't work. Confirmed for: Grafana → Prometheus, Grafana → PostgreSQL (yana-stocks). Use `toEndpoints` with pod labels.
 5. **ESO webhook disabled** — was blocking syncs. Do NOT re-enable without also adding CiliumNetworkPolicy for node IP ingress
 
 ### Files
@@ -216,8 +224,10 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 - `infrastructure/network-policies/netpol-cnpg.yaml` — CNPG operator + clusters
 - `infrastructure/network-policies/netpol-monitoring.yaml` — monitoring stack
 - `infrastructure/network-policies/netpol-apiserver-egress.yaml` — kube-apiserver egress for all namespaces
-- `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml` — Ceph OSD egress
-- `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml` — Grafana → Prometheus
+- `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml` — Ceph OSD egress (toCIDR 192.168.22.0/24, ports 6802-6809)
+- `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml` — Grafana → Prometheus (cross-namespace ClusterIP)
+- `infrastructure/cilium/ciliumnetpol-grafana-pg.yaml` — Grafana → PostgreSQL auth-service-pg in yana-stocks (cross-namespace ClusterIP)
+- `infrastructure/cilium/ciliumnetpol-pve-scrape.yaml` — Prometheus → Proxmox node exporters
 - `infrastructure/cilium/ciliumnetpol-eso-webhook.yaml` — ESO webhook (currently unused — webhook disabled)
 
 ### Adding a new namespace

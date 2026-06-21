@@ -161,7 +161,9 @@ The cluster uses **stacked etcd** — etcd runs on each control-plane node along
 Key implications:
 
 - Inter-pod traffic is not encapsulated → lower overhead, full observability via Hubble
-- `NetworkPolicy` objects work, but **Ceph OSD egress** and **Grafana → Prometheus** require `CiliumNetworkPolicy` with `toCIDR` — standard `NetworkPolicy` ClusterIP routing fails in native routing mode
+- `NetworkPolicy` objects work for most traffic, but **two categories require `CiliumNetworkPolicy`**:
+  - **Ceph OSD egress** (bare-metal IPs, ports 6802-6809): use `toCIDR: 192.168.22.0/24`
+  - **Cross-namespace ClusterIP routing**: standard NetworkPolicy doesn't reliably handle this in native routing mode — use `toEndpoints` with pod labels. Confirmed affected: Grafana → Prometheus, Grafana → PostgreSQL (yana-stocks)
 - ESO webhook disabled because kube-apiserver cannot connect to in-cluster services via node IPs without a `CiliumNetworkPolicy`
 
 Hubble UI: `hubble.yanatech.co.uk` (Authentik-protected)
@@ -262,8 +264,10 @@ Every namespace has `default-deny-all`. Key policy files:
 | `infrastructure/network-policies/netpol-cnpg.yaml`             | CNPG operator + clusters                                    |
 | `infrastructure/network-policies/netpol-monitoring.yaml`       | Monitoring stack                                            |
 | `infrastructure/network-policies/netpol-apiserver-egress.yaml` | kube-apiserver egress for operator namespaces               |
-| `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`             | Ceph OSD egress (ports 6802-6809, `toCIDR` 192.168.22.0/24) |
-| `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml`   | Grafana → Prometheus (ClusterIP bypass)                     |
+| `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`             | Ceph OSD egress (ports 6802-6809, `toCIDR` 192.168.22.0/24)   |
+| `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml`   | Grafana → Prometheus (cross-namespace ClusterIP)               |
+| `infrastructure/cilium/ciliumnetpol-grafana-pg.yaml`           | Grafana → PostgreSQL auth-service-pg in yana-stocks            |
+| `infrastructure/cilium/ciliumnetpol-pve-scrape.yaml`           | Prometheus → Proxmox node/PVE exporters                        |
 
 ---
 
@@ -339,9 +343,11 @@ graph LR
     Infisical -->|"API pull"| ESO
 
     subgraph ESO["External Secrets Operator"]
-        CSS["ClusterSecretStore: infisical<br/>(ReadOnly, Valid)"]
+        CSS["ClusterSecretStore: infisical<br/>(Infisical provider — main store)"]
+        CSS2["ClusterSecretStore: k8s-yana-stocks<br/>(Kubernetes provider — cross-ns secret sync)"]
         ES["ExternalSecret resources<br/>(refreshInterval: 1h)"]
         CSS --> ES
+        CSS2 --> ES
     end
 
     ES -->|"creates/owns"| K8sSecret["Kubernetes Secrets<br/>(in each namespace)"]
@@ -349,6 +355,8 @@ graph LR
 ```
 
 **ESO webhook is disabled** (`webhook.create: false`, `certController.create: false`) — Cilium native routing blocks kube-apiserver node IP connections to in-cluster webhook services.
+
+The `k8s-yana-stocks` ClusterSecretStore (Kubernetes provider) allows secrets to be synced cross-namespace within the cluster — used to pull the CNPG-generated `auth-service-pg-app` secret from the `yana-stocks` namespace into `monitoring` for the Grafana PostgreSQL datasource. Auth via a minimal-permission ServiceAccount (`eso-pg-reader`) in the `monitoring` namespace.
 
 ### 6.2 ExternalSecret Pattern
 
@@ -783,27 +791,44 @@ yana-stocks/                    # github.com/akann/yana-stocks
 
 ### 11.1 Stack
 
+| Component | Version | Storage | URL |
+|-----------|---------|---------|-----|
+| kube-prometheus-stack | 72.6.2 | — | — |
+| Grafana | 12.0.0 | — | https://grafana.yanatech.co.uk |
+| Prometheus | — | 50 Gi | — |
+| Alertmanager | — | 10 Gi | — |
+| Loki | — | 20 Gi | — |
+| Tempo | — | 20 Gi | — |
+| Promtail | — | DaemonSet | — |
+
 ```mermaid
 graph LR
     subgraph Sources["Data Sources"]
         Pods["Pods / Nodes"]
         K8s["kube-state-metrics\nnode-exporter"]
+        PVE["Proxmox exporters\n192.168.22.11-13"]
     end
 
     subgraph Collection["Collection"]
-        Prom["Prometheus\n(kube-prometheus-stack)\n20 Gi PVC"]
+        Prom["Prometheus\n50 Gi PVC"]
         Loki["Loki\n20 Gi PVC"]
         Tempo["Tempo\n20 Gi PVC"]
         Promtail["Promtail\n(DaemonSet)"]
     end
 
     subgraph Visualization["Visualization"]
-        Grafana["Grafana\ngrafana.yanatech.co.uk"]
-        Alert["Alertmanager\n5 Gi PVC"]
+        Grafana["Grafana\ngrafana.yanatech.co.uk\nAuthentik OIDC"]
+        Alert["Alertmanager\n10 Gi PVC"]
+    end
+
+    subgraph Notifications["Notifications"]
+        Gotify["Gotify\ngotify.yanatech.co.uk"]
+        Email["Email\nakan2000@gmail.com\n(critical only)"]
     end
 
     Pods -->|"metrics /metrics"| Prom
     K8s --> Prom
+    PVE --> Prom
     Pods -->|"stdout/stderr"| Promtail
     Promtail -->|"log streams"| Loki
     Pods -->|"OTLP traces"| Tempo
@@ -811,11 +836,34 @@ graph LR
     Loki --> Grafana
     Tempo --> Grafana
     Prom --> Alert
+    Alert -->|"all alerts"| Gotify
+    Alert -->|"severity=critical"| Email
 ```
 
-**Note:** Grafana → Prometheus requires `CiliumNetworkPolicy` — `ClusterIP` routing for Prometheus fails with Cilium native routing, causing `context deadline exceeded` errors. See `infrastructure/cilium/ciliumnetpol-grafana-prometheus.yaml`.
+### 11.2 Grafana Datasources
 
-### 11.2 Network Observability
+| Name | Type | Notes |
+|------|------|-------|
+| Prometheus | prometheus | in-namespace, CiliumNetworkPolicy required |
+| Loki | loki | in-namespace |
+| Tempo | tempo | in-namespace, trace→log→metric correlation configured |
+| Alertmanager | alertmanager | in-namespace |
+| Infinity | yesoreyeram-infinity-datasource | external REST/JSON/CSV |
+| PostgreSQL (auth-service) | postgres | `auth-service-pg-rw.yana-stocks:5432` — CiliumNetworkPolicy required |
+
+**CiliumNetworkPolicy requirement:** Standard NetworkPolicy doesn't work for cross-namespace ClusterIP traffic in Cilium native routing mode. Grafana → Prometheus and Grafana → PostgreSQL both require dedicated `CiliumNetworkPolicy` resources in `infrastructure/cilium/`.
+
+### 11.3 Alertmanager Routing
+
+| Receiver | Matcher | Destination |
+|----------|---------|-------------|
+| `null` | `alertname =~ Watchdog\|InfoInhibitor` | discarded |
+| `gotify` | default (all other alerts) | `alertmanager-gotify-bridge` in `gotify` namespace |
+| `critical-alerts` | `severity = critical` | Gotify + email to `akan2000@gmail.com` via SMTP2GO |
+
+Email relay: SMTP2GO (`mail-eu.smtp2go.com:2525`, MandatoryStartTLS). Credentials in `grafana-smtp-secret` (ESO-managed from Infisical).
+
+### 11.4 Network Observability
 
 - **Hubble UI:** `hubble.yanatech.co.uk` — real-time L3/L4 flow visualization built into Cilium
 - **Authentik-protected** via forward auth
@@ -946,6 +994,14 @@ ESO `webhook` and `certController` are both disabled. Do not re-enable without a
 ### Ceph OSD Egress
 
 Standard `NetworkPolicy` cannot reach Ceph OSDs on ports 6802-6809 (bare-metal IPs) in Cilium native routing mode. Use `CiliumNetworkPolicy` with `toCIDR: 192.168.22.0/24` for any namespace mounting Ceph RBD volumes.
+
+### Cross-Namespace ClusterIP Routing
+
+Standard `NetworkPolicy` doesn't reliably handle cross-namespace ClusterIP service routing in Cilium native routing mode. Use `CiliumNetworkPolicy` with `toEndpoints` (matching pod labels + `k8s:io.kubernetes.pod.namespace`). Known cases:
+- Grafana → Prometheus: `ciliumnetpol-grafana-prometheus.yaml`
+- Grafana → PostgreSQL (yana-stocks): `ciliumnetpol-grafana-pg.yaml`
+
+When adding new cross-namespace connections from Grafana (or any component in monitoring), create a corresponding `CiliumNetworkPolicy` in `infrastructure/cilium/` and add it to `kustomization.yaml`.
 
 ### Infisical Ingress Class Reversion
 
