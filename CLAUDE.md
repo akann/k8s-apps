@@ -209,6 +209,23 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 ### ArgoCD + Argo Rollouts pitfalls
 - **Never set `ServerSideApply=false` on a Rollout.** The Rollout CRD uses `x-kubernetes-preserve-unknown-fields` for `.spec.template`, so client-side structured merge diff fails with "field not declared in schema". The app-level `ServerSideApply=true` handles this correctly.
 - **Stray `spec.template` blocks in Service definitions** cause the same "field not declared in schema" error. Check multi-resource YAML files (Deployment + Service in one file) to ensure the Service section is not accidentally inheriting content from the Deployment's `spec.template`.
+- **`ComparisonError: field not declared in schema` on Rollout `.spec.template`**: Even with `ServerSideApply=true` and per-Application `ServerSideDiff=true` in syncOptions, ArgoCD v3.x requires the **global** `controller.diff.server.side: "true"` flag in `argocd-cmd-params-cm` (set via `configs.params` in the ArgoCD Helm values). Per-Application `ServerSideDiff=true` alone is insufficient — the controller ignores it without the global flag. Fix already applied in `infrastructure/argocd/values.yaml`.
+
+### Application source path discipline
+All manifests for an app (Deployments, Services, ExternalSecrets, etc.) MUST be inside the directory specified in the Application's `spec.source.path`. Files placed in a parent directory are silently ignored by ArgoCD. For apps with a `manifests/` subdirectory (e.g. `apps/gotify/manifests`), ensure every manifest — including ExternalSecrets — lives inside that subdirectory.
+
+### Harbor: RWO PVC rolling update deadlock
+Harbor's `harbor-jobservice` and `harbor-registry` Deployments use `ReadWriteOnce` Ceph RBD PVCs. During a rolling update, if the new pod is scheduled on a different node than the old pod, Kubernetes enters a deadlock:
+- The new pod can't start (can't mount the RWO volume held by the old pod on another node)
+- The old pod won't terminate (rolling update waits for the new pod to be ready first)
+
+**Symptom:** New RS pods stuck in `ContainerCreating` for hours with no events (events expire after ~1h).
+
+**Fix:** Manually delete the old running pods. Kubernetes releases the PVC, the new pods can mount it, and the old RS is garbage-collected once the new pods become Ready:
+```bash
+kubectl delete pod -n harbor <old-jobservice-pod> <old-registry-pod>
+```
+To identify old vs new pods: the new RS pods are the ones in `ContainerCreating`; the old RS pods are the ones `Running` from a different ReplicaSet name.
 
 ## Network Policies
 

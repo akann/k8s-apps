@@ -1011,3 +1011,31 @@ After ArgoCD sync, infisical ingress may revert to `infisical-nginx` class. Manu
 kubectl patch ingress infisical-ingress -n infisical --type='json' \
   -p='[{"op":"replace","path":"/spec/ingressClassName","value":"nginx"},...]'
 ```
+
+### Harbor: RWO PVC Rolling Update Deadlock
+
+`harbor-jobservice` and `harbor-registry` use `ReadWriteOnce` Ceph RBD PVCs. During a rolling update, if new pods are scheduled on a different node than the old pods, a deadlock occurs: new pods can't mount the volume (held by old pods on another node), old pods won't terminate (waiting for new pods to be Ready).
+
+**Symptom:** New pods stuck in `ContainerCreating` with no events (events expire after ~1h).
+
+**Fix:** Delete the old running pods to release the PVCs:
+
+```bash
+kubectl delete pod -n harbor <old-jobservice-pod> <old-registry-pod>
+```
+
+Kubernetes will garbage-collect the old ReplicaSet once the new pods become Ready.
+
+### ArgoCD ComparisonError on Argo Rollouts `.spec.template`
+
+ArgoCD's internal structured merge diff library doesn't know the Rollout CRD schema for `.spec.template`, causing `ComparisonError: field not declared in schema`. Per-Application `ServerSideDiff=true` in syncOptions is **not sufficient** in ArgoCD v3.x.
+
+**Fix:** Set the global flag in `argocd-cmd-params-cm` via Helm values (`infrastructure/argocd/values.yaml`):
+
+```yaml
+configs:
+  params:
+    controller.diff.server.side: "true"
+```
+
+This makes the controller delegate diff computation to the API server (dry-run SSA), bypassing the internal library entirely.
