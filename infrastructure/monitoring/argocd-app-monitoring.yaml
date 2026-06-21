@@ -26,6 +26,10 @@ spec:
             GF_AUTH_GENERIC_OAUTH_API_URL: https://authentik.yanatech.co.uk/application/o/userinfo/
             GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups, 'authentik Admins') && 'Admin' || 'Viewer'"
             GF_SERVER_ROOT_URL: https://grafana.yanatech.co.uk
+            GF_SMTP_ENABLED: "true"
+            GF_SMTP_HOST: "mail-eu.smtp2go.com:2525"
+            GF_SMTP_FROM_NAME: "Grafana | YanaTech"
+            GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
           envValueFrom:
             GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
               secretKeyRef:
@@ -35,6 +39,18 @@ spec:
               secretKeyRef:
                 name: grafana-authentik-secret
                 key: client_secret
+            GF_SMTP_USER:
+              secretKeyRef:
+                name: grafana-smtp-secret
+                key: smtp_username
+            GF_SMTP_PASSWORD:
+              secretKeyRef:
+                name: grafana-smtp-secret
+                key: smtp_password
+            GF_SMTP_FROM_ADDRESS:
+              secretKeyRef:
+                name: grafana-smtp-secret
+                key: smtp_from
           additionalDataSources:
             - name: Loki
               type: loki
@@ -123,6 +139,11 @@ spec:
           config:
             global:
               resolve_timeout: 5m
+              smtp_smarthost: 'mail-eu.smtp2go.com:2525'
+              smtp_from: 'info@yanatech.co.uk'
+              smtp_auth_username: 'yanatech.co.uk'
+              smtp_auth_password_file: '/etc/alertmanager/smtp/smtp_password'
+              smtp_require_tls: true
             route:
               group_by: ['alertname', 'namespace']
               group_wait: 30s
@@ -133,11 +154,21 @@ spec:
                 - matchers:
                     - alertname =~ "Watchdog|InfoInhibitor"
                   receiver: "null"
+                - matchers:
+                    - severity = critical
+                  receiver: critical-alerts
             receivers:
               - name: "null"
               - name: gotify
                 webhook_configs:
                   - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook'
+                    send_resolved: true
+              - name: critical-alerts
+                webhook_configs:
+                  - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook'
+                    send_resolved: true
+                email_configs:
+                  - to: 'akan2000@gmail.com'
                     send_resolved: true
             inhibit_rules:
               - source_matchers:
@@ -155,6 +186,14 @@ spec:
                   - namespace
                   - alertname
           alertmanagerSpec:
+            volumes:
+              - name: smtp-secret
+                secret:
+                  secretName: grafana-smtp-secret
+            volumeMounts:
+              - name: smtp-secret
+                mountPath: /etc/alertmanager/smtp
+                readOnly: true
             storage:
               volumeClaimTemplate:
                 spec:
