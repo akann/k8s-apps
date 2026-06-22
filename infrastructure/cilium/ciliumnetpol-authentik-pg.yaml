@@ -1,0 +1,21 @@
+# CiliumNetworkPolicy required for Authentik to reach pg-main in cnpg-clusters
+# Standard NetworkPolicy cross-namespace ClusterIP routing fails in Cilium native routing mode
+# when pods are on different nodes
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-authentik-to-pg
+  namespace: authentik
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-clusters
+            cnpg.io/cluster: pg-main
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP

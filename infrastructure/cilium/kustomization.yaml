@@ -7,3 +7,4 @@ resources:
   - ciliumnetpol-grafana-prometheus.yaml
   - ciliumnetpol-pve-scrape.yaml
   - ciliumnetpol-grafana-pg.yaml
+  - ciliumnetpol-authentik-pg.yaml
