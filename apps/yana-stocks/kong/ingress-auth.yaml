@@ -219,3 +219,91 @@ spec:
                 name: auth-service
                 port:
                   number: 3000
+---
+# GET /api/auth/mfa → auth-service (JWT required — get MFA status)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-mfa-status
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/mfa
+            pathType: Exact
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 3000
+---
+# POST /api/auth/mfa/setup → auth-service (JWT required — generate TOTP secret)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-mfa-setup
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/mfa/setup
+            pathType: Exact
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 3000
+---
+# POST /api/auth/mfa/enable → auth-service (JWT required — verify code and enable MFA)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-mfa-enable
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/mfa/enable
+            pathType: Exact
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 3000
+---
+# DELETE /api/auth/mfa → auth-service (JWT required — disable MFA)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-auth-mfa-disable
+  namespace: yana-stocks
+  annotations:
+    konghq.com/plugins: jwt-auth,cors
+spec:
+  ingressClassName: kong
+  rules:
+    - host: api-gateway.yanatech.co.uk
+      http:
+        paths:
+          - path: /api/auth/mfa
+            pathType: Exact
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 3000

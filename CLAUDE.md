@@ -227,6 +227,27 @@ kubectl delete pod -n harbor <old-jobservice-pod> <old-registry-pod>
 ```
 To identify old vs new pods: the new RS pods are the ones in `ContainerCreating`; the old RS pods are the ones `Running` from a different ReplicaSet name.
 
+If both RS have competing pods, check RS revision numbers to confirm which is current:
+```bash
+kubectl get rs -n harbor <rs-name> -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}'
+```
+Scale down the old RS to 0 to break the deadlock: `kubectl scale rs -n harbor <old-rs-name> --replicas=0`
+
+### Harbor: jobservice/core CORE_SECRET mismatch after cluster restart
+After a cluster restart, ArgoCD may sync and update the `harbor-core` Kubernetes secret shortly after harbor-core pods have already started. This creates a mismatch: harbor-core is running with the old `CORE_SECRET` value, but newly-started jobservice pods read the new value → `401 UNAUTHORIZED` on `/api/v2.0/internalconfig`.
+
+**Symptom:** `harbor-jobservice` CrashLoopBackOff with `http error: code 401, message {"errors":[{"code":"UNAUTHORIZED","message":"only internal service is allowed to call this API"}]}`
+
+**Confirm:** Compare the running harbor-core env vs the current k8s secret:
+```bash
+kubectl exec -n harbor <harbor-core-pod> -- sh -c 'echo $CORE_SECRET'
+kubectl get secret harbor-core -n harbor -o jsonpath='{.data.secret}' | base64 -d
+```
+**Fix:** Restart harbor-core so it reloads the current secret value:
+```bash
+kubectl rollout restart deployment harbor-core -n harbor
+```
+
 ## Network Policies
 
 ### Critical rules
