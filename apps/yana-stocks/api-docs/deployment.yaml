@@ -55,7 +55,3 @@ spec:
   ports:
     - port: 80
       targetPort: 80
-  template:
-    spec:
-      containers:
-        - image: harbor.yanatech.co.uk/yana-stocks/api-docs:cc0b173fc46fdf717ba13754e85ce1357f62422f
