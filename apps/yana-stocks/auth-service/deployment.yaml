@@ -78,7 +78,3 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
-  template:
-    spec:
-      containers:
-        - image: harbor.yanatech.co.uk/yana-stocks/auth-service:6e9a59f975a451e63ad800feb8c3b25bc2f640ad
