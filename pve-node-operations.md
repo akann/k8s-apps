@@ -2,7 +2,7 @@
 
 > **Cluster:** cluster01  
 > **Current nodes:** pve1 (192.168.22.11) / pve2 (192.168.22.12) / pve3 (192.168.22.13)  
-> **Last updated:** 2026-06-23  
+> **Last updated:** 2026-06-23
 
 This document covers two scenarios:
 
@@ -13,31 +13,39 @@ This document covers two scenarios:
 
 ## Table of Contents
 
-1. [Hardware Reference](#1-hardware-reference)
-2. [Replacing a Node](#2-replacing-a-node)
-   - [2.1 Pre-checks](#21-pre-checks)
-   - [2.2 Evacuate the Failing Node](#22-evacuate-the-failing-node)
-   - [2.3 Remove Ceph Daemons](#23-remove-ceph-daemons)
-   - [2.4 Remove from PVE Cluster](#24-remove-from-pve-cluster)
-   - [2.5 Prepare Replacement Hardware](#25-prepare-replacement-hardware)
-   - [2.6 Rejoin the Cluster](#26-rejoin-the-cluster)
-   - [2.7 Restore Network Config](#27-restore-network-config)
-   - [2.8 Restore FRR / OSPF](#28-restore-frr--ospf)
-   - [2.9 Restore Ceph Daemons](#29-restore-ceph-daemons)
-   - [2.10 Restore Firewall Rules](#210-restore-firewall-rules)
-   - [2.11 Restore VMs and HA](#211-restore-vms-and-ha)
-   - [2.12 Final Verification](#212-final-verification)
-3. [Adding a New Node (pve4)](#3-adding-a-new-node-pve4)
-   - [3.1 Cluster Network Topology Constraint](#31-cluster-network-topology-constraint)
-   - [3.2 New Node Addressing](#32-new-node-addressing)
-   - [3.3 Install PVE on New Hardware](#33-install-pve-on-new-hardware)
-   - [3.4 Network Configuration](#34-network-configuration)
-   - [3.5 FRR / OSPF on pve4](#35-frr--ospf-on-pve4)
-   - [3.6 Join the Cluster](#36-join-the-cluster)
-   - [3.7 Add Ceph Daemons](#37-add-ceph-daemons)
-   - [3.8 Add Firewall Rules](#38-add-firewall-rules)
-   - [3.9 Final Verification](#39-final-verification)
-4. [Reference: Node-Specific Values](#4-reference-node-specific-values)
+- [PVE Node Operations — Adding and Replacing Cluster Nodes](#pve-node-operations--adding-and-replacing-cluster-nodes)
+  - [Table of Contents](#table-of-contents)
+  - [1. Hardware Reference](#1-hardware-reference)
+  - [2. Replacing a Node](#2-replacing-a-node)
+    - [2.1 Pre-checks](#21-pre-checks)
+    - [2.2 Evacuate the Failing Node](#22-evacuate-the-failing-node)
+    - [2.3 Remove Ceph Daemons](#23-remove-ceph-daemons)
+    - [2.4 Remove from PVE Cluster](#24-remove-from-pve-cluster)
+    - [2.5 Prepare Replacement Hardware](#25-prepare-replacement-hardware)
+    - [2.6 Rejoin the Cluster](#26-rejoin-the-cluster)
+    - [2.7 Restore Network Config](#27-restore-network-config)
+    - [2.8 Restore FRR / OSPF](#28-restore-frr--ospf)
+      - [ECMP Routing Fix (pve2 and pve3 only)](#ecmp-routing-fix-pve2-and-pve3-only)
+    - [2.9 Restore Ceph Daemons](#29-restore-ceph-daemons)
+    - [2.10 Restore Firewall Rules](#210-restore-firewall-rules)
+    - [2.11 Restore VMs and HA](#211-restore-vms-and-ha)
+    - [2.12 Final Verification](#212-final-verification)
+  - [3. Adding a New Node (pve4)](#3-adding-a-new-node-pve4)
+    - [3.1 Cluster Network Topology Constraint](#31-cluster-network-topology-constraint)
+    - [3.2 New Node Addressing](#32-new-node-addressing)
+    - [3.3 Install PVE on New Hardware](#33-install-pve-on-new-hardware)
+    - [3.4 Network Configuration](#34-network-configuration)
+    - [3.5 FRR / OSPF on pve4](#35-frr--ospf-on-pve4)
+    - [3.6 Join the Cluster](#36-join-the-cluster)
+    - [3.7 Add Ceph Daemons](#37-add-ceph-daemons)
+    - [3.8 Add Firewall Rules](#38-add-firewall-rules)
+    - [3.9 Final Verification](#39-final-verification)
+  - [4. Reference: Node-Specific Values](#4-reference-node-specific-values)
+    - [Addressing Table](#addressing-table)
+    - [Cluster Links](#cluster-links)
+    - [Ceph OSD Assignment](#ceph-osd-assignment)
+    - [OSPF Networks per Node](#ospf-networks-per-node)
+    - [Corosync Ring1 Addresses](#corosync-ring1-addresses)
 
 ---
 
@@ -45,17 +53,17 @@ This document covers two scenarios:
 
 All current nodes are identical. A replacement must use the same NIC model (or have matching PCI names) for the network config to apply without changes.
 
-| Component | Spec |
-|---|---|
-| CPU | Intel Core i5-12600H — 12c/16t |
-| RAM | 64 GiB DDR5 |
-| NIC cluster | Intel X710 10GbE SFP+ dual-port — `enp2s0f0np0`, `enp2s0f1np1` |
-| NIC public | Intel I226-V 2.5GbE — `enp87s0` |
-| NIC secondary | Intel I226-LM 2.5GbE — `enp90s0` |
-| WiFi | MediaTek MT7922 — leave `DOWN`, never configure |
-| NVMe OS | Crucial CT500P3PSSD8 — 465.8 GB (slot: nvme1) |
-| NVMe OSD large | Lexar NM790 2 TB (slot: nvme0) |
-| NVMe OSD small | Lexar NM790 1 TB (slot: nvme2) |
+| Component      | Spec                                                           |
+| -------------- | -------------------------------------------------------------- |
+| CPU            | Intel Core i5-12600H — 12c/16t                                 |
+| RAM            | 64 GiB DDR5                                                    |
+| NIC cluster    | Intel X710 10GbE SFP+ dual-port — `enp2s0f0np0`, `enp2s0f1np1` |
+| NIC public     | Intel I226-V 2.5GbE — `enp87s0`                                |
+| NIC secondary  | Intel I226-LM 2.5GbE — `enp90s0`                               |
+| WiFi           | MediaTek MT7922 — leave `DOWN`, never configure                |
+| NVMe OS        | Crucial CT500P3PSSD8 — 465.8 GB (slot: nvme1)                  |
+| NVMe OSD large | Lexar NM790 2 TB (slot: nvme0)                                 |
+| NVMe OSD small | Lexar NM790 1 TB (slot: nvme2)                                 |
 
 **NVMe slot order is fixed by physical slot, not by Lexar label.** Always verify with `lsblk -d -o NAME,SIZE,MODEL` before touching disks.
 
@@ -188,18 +196,19 @@ Install Proxmox VE 9 from the official ISO onto the **Crucial NVMe only** (nvme1
 
 **Installer settings:**
 
-| Setting | Value |
-|---|---|
-| Target disk | Crucial 465 GB NVMe (NOT the Lexar drives) |
-| Filesystem | `ext4` |
-| Hostname | same as original: `pve1.akan.home` / `pve2.akan.home` / `pve3.akan.home` |
-| IP address | same as original (see §4) |
-| Gateway | `192.168.22.1` |
-| DNS | `192.168.22.1` |
+| Setting     | Value                                                                    |
+| ----------- | ------------------------------------------------------------------------ |
+| Target disk | Crucial 465 GB NVMe (NOT the Lexar drives)                               |
+| Filesystem  | `ext4`                                                                   |
+| Hostname    | same as original: `pve1.akan.home` / `pve2.akan.home` / `pve3.akan.home` |
+| IP address  | same as original (see §4)                                                |
+| Gateway     | `192.168.22.1`                                                           |
+| DNS         | `192.168.22.1`                                                           |
 
 After install, set up APT repositories before touching anything else:
 
 **`/etc/apt/sources.list.d/proxmox.sources`**
+
 ```
 Types: deb
 URIs: http://download.proxmox.com/debian/pve
@@ -209,6 +218,7 @@ Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 ```
 
 **`/etc/apt/sources.list.d/ceph.sources`**
+
 ```
 Types: deb
 URIs: http://download.proxmox.com/debian/ceph-squid
@@ -220,6 +230,7 @@ Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 Disable the enterprise repo in `/etc/apt/sources.list.d/pve-enterprise.sources` (comment all lines).
 
 **`/etc/apt/sources.list.d/debian.sources`**
+
 ```
 Types: deb
 URIs: http://deb.debian.org/debian/
@@ -326,6 +337,7 @@ apt install frr -y
 ```
 
 Enable OSPF in `/etc/frr/daemons`:
+
 ```
 ospfd=yes
 ```
@@ -375,6 +387,7 @@ pve1 does not need this. For pve2 or pve3, the OSPF ECMP path via the direct pve
 Create `/usr/local/sbin/ceph-routing-setup.sh`:
 
 **pve2:**
+
 ```bash
 cat > /usr/local/sbin/ceph-routing-setup.sh << 'EOF'
 #!/bin/bash
@@ -386,6 +399,7 @@ chmod +x /usr/local/sbin/ceph-routing-setup.sh
 ```
 
 **pve3:**
+
 ```bash
 cat > /usr/local/sbin/ceph-routing-setup.sh << 'EOF'
 #!/bin/bash
@@ -552,11 +566,11 @@ Adding a 4th node creates a problem: with only 2 SFP+ ports per node, pve4 can d
 
 **Options:**
 
-| Option | Pros | Cons |
-|---|---|---|
-| Add a 10GbE switch to the cluster network | Clean full mesh for 4+ nodes, existing NICs unchanged | Switch cost, new cabling |
-| Accept partial mesh — pve4 connects to pve1 and pve2 only; pve3↔pve4 via OSPF | No new hardware | One hop between pve3 and pve4, single point of failure for that path |
-| Repurpose vmbr1 (I226-LM 2.5GbE) for cluster traffic | No switch needed | Drops cluster bandwidth to 2.5GbE, loses separate storage network benefit |
+| Option                                                                        | Pros                                                  | Cons                                                                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| Add a 10GbE switch to the cluster network                                     | Clean full mesh for 4+ nodes, existing NICs unchanged | Switch cost, new cabling                                                  |
+| Accept partial mesh — pve4 connects to pve1 and pve2 only; pve3↔pve4 via OSPF | No new hardware                                       | One hop between pve3 and pve4, single point of failure for that path      |
+| Repurpose vmbr1 (I226-LM 2.5GbE) for cluster traffic                          | No switch needed                                      | Drops cluster bandwidth to 2.5GbE, loses separate storage network benefit |
 
 **Recommended approach (switch):** Add a 10GbE switch (or SFP+ DAC switch) and rewire the cluster network so all nodes connect to the switch via one X710 port each, leaving the second port as a bond or spare. OSPF continues to work, adjacencies form over the switch fabric. Update `/etc/network/interfaces` on each node to reflect the new addresses.
 
@@ -564,14 +578,14 @@ The instructions below assume the **partial mesh** option (no new hardware) sinc
 
 ### 3.2 New Node Addressing
 
-| Property | Value |
-|---|---|
-| Hostname | `pve4.akan.home` |
-| Management IP | `192.168.22.14/24` |
-| OSPF loopback | `10.255.255.4/32` |
-| vmbr1 IP | `192.168.33.14/24` |
-| Link to pve1 | pve4: `10.10.40.2/30`, pve1: `10.10.40.1/30` |
-| Link to pve2 | pve4: `10.10.50.2/30`, pve2: `10.10.50.1/30` |
+| Property      | Value                                        |
+| ------------- | -------------------------------------------- |
+| Hostname      | `pve4.akan.home`                             |
+| Management IP | `192.168.22.14/24`                           |
+| OSPF loopback | `10.255.255.4/32`                            |
+| vmbr1 IP      | `192.168.33.14/24`                           |
+| Link to pve1  | pve4: `10.10.40.2/30`, pve1: `10.10.40.1/30` |
+| Link to pve2  | pve4: `10.10.50.2/30`, pve2: `10.10.50.1/30` |
 
 pve3 reaches pve4 via OSPF through pve1 or pve2.
 
@@ -588,8 +602,8 @@ Wait — pve1's `enp2s0f1np1` is currently used for the pve1→pve3 link (10.10.
 
 **Practical resolution:** connect pve4 via `enp2s0f0np0 → pve2` and `enp2s0f1np1 → pve3` (reuse pve2 and pve3's free port slots), and reach pve1 via OSPF:
 
-| Link | pve4 port | pve4 addr | Remote port | Remote addr |
-|---|---|---|---|---|
+| Link        | pve4 port   | pve4 addr     | Remote port                       | Remote addr   |
+| ----------- | ----------- | ------------- | --------------------------------- | ------------- |
 | pve4 → pve2 | enp2s0f0np0 | 10.10.40.2/30 | enp2s0f1np1 (currently pve2→pve3) | 10.10.40.1/30 |
 | pve4 → pve3 | enp2s0f1np1 | 10.10.50.2/30 | enp2s0f0np0 (currently pve3→pve1) | 10.10.50.1/30 |
 
@@ -843,25 +857,25 @@ qm destroy 999
 
 ### Addressing Table
 
-| Property | pve1 | pve2 | pve3 | pve4 (if added) |
-|---|---|---|---|---|
-| Management IP | 192.168.22.11 | 192.168.22.12 | 192.168.22.13 | 192.168.22.14 |
-| vmbr1 IP | 192.168.33.11 | 192.168.33.12 | 192.168.33.13 | 192.168.33.14 |
-| OSPF loopback | 10.255.255.1 | 10.255.255.2 | 10.255.255.3 | 10.255.255.4 |
-| Corosync nodeid | 1 | 2 | 3 | 4 |
+| Property        | pve1          | pve2          | pve3          | pve4 (if added) |
+| --------------- | ------------- | ------------- | ------------- | --------------- |
+| Management IP   | 192.168.22.11 | 192.168.22.12 | 192.168.22.13 | 192.168.22.14   |
+| vmbr1 IP        | 192.168.33.11 | 192.168.33.12 | 192.168.33.13 | 192.168.33.14   |
+| OSPF loopback   | 10.255.255.1  | 10.255.255.2  | 10.255.255.3  | 10.255.255.4    |
+| Corosync nodeid | 1             | 2             | 3             | 4               |
 
 ### Cluster Links
 
-| Link | pve1 end | pve2 end | pve3 end |
-|---|---|---|---|
-| pve1 ↔ pve2 | 10.10.10.1/30 (enp2s0f0np0) | 10.10.10.2/30 (enp2s0f0np0) | — |
-| pve1 ↔ pve3 | 10.10.20.1/30 (enp2s0f1np1) | — | 10.10.20.2/30 (enp2s0f0np0) |
-| pve2 ↔ pve3 | — | 10.10.30.1/30 (enp2s0f1np1) | 10.10.30.2/30 (enp2s0f1np1) |
+| Link        | pve1 end                    | pve2 end                    | pve3 end                    |
+| ----------- | --------------------------- | --------------------------- | --------------------------- |
+| pve1 ↔ pve2 | 10.10.10.1/30 (enp2s0f0np0) | 10.10.10.2/30 (enp2s0f0np0) | —                           |
+| pve1 ↔ pve3 | 10.10.20.1/30 (enp2s0f1np1) | —                           | 10.10.20.2/30 (enp2s0f0np0) |
+| pve2 ↔ pve3 | —                           | 10.10.30.1/30 (enp2s0f1np1) | 10.10.30.2/30 (enp2s0f1np1) |
 
 ### Ceph OSD Assignment
 
-| OSD | Node | Device | Size |
-|---|---|---|---|
+| OSD   | Node | Device               | Size     |
+| ----- | ---- | -------------------- | -------- |
 | osd.0 | pve1 | nvme0n1 (Lexar 2 TB) | 1.86 TiB |
 | osd.1 | pve2 | nvme0n1 (Lexar 2 TB) | 1.86 TiB |
 | osd.2 | pve3 | nvme0n1 (Lexar 2 TB) | 1.86 TiB |
@@ -873,8 +887,8 @@ qm destroy 999
 
 ### OSPF Networks per Node
 
-| Node | Networks announced |
-|---|---|
+| Node | Networks announced                            |
+| ---- | --------------------------------------------- |
 | pve1 | 10.10.10.0/30, 10.10.20.0/30, 10.255.255.1/32 |
 | pve2 | 10.10.10.0/30, 10.10.30.0/30, 10.255.255.2/32 |
 | pve3 | 10.10.20.0/30, 10.10.30.0/30, 10.255.255.3/32 |
@@ -884,8 +898,8 @@ qm destroy 999
 
 Each node's `ring1_addr` in corosync is the IP of its direct cluster link used for the high-priority ring. The links must be OSPF-reachable from all nodes.
 
-| Node | ring1_addr | Physical link |
-|---|---|---|
+| Node | ring1_addr | Physical link      |
+| ---- | ---------- | ------------------ |
 | pve1 | 10.10.20.1 | enp2s0f1np1 → pve3 |
 | pve2 | 10.10.10.2 | enp2s0f0np0 → pve1 |
 | pve3 | 10.10.30.2 | enp2s0f1np1 → pve2 |
