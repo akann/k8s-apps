@@ -2,7 +2,7 @@
 
 > **Cluster:** cluster01  
 > **Nodes:** pve1 / pve2 / pve3  
-> **Last updated:** 2026-06-23  
+> **Last updated:** 2026-06-23 (hardware section)  
 > **PVE version:** 9.2.3 — Debian 13 (trixie) — kernel 7.0.6-2-pve  
 
 This document is a complete record of how this cluster is built. It is intended to allow full recreation from bare metal.
@@ -31,12 +31,36 @@ This document is a complete record of how this cluster is built. It is intended 
 
 ## 1. Hardware
 
-All three nodes are identical (Micro Computer (HK) Tech Limited Venus Series mini-PC).
+All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact Intel 12th-gen mini-PCs with dual SFP+ 10GbE and dual 2.5GbE, purpose-built for homelab clustering.
+
+### Device — MINISFORUM MS-01
+
+```
+  Front Panel
+  ┌─────────────────────────────────────────────────────┐
+  │  ┌──────────────────────────────────────────────┐   │
+  │  │ ⏻  [USB3-A] [USB3-A] [TB4/USB4] [3.5mm]    │   │
+  │  └──────────────────────────────────────────────┘   │
+  │                MINISFORUM  MS-01                     │
+  └─────────────────────────────────────────────────────┘
+
+  Rear Panel
+  ┌─────────────────────────────────────────────────────┐
+  │ ┌────┐┌────┐  ┌──────┐┌──────┐  ┌────┐┌────┐ ┌──┐ │
+  │ │SFP+││SFP+│  │2.5GbE││2.5GbE│  │HDMI││ DP │ │DC│ │
+  │ └────┘└────┘  └──────┘└──────┘  └────┘└────┘ └──┘ │
+  │  Intel X710    I226-V   I226-LM                     │
+  │  (enp2s0f0np0  (enp87s0) (enp90s0)                 │
+  │   enp2s0f1np1)                                      │
+  └─────────────────────────────────────────────────────┘
+  Dimensions: 197 × 168 × 62 mm
+```
 
 ### Per-Node Specs
 
 | Component | Detail |
 |---|---|
+| Model | MINISFORUM MS-01 Mini Workstation |
 | CPU | Intel Core i5-12600H — 12 cores / 16 threads / 4.5 GHz boost |
 | RAM | 64 GiB DDR5 |
 | NIC (cluster) | Intel X710 10GbE SFP+ — dual port (`enp2s0f0np0`, `enp2s0f1np1`) |
@@ -54,6 +78,35 @@ All three nodes are identical (Micro Computer (HK) Tech Limited Venus Series min
 | pve1 | 192.168.22.11 | 10.255.255.1 | nvme0 (2TB OSD), nvme1 (OS), nvme2 (1TB OSD) |
 | pve2 | 192.168.22.12 | 10.255.255.2 | same slot order |
 | pve3 | 192.168.22.13 | 10.255.255.3 | same slot order |
+
+### Network Topology
+
+Each MS-01 connects to the network switch via its 2.5GbE port (management and VM traffic), and forms a **full-mesh** of direct 10GbE SFP+ links with the other two nodes (Ceph replication + Corosync ring1). No SFP+ traffic touches the switch.
+
+```mermaid
+graph TB
+    SW["🔀 Network Switch\n192.168.22.1/24"]
+
+    pve1["🖥 pve1\nMINISFORUM MS-01\n192.168.22.11"]
+    pve2["🖥 pve2\nMINISFORUM MS-01\n192.168.22.12"]
+    pve3["🖥 pve3\nMINISFORUM MS-01\n192.168.22.13"]
+
+    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve1
+    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve2
+    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve3
+
+    pve1 -- "10GbE SFP+ DAC\nf0np0 ↔ f0np0\n10.10.10.0/30" --- pve2
+    pve1 -- "10GbE SFP+ DAC\nf1np1 ↔ f0np0\n10.10.20.0/30" --- pve3
+    pve2 -- "10GbE SFP+ DAC\nf1np1 ↔ f1np1\n10.10.30.0/30" --- pve3
+```
+
+**Cable summary** (3 × DAC SFP+ cables, no switch needed):
+
+| Cable | From | To | Subnet | Purpose |
+|---|---|---|---|---|
+| DAC-1 | pve1 `enp2s0f0np0` | pve2 `enp2s0f0np0` | 10.10.10.0/30 | Ceph + Corosync ring1 |
+| DAC-2 | pve1 `enp2s0f1np1` | pve3 `enp2s0f0np0` | 10.10.20.0/30 | Ceph + Corosync ring1 |
+| DAC-3 | pve2 `enp2s0f1np1` | pve3 `enp2s0f1np1` | 10.10.30.0/30 | Ceph + Corosync ring1 |
 
 ### Ceph OSD Assignment
 

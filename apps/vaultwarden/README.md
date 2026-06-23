@@ -1,26 +1,26 @@
 # Vaultwarden
 
-## Manual prerequisite
+Password manager (Bitwarden-compatible). Deployed via ArgoCD.
 
-Before syncing, create the secret in the `vaultwarden` namespace.
-Store all values in Vaultwarden itself once it's up, and in a secure location during bootstrap.
+## Secrets
 
-```bash
-kubectl create namespace vaultwarden
+Managed by ESO — ExternalSecret `vaultwarden-secret` pulls from Infisical:
 
-kubectl create secret generic vaultwarden-secret \
-  --from-literal=DATABASE_URL='postgresql://vaultwarden:<password>@authentik-postgresql.authentik.svc.cluster.local:5432/vaultwarden' \
-  --from-literal=ADMIN_TOKEN='<generate with: openssl rand -base64 48>' \
-  --from-literal=DOMAIN='https://vault.yanatech.co.uk' \
-  --from-literal=SIGNUPS_ALLOWED='false' \
-  -n vaultwarden
-```
+| Infisical key | Secret key | Description |
+|---|---|---|
+| `/vaultwarden/DATABASE_URL` | `DATABASE_URL` | `postgresql://vaultwarden:<pw>@pg-main-rw.cnpg-clusters.svc.cluster.local:5432/vaultwarden` |
+| `/vaultwarden/ADMIN_TOKEN` | `ADMIN_TOKEN` | bcrypt hash of the admin password |
+| `/vaultwarden/DOMAIN` | `DOMAIN` | `https://vault.yanatech.co.uk` |
+| `/vaultwarden/SIGNUPS_ALLOWED` | `SIGNUPS_ALLOWED` | `false` |
+
+Store the raw values in Vaultwarden itself as the bootstrap source of truth.
+
+## Database
+
+Shared CNPG cluster `pg-main` in the `cnpg-clusters` namespace.  
+Connection: `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`, database `vaultwarden`, owner `vaultwarden`.
 
 ## Notes
-- Database: Authentik PostgreSQL instance (authentik namespace)
-- `SIGNUPS_ALLOWED=false` — create your account first via ADMIN_TOKEN, then disable admin access
-- When dedicated PostgreSQL VM is ready, migrate database and update DATABASE_URL
-
-## TODO
-- Migrate to dedicated PostgreSQL VM
-- Move secrets to Sealed Secrets
+- `SIGNUPS_ALLOWED=false` — create your account first via the admin panel (`/admin`), then revoke the admin token
+- Data volume: `vaultwarden-data` PVC (5 Gi, ceph-rbd) — mounted at `/data`
+- Reloader annotation on the Deployment restarts pods automatically when `vaultwarden-secret` changes

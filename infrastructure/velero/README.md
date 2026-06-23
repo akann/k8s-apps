@@ -2,24 +2,18 @@
 
 Cluster backups to Backblaze B2.
 
-## Manual prerequisite
+## Credentials
 
-```bash
-kubectl create namespace velero
+Managed by ESO — ExternalSecret `velero-b2-credentials` pulls from Infisical:
+- `/velero/aws_access_key_id`
+- `/velero/aws_secret_access_key`
 
-kubectl create secret generic velero-b2-credentials \
-  --from-literal=cloud="[default]
-aws_access_key_id=<keyID>
-aws_secret_access_key=<applicationKey>" \
-  -n velero
-```
-
-Store credentials in Vaultwarden.
+Store the raw credentials in Vaultwarden as the bootstrap source of truth.
 
 ## Backup schedule
-- Daily at 2am UTC
+- Weekly, Sundays at 02:00 UTC (`0 2 * * 0`)
 - Retention: 30 days (720h)
-- Namespaces: vaultwarden, authentik, monitoring, kafka, ingress-nginx, cert-manager, argocd
+- Scope: all namespaces except system/operator namespaces (see `excludedNamespaces` in `argocd-app-velero.yaml`)
 
 ## Manual backup
 ```bash

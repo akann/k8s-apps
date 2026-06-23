@@ -24,7 +24,7 @@ kubectl apply -f infrastructure/metallb/l2advertisement.yaml
 | Setting | Value |
 |---------|-------|
 | Mode | L2Advertisement |
-| IP Pool | `192.168.22.200 – 192.168.22.220` |
+| IP Pool | `192.168.22.200 – 192.168.22.249` |
 | Ingress VIP | `192.168.22.200` (ingress-nginx) |
 
 The ingress-nginx `LoadBalancer` service picks up `192.168.22.200` from this pool. pfSense NATs `62.3.101.138:80/443` to that VIP.
