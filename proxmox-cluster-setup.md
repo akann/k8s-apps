@@ -2,7 +2,7 @@
 
 > **Cluster:** cluster01  
 > **Nodes:** pve1 / pve2 / pve3  
-> **Last updated:** 2026-06-19  
+> **Last updated:** 2026-06-23  
 > **PVE version:** 9.2.3 — Debian 13 (trixie) — kernel 7.0.6-2-pve  
 
 This document is a complete record of how this cluster is built. It is intended to allow full recreation from bare metal.
@@ -347,6 +347,63 @@ vtysh -c "show ip ospf neighbor"   # should show 2 neighbors
 vtysh -c "show ip route ospf"      # should show routes to other nodes
 ```
 
+### ECMP Asymmetric Routing Fix (pve2 and pve3 only)
+
+**Problem:** OSPF advertises two equal-cost paths between pve2 and pve3 — one via the direct pve2↔pve3 link (10.10.30.0/30) and one via pve1. When ECMP hashes a TCP connection onto the direct link, pve2 uses source IP `10.10.30.1` (not its Ceph cluster IP `10.10.10.2`) to reach pve3. pve3 responds via pve1 (source `10.10.20.2`), and pve2's socket expects a reply from `10.10.20.2` — not from `10.10.30.1`. This asymmetry breaks the TCP three-way handshake, leaving sockets in SYN-RECV/FIN-WAIT-1 and causing Ceph OSD heartbeat failures between pve2 and pve3 OSDs.
+
+**Fix:** Add a static route (metric 0, beats OSPF metric 20) that forces cross-cluster traffic through pve1 on both affected nodes, and a source-based policy routing rule as defence-in-depth. Both are applied at boot via a systemd oneshot service.
+
+Create `/usr/local/sbin/ceph-routing-setup.sh` on **pve2**:
+
+```bash
+#!/bin/bash
+# Fix ECMP asymmetric routing: force pve3 cluster traffic via pve1 (symmetric path)
+ip route replace 10.10.20.0/30 via 10.10.10.1 dev enp2s0f0np0
+ip route replace 10.10.0.0/16 via 10.10.10.1 dev enp2s0f0np0 table 200
+ip rule del from 10.10.10.2 table 200 2>/dev/null; ip rule add from 10.10.10.2 table 200 priority 100
+```
+
+Create `/usr/local/sbin/ceph-routing-setup.sh` on **pve3**:
+
+```bash
+#!/bin/bash
+# Fix ECMP asymmetric routing: force pve2 cluster traffic via pve1 (symmetric path)
+ip route replace 10.10.10.0/30 via 10.10.20.1 dev enp2s0f0np0
+ip route replace 10.10.0.0/16 via 10.10.20.1 dev enp2s0f0np0 table 200
+ip rule del from 10.10.20.2 table 200 2>/dev/null; ip rule add from 10.10.20.2 table 200 priority 100
+```
+
+Create `/etc/systemd/system/ceph-routing.service` on **both pve2 and pve3**:
+
+```ini
+[Unit]
+Description=Ceph OSD ECMP Routing Fix
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/ceph-routing-setup.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable on both nodes:
+
+```bash
+chmod 755 /usr/local/sbin/ceph-routing-setup.sh
+systemctl daemon-reload
+systemctl enable --now ceph-routing.service
+```
+
+**pve1 does not need this fix** — its two X710 ports have direct kernel-connected routes to both pve2 (`10.10.10.0/30 dev enp2s0f0np0`) and pve3 (`10.10.20.0/30 dev enp2s0f1np1`), so no ECMP ambiguity exists.
+
+**Why the static route survives FRR restarts:** `ip route replace` installs a `proto boot` route with metric 0. FRR's OSPF routes use `proto ospf` with metric 20. Both coexist in the kernel RIB; the kernel always selects the lower metric. FRR cannot replace the static route.
+
+---
+
 ### DNS
 
 Each node uses the home router as primary DNS with Cloudflare as fallback:
@@ -487,7 +544,7 @@ OSDs:      6 (2 per node, all NVMe SSD)
     osd_max_backfills        = 2
     osd_recovery_max_active  = 4
     osd_recovery_op_priority = 2
-    osd_client_op_priority   = 63
+    osd_client_op_priority   = 32
     osd_recovery_sleep       = 0.1
 
     bluestore_cache_autotune     = true
@@ -550,7 +607,7 @@ OSDs:      6 (2 per node, all NVMe SSD)
     mgr_tick_period  = 5
 
 [osd]
-    osd_heartbeat_grace          = 20
+    osd_heartbeat_grace          = 120
     osd_heartbeat_interval       = 6
     osd_mon_heartbeat_interval   = 30
     bluestore_min_alloc_size_hdd = 64K
@@ -598,6 +655,40 @@ rbd pool init kubernetes
 
 # CephFS — backups, ISOs, snippets
 pveceph fs create --pg-num 32 --add-storage
+```
+
+### Kubernetes CRUSH Rule
+
+The `kubernetes` pool uses a dedicated CRUSH rule (`kubernetes_rule`) that restricts PG placement to pve1 and pve2 only. This protects Kubernetes RBD volumes from being disrupted during pve3 maintenance or recovery.
+
+The `kubernetes_safe` root bucket is a separate CRUSH root that references the same pve1 and pve2 host buckets as the `default` root (Ceph supports shared subtrees):
+
+```bash
+# Create the kubernetes_safe root and add pve1 + pve2 to it
+ceph osd crush add-bucket kubernetes_safe root
+ceph osd crush link pve1 root=kubernetes_safe
+ceph osd crush link pve2 root=kubernetes_safe
+
+# Create the CRUSH rule targeting this root
+ceph osd crush rule create-replicated kubernetes_rule kubernetes_safe host
+
+# Apply to the kubernetes pool
+ceph osd pool set kubernetes crush_rule kubernetes_rule
+
+# To add pve3 back (after verifying pve3 is stable):
+ceph osd crush link pve3 root=kubernetes_safe
+```
+
+To verify current placement:
+
+```bash
+ceph osd crush dump | python3 -c "
+import json,sys; d=json.load(sys.stdin)
+for b in d['buckets']:
+    if 'kubernetes' in b.get('name',''):
+        print(b['name'], 'items:', [i['id'] for i in b['items']])
+"
+ceph osd pool get kubernetes crush_rule
 ```
 
 ### Pool Protection
@@ -987,6 +1078,62 @@ ceph crash archive-all
 
 # Check balancer
 ceph balancer status
+```
+
+### OSD Recovery — Safe Reintegration Procedure
+
+When bringing a pve3 OSD back after a period down, do **not** set reweight directly to 1.0. The ECMP routing fix must be in place first, then gradually increase weight to avoid flooding primaries.
+
+```bash
+# Step 1: Verify routing fix is active on pve2 and pve3
+ssh pve2 systemctl is-active ceph-routing.service
+ssh pve3 systemctl is-active ceph-routing.service
+
+# Step 2: Start the OSD
+ssh pve3 systemctl start ceph-osd@<id>
+
+# Step 3: Reweight gradually (wait for HEALTH_WARN to stabilise between steps)
+ceph osd reweight osd.<id> 0.01
+# ... confirm heartbeats are working (no "Slow OSD heartbeats" or "possibly improving") ...
+ceph osd reweight osd.<id> 0.1
+ceph osd reweight osd.<id> 0.5
+ceph osd reweight osd.<id> 1.0
+
+# Step 4: Restore primary-affinity once at full weight
+ceph osd primary-affinity osd.<id> 1.0
+
+# Monitor recovery
+watch -n5 "ceph -s | grep -E '(health|pgs:|recovery)'"
+```
+
+**Heartbeat verification:** Before increasing weight past 0.1, confirm heartbeats between pve3 and pve2 OSDs are clean:
+
+```bash
+ceph health detail | grep -i 'slow.*heartbeat'
+# Should show nothing, or "possibly improving" with decreasing ms values
+```
+
+### CRUSH Map Management
+
+```bash
+# Show current kubernetes_safe root contents
+ceph osd crush dump | python3 -c "
+import json,sys; d=json.load(sys.stdin)
+for b in d['buckets']:
+    if 'kubernetes' in b.get('name',''):
+        print(b['name'], 'items:', [i['id'] for i in b['items']])"
+
+# Add/remove pve3 from kubernetes_safe (e.g. during pve3 maintenance)
+ceph osd crush link pve3 root=kubernetes_safe      # add back
+ceph osd crush unlink pve3 root=kubernetes_safe    # remove
+
+# Check primary-affinity for all OSDs
+ceph osd dump | grep primary_affinity
+
+# Temporarily lock an OSD out of primary elections (e.g. during recovery)
+ceph osd primary-affinity osd.<id> 0
+# Restore:
+ceph osd primary-affinity osd.<id> 1.0
 ```
 
 ### Mon Leader Management

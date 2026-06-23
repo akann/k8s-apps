@@ -2,7 +2,7 @@
 
 > **Cluster:** cluster01  
 > **Current nodes:** pve1 (192.168.22.11) / pve2 (192.168.22.12) / pve3 (192.168.22.13)  
-> **Last updated:** 2026-06-19  
+> **Last updated:** 2026-06-23  
 
 This document covers two scenarios:
 
@@ -366,6 +366,63 @@ systemctl enable --now frr
 # Verify adjacencies (expect 2 FULL neighbors)
 vtysh -c "show ip ospf neighbor"
 vtysh -c "show ip route ospf"
+```
+
+#### ECMP Routing Fix (pve2 and pve3 only)
+
+pve1 does not need this. For pve2 or pve3, the OSPF ECMP path via the direct pve2↔pve3 link causes Ceph OSD heartbeat deadlocks (see `proxmox-cluster-setup.md` §5 "ECMP Asymmetric Routing Fix"). These files are **not** in pmxcfs and must be recreated manually after a node rebuild.
+
+Create `/usr/local/sbin/ceph-routing-setup.sh`:
+
+**pve2:**
+```bash
+cat > /usr/local/sbin/ceph-routing-setup.sh << 'EOF'
+#!/bin/bash
+ip route replace 10.10.20.0/30 via 10.10.10.1 dev enp2s0f0np0
+ip route replace 10.10.0.0/16 via 10.10.10.1 dev enp2s0f0np0 table 200
+ip rule del from 10.10.10.2 table 200 2>/dev/null; ip rule add from 10.10.10.2 table 200 priority 100
+EOF
+chmod +x /usr/local/sbin/ceph-routing-setup.sh
+```
+
+**pve3:**
+```bash
+cat > /usr/local/sbin/ceph-routing-setup.sh << 'EOF'
+#!/bin/bash
+ip route replace 10.10.10.0/30 via 10.10.20.1 dev enp2s0f0np0
+ip route replace 10.10.0.0/16 via 10.10.20.1 dev enp2s0f0np0 table 200
+ip rule del from 10.10.20.2 table 200 2>/dev/null; ip rule add from 10.10.20.2 table 200 priority 100
+EOF
+chmod +x /usr/local/sbin/ceph-routing-setup.sh
+```
+
+Create and enable the systemd service on both pve2 and pve3:
+
+```bash
+cat > /etc/systemd/system/ceph-routing.service << 'EOF'
+[Unit]
+Description=Ceph OSD ECMP Routing Fix
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/ceph-routing-setup.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now ceph-routing.service
+systemctl is-active ceph-routing.service   # should print "active"
+```
+
+Verify the fix is in effect (pve2 example — pve3→pve2 traffic should use 10.10.20.x, not 10.10.30.x):
+
+```bash
+ip route get 10.10.20.2   # must show via 10.10.10.1, not 10.10.30.1
 ```
 
 ### 2.9 Restore Ceph Daemons
