@@ -301,7 +301,7 @@ iface vmbr1 inet static
     bridge-stp off
     bridge-fd 0
     bridge-vlan-aware yes
-    bridge-vids 33 44 55 66
+    bridge-vids 33
 ```
 
 Apply:
@@ -647,7 +647,7 @@ iface vmbr1 inet static
     bridge-stp off
     bridge-fd 0
     bridge-vlan-aware yes
-    bridge-vids 33 44 55 66
+    bridge-vids 33
 ```
 
 Also update `/etc/network/interfaces` on **pve2** and **pve3** to replace the affected link addresses, then `ifreload -a` on each node.

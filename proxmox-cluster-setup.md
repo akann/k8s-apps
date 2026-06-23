@@ -240,7 +240,7 @@ iface vmbr1 inet static
     bridge-stp off
     bridge-fd 0
     bridge-vlan-aware yes
-    bridge-vids 33 44 55 66
+    bridge-vids 33
 ```
 
 ### `/etc/network/interfaces` — pve2
