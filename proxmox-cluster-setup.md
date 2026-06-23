@@ -957,8 +957,6 @@ All K8s VMs and LXC containers are enrolled in Proxmox HA. HA provides automatic
 | vm:201 | pve1 | 3 | 2 |
 | vm:202 | pve2 | 3 | 2 |
 | vm:203 | pve3 | 3 | 2 |
-| ct:401 | pve2 | 3 | 1 |
-| ct:113 | pve3 | — | — |
 
 ### HA Node Affinity Rules
 
@@ -1006,7 +1004,7 @@ Fencing is armed by default (`CRM watchdog active` in `ha-manager status`). The 
 
 | Job ID | VMs / CTs | Schedule | Storage | Mode | Retention |
 |---|---|---|---|---|---|
-| `k8s-vms-weekly` | 101,102,103,201,202,203,401 | Sunday 03:00 | cephfs | snapshot | 4 weekly, 2 monthly |
+| `k8s-vms-weekly` | 101,102,103,201,202,203 | Sunday 03:00 | cephfs | snapshot | 4 weekly, 2 monthly |
 
 Velero (in Kubernetes) runs at Sunday 02:00. Proxmox vzdump at 03:00 captures the full VM disk after Velero has completed its cluster-level backup.
 
@@ -1019,10 +1017,10 @@ pvesh create /cluster/backup \
   --schedule "sun 03:00" \
   --compress zstd \
   --mode snapshot \
-  --vmid 101,102,103,201,202,203,401 \
+  --vmid 101,102,103,201,202,203 \
   --notes-template "{{guestname}} - {{node}}" \
   --prune-backups "keep-weekly=4,keep-monthly=2" \
-  --comment "Weekly backup of all K8s VMs and homepage"
+  --comment "Weekly backup of K8s VMs"
 ```
 
 **Mode `snapshot`** uses a temporary RBD snapshot to produce a consistent backup without suspending the VM. The backup stream goes directly to CephFS — no intermediate node storage required.
