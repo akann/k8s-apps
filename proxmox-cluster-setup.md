@@ -877,14 +877,12 @@ Six VMs across three nodes. Control-plane VMs have 4 cores / 8 GB; workers have 
 
 | VMID | Name | Node | Cores | RAM | Disk | IP |
 |---|---|---|---|---|---|---|
-| 101 | k8s-cp-1 | pve2* | 4 | 8 GB | 50 GB rbd | 192.168.22.21 |
+| 101 | k8s-cp-1 | pve1 | 4 | 8 GB | 50 GB rbd | 192.168.22.21 |
 | 102 | k8s-cp-2 | pve2 | 4 | 8 GB | 50 GB rbd | 192.168.22.22 |
 | 103 | k8s-cp-3 | pve3 | 4 | 8 GB | 50 GB rbd | 192.168.22.23 |
 | 201 | k8s-worker-1 | pve1 | 8 | 40 GB | 100 GB rbd | 192.168.22.31 |
 | 202 | k8s-worker-2 | pve2 | 8 | 40 GB | 100 GB rbd | 192.168.22.32 |
 | 203 | k8s-worker-3 | pve3 | 8 | 40 GB | 100 GB rbd | 192.168.22.33 |
-
-\* k8s-cp-1 was originally on pve1 but migrated to pve2 by the HA affinity rule.
 
 ### Cloning from Template
 
@@ -953,13 +951,13 @@ All K8s VMs and LXC containers are enrolled in Proxmox HA. HA provides automatic
 
 | SID | Current Node | max_restart | max_relocate |
 |---|---|---|---|
-| vm:101 | pve2 | 3 | 2 |
+| vm:101 | pve1 | 3 | 2 |
 | vm:102 | pve2 | 3 | 2 |
 | vm:103 | pve3 | 3 | 2 |
 | vm:201 | pve1 | 3 | 2 |
 | vm:202 | pve2 | 3 | 2 |
 | vm:203 | pve3 | 3 | 2 |
-| ct:401 | pve1 | 3 | 1 |
+| ct:401 | pve2 | 3 | 1 |
 | ct:113 | pve3 | — | — |
 
 ### HA Node Affinity Rules
