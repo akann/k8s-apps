@@ -64,39 +64,7 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 
 Each MS-01 connects to the network switch via its 2.5GbE port (management and VM traffic), and forms a **full-mesh** of direct 10GbE SFP+ links with the other two nodes (Ceph replication + Corosync ring1). No SFP+ traffic touches the switch.
 
-```mermaid
-graph TB
-    %% External Network Switch
-    SW["🔀 Network Switch<br/>192.168.22.1/24"]
-
-    %% Proxmox Hosts
-    subgraph Cluster["🖥 Proxmox Cluster"]
-        direction TB
-
-        pve1["<b>pve1</b><br/>MINISFORUM MS-01<br/>192.168.22.11"]
-        pve2["<b>pve2</b><br/>MINISFORUM MS-01<br/>192.168.22.12"]
-        pve3["<b>pve3</b><br/>MINISFORUM MS-01<br/>192.168.22.13"]
-    end
-
-    %% Management & VM Network (2.5GbE)
-    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve1
-    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve2
-    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve3
-
-    %% Ceph/Replication Network (10GbE Mesh)
-    pve1 <--->|"<b>10GbE DAC</b><br/>f0np0 ↔ f0np0<br/>10.10.10.0/30<br/><i>Ceph/Replication</i>"| pve2
-    pve1 <--->|"<b>10GbE DAC</b><br/>f1np1 ↔ f0np0<br/>10.10.20.0/30<br/><i>Ceph/Replication</i>"| pve3
-    pve2 <--->|"<b>10GbE DAC</b><br/>f1np1 ↔ f1np1<br/>10.10.30.0/30<br/><i>Ceph/Replication</i>"| pve3
-
-    %% Styling
-    classDef switch fill:#4A90D9,stroke:#2E5C8A,color:#fff,stroke-width:2px
-    classDef host fill:#2ECC71,stroke:#27AE60,color:#fff,stroke-width:2px
-    classDef cluster fill:#ECF0F1,stroke:#BDC3C7,color:#2C3E50,stroke-width:1px,stroke-dasharray: 5 5
-
-    class SW switch
-    class pve1,pve2,pve3 host
-    class Cluster cluster
-```
+![Proxmox MS-01 Cluster Network Diagram](docs/proxmox_ms01_cluster_network.svg)
 
 **Cable summary** (3 × DAC SFP+ cables, no switch needed):
 
