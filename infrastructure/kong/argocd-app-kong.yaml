@@ -23,7 +23,7 @@ spec:
             enabled: true
             type: LoadBalancer
             annotations:
-              metallb.universe.tf/loadBalancerIPs: 192.168.22.202
+              metallb.universe.tf/loadBalancerIPs: 192.168.33.202
             http:
               enabled: true
               servicePort: 80
