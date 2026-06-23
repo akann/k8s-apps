@@ -503,7 +503,9 @@ pvecm status   # Ring ID should stabilise, Quorate: Yes
 
 ## 7. Ceph Storage
 
-Ceph 19.2.3 (squid) runs natively on Proxmox. All daemons (mon, mgr, mds, osd) are managed by PVE.
+Ceph 19.2.3 (Squid) runs natively on Proxmox. All daemons (mon, mgr, mds, osd) are managed by PVE.
+
+> **Pending upgrade**: Ceph 19.2.4 was released upstream 2026-06-01 and fixes known RocksDB crash bugs affecting mon and OSD daemons on this cluster. The Proxmox `ceph-squid` repo had not packaged it as of 2026-06-23. Check periodically: `apt-get update && apt-cache policy ceph-mon | grep Candidate`. When `19.2.4-pve*` appears, do a rolling upgrade: pve3 → pve2 → pve1 (upgrade the current mon leader last).
 
 ### Architecture
 
@@ -726,8 +728,12 @@ ceph config set global mon_osd_down_out_interval 300
 # Slow ping warning
 ceph config set mon mon_warn_on_slow_ping_time 250
 
-# Mon election: connectivity-weighted (smarter than round-robin)
-ceph mon set election_strategy connectivity
+# Mon election: classic (rank-based)
+# NOTE: connectivity strategy was trialled but caused mon crashes on pve1 and pve3 —
+# it persists connectivity scores to the mon RocksDB on every ping, which triggered
+# MonitorDBStore::apply_transaction aborts under load (Ceph 19.2.3 bug).
+# Revert to classic once 19.2.4 is available and the underlying bug is fixed.
+ceph mon set election_strategy classic
 ```
 
 ### MGR Modules
@@ -975,7 +981,7 @@ pvesh create /cluster/ha/rules \
   --strict 0
 ```
 
-Rationale for lower pve1 CP priority: pve1 has experienced recurring Ceph daemon crashes (mon.pve1 and osd.0/osd.3). K8s control-plane nodes are more sensitive to instability than workers, since losing a CP node triggers etcd re-election. See audit report `pve1-audit-2026-06-19.md`.
+Rationale for lower pve1 CP priority: pve1 has experienced recurring Ceph daemon crashes (mon.pve1 and osd.0/osd.3). K8s control-plane nodes are more sensitive to instability than workers, since losing a CP node triggers etcd re-election. Root cause identified 2026-06-23: Ceph 19.2.3 bugs in MonitorDBStore and BlueStore RocksDB — see Mon Leader Management section. Mitigated by switching to classic election strategy; full fix requires upgrade to 19.2.4+.
 
 ### Enrolment Commands
 
@@ -1138,15 +1144,26 @@ ceph osd primary-affinity osd.<id> 1.0
 
 ### Mon Leader Management
 
-pve1 is currently disallowed as monitor leader due to recurring crashes:
+**Current state (2026-06-23):** `election_strategy classic`. pve1 is the mon leader (rank 0 always wins in classic mode). The `disallowed_leaders` mechanism only works with `connectivity` strategy and is currently a no-op.
+
+**Root cause of recurring crashes (investigated 2026-06-23):**
+- `mon.pve1` and `mon.pve3` both crashed with `MonitorDBStore::apply_transaction: ceph_abort_msg("failed to write to db")` — a Ceph 19.2.3 bug where any RocksDB write error causes an abort rather than a retry.
+- The `connectivity` election strategy worsened this by writing connectivity scores to the mon DB on **every ping**, dramatically increasing write frequency and triggering the bug. Switching to `classic` eliminates that write path.
+- `osd.0` and `osd.3` crash with a null pointer in `RocksDB::InternalStats::HandleBaseLevel` — a separate Ceph 19.2.3 bug in BlueStore's compaction path.
+- NVMe temperature (previously ~70°C, now ~55°C after fan addition) was **not** a contributing factor: drive warning thresholds are 83–90°C, `Warning Temperature Time = 0` on all drives.
+- Fix: upgrade to Ceph 19.2.4 when `19.2.4-pve*` lands in the Proxmox repo.
 
 ```bash
-# Check current leader
+# Check current leader and election strategy
 ceph mon stat
+ceph mon dump | grep election_strategy
 
-# Remove restriction once pve1 is stable
+# To re-enable connectivity strategy after upgrading to 19.2.4+:
+ceph mon set election_strategy connectivity
+ceph mon add disallowed_leader pve1   # re-add if pve1 instability recurs
+
+# To remove disallowed_leader restriction:
 ceph mon rm disallowed_leader pve1
-ceph mon set election_strategy classic
 ```
 
 ### Corosync Config Changes
