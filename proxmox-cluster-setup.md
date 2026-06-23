@@ -662,23 +662,25 @@ pveceph fs create --pg-num 32 --add-storage
 
 ### Kubernetes CRUSH Rule
 
-The `kubernetes` pool uses a dedicated CRUSH rule (`kubernetes_rule`) that restricts PG placement to pve1 and pve2 only. This protects Kubernetes RBD volumes from being disrupted during pve3 maintenance or recovery.
+The `kubernetes` pool uses a dedicated CRUSH rule (`kubernetes_rule`) backed by the `kubernetes_safe` CRUSH root. Normally all three hosts are members, giving full 3-replica coverage. During pve3 maintenance or recovery, pve3 can be unlinked to restrict placement to pve1+pve2 only — allowing the pool to degrade gracefully to 2 replicas without peering failures.
 
-The `kubernetes_safe` root bucket is a separate CRUSH root that references the same pve1 and pve2 host buckets as the `default` root (Ceph supports shared subtrees):
+**Current state:** pve1, pve2, and pve3 are all in `kubernetes_safe`. All 6 OSDs are up at full reweight and primary-affinity 1.0 (restored 2026-06-23 after ECMP routing fix and gradual reweight: 0.05 → 0.1 → 0.25 → 0.5 → 1.0).
+
+The `kubernetes_safe` root bucket references the same host buckets as the `default` root (Ceph supports shared subtrees):
 
 ```bash
-# Create the kubernetes_safe root and add pve1 + pve2 to it
+# Initial setup (one-time)
 ceph osd crush add-bucket kubernetes_safe root
 ceph osd crush link pve1 root=kubernetes_safe
 ceph osd crush link pve2 root=kubernetes_safe
-
-# Create the CRUSH rule targeting this root
+ceph osd crush link pve3 root=kubernetes_safe
 ceph osd crush rule create-replicated kubernetes_rule kubernetes_safe host
-
-# Apply to the kubernetes pool
 ceph osd pool set kubernetes crush_rule kubernetes_rule
 
-# To add pve3 back (after verifying pve3 is stable):
+# During pve3 maintenance — restrict to pve1+pve2 only:
+ceph osd crush unlink pve3 root=kubernetes_safe
+
+# After pve3 returns — restore full 3-node placement:
 ceph osd crush link pve3 root=kubernetes_safe
 ```
 
@@ -1141,9 +1143,10 @@ ssh pve3 systemctl is-active ceph-routing.service
 ssh pve3 systemctl start ceph-osd@<id>
 
 # Step 3: Reweight gradually (wait for HEALTH_WARN to stabilise between steps)
-ceph osd reweight osd.<id> 0.01
+ceph osd reweight osd.<id> 0.05
 # ... confirm heartbeats are working (no "Slow OSD heartbeats" or "possibly improving") ...
 ceph osd reweight osd.<id> 0.1
+ceph osd reweight osd.<id> 0.25
 ceph osd reweight osd.<id> 0.5
 ceph osd reweight osd.<id> 1.0
 
