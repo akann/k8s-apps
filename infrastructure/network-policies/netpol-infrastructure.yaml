@@ -33,6 +33,8 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 7472
+    - ports:
+        - port: 9443  # webhook (kube-apiserver → metallb-controller)
   egress:
     - to:
         - podSelector: {}
