@@ -3,7 +3,7 @@
 > **Cluster:** cluster01  
 > **Nodes:** pve1 / pve2 / pve3  
 > **Last updated:** 2026-06-23 (hardware section)  
-> **PVE version:** 9.2.3 — Debian 13 (trixie) — kernel 7.0.6-2-pve  
+> **PVE version:** 9.2.3 — Debian 13 (trixie) — kernel 7.0.6-2-pve
 
 This document is a complete record of how this cluster is built. It is intended to allow full recreation from bare metal.
 
@@ -35,49 +35,56 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 
 ### Device — MINISFORUM MS-01
 
-```
+```text
   Front Panel
-  ┌─────────────────────────────────────────────────────┐
-  │  ┌──────────────────────────────────────────────┐   │
-  │  │ ⏻  [USB3-A] [USB3-A] [TB4/USB4] [3.5mm]    │   │
-  │  └──────────────────────────────────────────────┘   │
-  │                MINISFORUM  MS-01                     │
-  └─────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------+
+|  +---+                                                                |
+|  | O | Power Button                                                   |
+|  +---+                                                                |
+|                                                                       |
+|  [===] [===] [===] [===]  ( )   [=======] [=======]  |||||||||||||||  |
+|  Status Indicator LEDs   Audio   USB 3.2   USB 3.2   |||||||||||||||  |
+|                          Jack    Gen 1     Gen 2     ||| Vent Grille  |
++-----------------------------------------------------------------------+
 
   Rear Panel
-  ┌─────────────────────────────────────────────────────┐
-  │ ┌────┐┌────┐  ┌──────┐┌──────┐  ┌────┐┌────┐ ┌──┐ │
-  │ │SFP+││SFP+│  │2.5GbE││2.5GbE│  │HDMI││ DP │ │DC│ │
-  │ └────┘└────┘  └──────┘└──────┘  └────┘└────┘ └──┘ │
-  │  Intel X710    I226-V   I226-LM                     │
-  │  (enp2s0f0np0  (enp87s0) (enp90s0)                 │
-  │   enp2s0f1np1)                                      │
-  └─────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------+
+|  +-------------------------------------------------+                  |
+|  |               PCIe Expansion Slot               |                  |
+|  +-------------------------------------------------+                  |
+|                                                                       |
+|  [====]  [====]     [====]  [====]     [  ]  [  ]     ||||||||||||||  |
+|   10G     10G        2.5G    2.5G      USB4  USB4     ||||||||||||||  |
+|   SFP+    SFP+       RJ45    RJ45      Type-C         ||||||||||||||  |
+|                                                       ||| Exhaust     |
+|  [=======]          [=======]  [=======]      O       ||| Fan         |
+|    HDMI               USB 3.2    USB 2.0     DC-In    ||||||||||||||  |
++-----------------------------------------------------------------------+
   Dimensions: 197 × 168 × 62 mm
 ```
 
 ### Per-Node Specs
 
-| Component | Detail |
-|---|---|
-| Model | MINISFORUM MS-01 Mini Workstation |
-| CPU | Intel Core i5-12600H — 12 cores / 16 threads / 4.5 GHz boost |
-| RAM | 64 GiB DDR5 |
-| NIC (cluster) | Intel X710 10GbE SFP+ — dual port (`enp2s0f0np0`, `enp2s0f1np1`) |
-| NIC (public) | Intel I226-V 2.5GbE (`enp87s0`) |
-| NIC (secondary) | Intel I226-LM 2.5GbE (`enp90s0`) |
-| WiFi | MediaTek MT7922 — unused, leave `DOWN` |
-| NVMe (OS) | Crucial CT500P3PSSD8 — 465.8 GB |
-| NVMe (OSD large) | Lexar NM790 — 2 TB |
-| NVMe (OSD small) | Lexar NM790 — 1 TB |
+| Component        | Detail                                                           |
+| ---------------- | ---------------------------------------------------------------- |
+| Model            | MINISFORUM MS-01 Mini Workstation                                |
+| CPU              | Intel Core i5-12600H — 12 cores / 16 threads / 4.5 GHz boost     |
+| RAM              | 64 GiB DDR5                                                      |
+| NIC (cluster)    | Intel X710 10GbE SFP+ — dual port (`enp2s0f0np0`, `enp2s0f1np1`) |
+| NIC (public)     | Intel I226-V 2.5GbE (`enp87s0`)                                  |
+| NIC (secondary)  | Intel I226-LM 2.5GbE (`enp90s0`)                                 |
+| WiFi             | MediaTek MT7922 — unused, leave `DOWN`                           |
+| NVMe (OS)        | Crucial CT500P3PSSD8 — 465.8 GB                                  |
+| NVMe (OSD large) | Lexar NM790 — 2 TB                                               |
+| NVMe (OSD small) | Lexar NM790 — 1 TB                                               |
 
 ### Node Addressing
 
-| Node | Mgmt IP | OSPF Loopback | PCI NVMe slots |
-|---|---|---|---|
-| pve1 | 192.168.22.11 | 10.255.255.1 | nvme0 (2TB OSD), nvme1 (OS), nvme2 (1TB OSD) |
-| pve2 | 192.168.22.12 | 10.255.255.2 | same slot order |
-| pve3 | 192.168.22.13 | 10.255.255.3 | same slot order |
+| Node | Mgmt IP       | OSPF Loopback | PCI NVMe slots                               |
+| ---- | ------------- | ------------- | -------------------------------------------- |
+| pve1 | 192.168.22.11 | 10.255.255.1  | nvme0 (2TB OSD), nvme1 (OS), nvme2 (1TB OSD) |
+| pve2 | 192.168.22.12 | 10.255.255.2  | same slot order                              |
+| pve3 | 192.168.22.13 | 10.255.255.3  | same slot order                              |
 
 ### Network Topology
 
@@ -85,33 +92,50 @@ Each MS-01 connects to the network switch via its 2.5GbE port (management and VM
 
 ```mermaid
 graph TB
-    SW["🔀 Network Switch\n192.168.22.1/24"]
+    %% External Network Switch
+    SW["🔀 Network Switch<br/>192.168.22.1/24"]
 
-    pve1["🖥 pve1\nMINISFORUM MS-01\n192.168.22.11"]
-    pve2["🖥 pve2\nMINISFORUM MS-01\n192.168.22.12"]
-    pve3["🖥 pve3\nMINISFORUM MS-01\n192.168.22.13"]
+    %% Proxmox Hosts
+    subgraph Cluster["🖥 Proxmox Cluster"]
+        direction TB
 
-    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve1
-    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve2
-    SW -- "2.5GbE enp87s0\nvmbr0 (VMs + mgmt)" --- pve3
+        pve1["<b>pve1</b><br/>MINISFORUM MS-01<br/>192.168.22.11"]
+        pve2["<b>pve2</b><br/>MINISFORUM MS-01<br/>192.168.22.12"]
+        pve3["<b>pve3</b><br/>MINISFORUM MS-01<br/>192.168.22.13"]
+    end
 
-    pve1 -- "10GbE SFP+ DAC\nf0np0 ↔ f0np0\n10.10.10.0/30" --- pve2
-    pve1 -- "10GbE SFP+ DAC\nf1np1 ↔ f0np0\n10.10.20.0/30" --- pve3
-    pve2 -- "10GbE SFP+ DAC\nf1np1 ↔ f1np1\n10.10.30.0/30" --- pve3
+    %% Management & VM Network (2.5GbE)
+    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve1
+    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve2
+    SW <--->|"<b>2.5GbE Link</b><br/>enp87s0 → vmbr0<br/><i>VMs + Management</i>"| pve3
+
+    %% Ceph/Replication Network (10GbE Mesh)
+    pve1 <--->|"<b>10GbE DAC</b><br/>f0np0 ↔ f0np0<br/>10.10.10.0/30<br/><i>Ceph/Replication</i>"| pve2
+    pve1 <--->|"<b>10GbE DAC</b><br/>f1np1 ↔ f0np0<br/>10.10.20.0/30<br/><i>Ceph/Replication</i>"| pve3
+    pve2 <--->|"<b>10GbE DAC</b><br/>f1np1 ↔ f1np1<br/>10.10.30.0/30<br/><i>Ceph/Replication</i>"| pve3
+
+    %% Styling
+    classDef switch fill:#4A90D9,stroke:#2E5C8A,color:#fff,stroke-width:2px
+    classDef host fill:#2ECC71,stroke:#27AE60,color:#fff,stroke-width:2px
+    classDef cluster fill:#ECF0F1,stroke:#BDC3C7,color:#2C3E50,stroke-width:1px,stroke-dasharray: 5 5
+
+    class SW switch
+    class pve1,pve2,pve3 host
+    class Cluster cluster
 ```
 
 **Cable summary** (3 × DAC SFP+ cables, no switch needed):
 
-| Cable | From | To | Subnet | Purpose |
-|---|---|---|---|---|
+| Cable | From               | To                 | Subnet        | Purpose               |
+| ----- | ------------------ | ------------------ | ------------- | --------------------- |
 | DAC-1 | pve1 `enp2s0f0np0` | pve2 `enp2s0f0np0` | 10.10.10.0/30 | Ceph + Corosync ring1 |
 | DAC-2 | pve1 `enp2s0f1np1` | pve3 `enp2s0f0np0` | 10.10.20.0/30 | Ceph + Corosync ring1 |
 | DAC-3 | pve2 `enp2s0f1np1` | pve3 `enp2s0f1np1` | 10.10.30.0/30 | Ceph + Corosync ring1 |
 
 ### Ceph OSD Assignment
 
-| OSD | Node | Device | Size |
-|---|---|---|---|
+| OSD   | Node | Device              | Size     |
+| ----- | ---- | ------------------- | -------- |
 | osd.0 | pve1 | nvme0n1 (Lexar 2TB) | 1.86 TiB |
 | osd.1 | pve2 | nvme0n1 (Lexar 2TB) | 1.86 TiB |
 | osd.2 | pve3 | nvme0n1 (Lexar 2TB) | 1.86 TiB |
@@ -128,6 +152,7 @@ Total raw: **8.4 TiB** across 6 SSDs with replication factor 3.
 Install Proxmox VE 9 from the official ISO onto `nvme1n1` (Crucial OS disk) on each node. Use the graphical installer.
 
 **Installer settings:**
+
 - Target disk: select the Crucial 465 GB NVMe (do **not** select the Lexar drives — those are reserved for Ceph)
 - Filesystem: `ext4` (or `xfs`) — do **not** use ZFS for the OS disk; the Ceph OSD drives are bare block devices
 - Hostname: `pve1.akan.home`, `pve2.akan.home`, `pve3.akan.home`
@@ -474,10 +499,10 @@ pvesh set /nodes/pve3/dns --dns1 192.168.22.1 --dns2 1.1.1.1 --search akan.home
 
 Corosync uses **knet transport** with two rings:
 
-| Ring | Interface | Network | Priority | Role |
-|---|---|---|---|---|
-| ring0 | vmbr0 (192.168.22.x) | Public/management | 1 (low) | Failover only |
-| ring1 | X710 cluster links (10.10.x.x) | Dedicated cluster | 2 (high) | Primary path |
+| Ring  | Interface                      | Network           | Priority | Role          |
+| ----- | ------------------------------ | ----------------- | -------- | ------------- |
+| ring0 | vmbr0 (192.168.22.x)           | Public/management | 1 (low)  | Failover only |
+| ring1 | X710 cluster links (10.10.x.x) | Dedicated cluster | 2 (high) | Primary path  |
 
 Ring1 (the dedicated 10GbE mesh) carries all corosync heartbeat traffic. If it fails, ring0 on the management network provides quorum continuity. `link_mode: passive` keeps one ring active at a time.
 
@@ -536,6 +561,7 @@ totem {
 ```
 
 **Note on ring1 addresses:** Each node's `ring1_addr` is its end of a direct point-to-point X710 link. OSPF ensures the addresses are routable across the mesh:
+
 - pve1's ring1 (10.10.20.1) is directly connected to pve3 and OSPF-reachable from pve2
 - pve2's ring1 (10.10.10.2) is directly connected to pve1
 - pve3's ring1 (10.10.30.2) is directly connected to pve2
@@ -928,14 +954,14 @@ Six VMs across three nodes. Control-plane VMs have 4 cores / 8 GB; workers have 
 
 ### VM Inventory
 
-| VMID | Name | Node | Cores | RAM | Disk | IP |
-|---|---|---|---|---|---|---|
-| 101 | k8s-cp-1 | pve1 | 4 | 8 GB | 50 GB rbd | 192.168.22.21 |
-| 102 | k8s-cp-2 | pve2 | 4 | 8 GB | 50 GB rbd | 192.168.22.22 |
-| 103 | k8s-cp-3 | pve3 | 4 | 8 GB | 50 GB rbd | 192.168.22.23 |
-| 201 | k8s-worker-1 | pve1 | 8 | 40 GB | 100 GB rbd | 192.168.22.31 |
-| 202 | k8s-worker-2 | pve2 | 8 | 40 GB | 100 GB rbd | 192.168.22.32 |
-| 203 | k8s-worker-3 | pve3 | 8 | 40 GB | 100 GB rbd | 192.168.22.33 |
+| VMID | Name         | Node | Cores | RAM   | Disk       | IP            |
+| ---- | ------------ | ---- | ----- | ----- | ---------- | ------------- |
+| 101  | k8s-cp-1     | pve1 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.21 |
+| 102  | k8s-cp-2     | pve2 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.22 |
+| 103  | k8s-cp-3     | pve3 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.23 |
+| 201  | k8s-worker-1 | pve1 | 8     | 40 GB | 100 GB rbd | 192.168.22.31 |
+| 202  | k8s-worker-2 | pve2 | 8     | 40 GB | 100 GB rbd | 192.168.22.32 |
+| 203  | k8s-worker-3 | pve3 | 8     | 40 GB | 100 GB rbd | 192.168.22.33 |
 
 ### Cloning from Template
 
@@ -981,18 +1007,18 @@ qm start 201
 
 ### Common VM Config (all VMs)
 
-| Setting | Value | Reason |
-|---|---|---|
-| `bios` | `ovmf` | UEFI — required for Secure Boot capable guests |
-| `machine` | `q35` | Modern PCIe chipset, required for OVMF |
-| `cpu` | `host` | Pass through host CPU flags — needed for AVX/AES in containers |
-| `scsihw` | `virtio-scsi-single` | Best performance for single-queue NVMe-backed RBD |
-| `cache` | `none` | Let Ceph handle caching; guest-side cache adds no benefit |
-| `discard` | `on` | Propagate TRIM to Ceph RBD thin provisioning |
-| `ssd` | `1` | Hint guest that disk is SSD; enables rotational=0 in guest |
-| `serial0` | `socket` | Console access without VNC; required with `vga serial0` |
-| `agent` | `enabled=1` | QEMU guest agent for clean shutdown, IP reporting |
-| `onboot` | `1` | Auto-start on PVE node boot (HA also handles this) |
+| Setting   | Value                | Reason                                                         |
+| --------- | -------------------- | -------------------------------------------------------------- |
+| `bios`    | `ovmf`               | UEFI — required for Secure Boot capable guests                 |
+| `machine` | `q35`                | Modern PCIe chipset, required for OVMF                         |
+| `cpu`     | `host`               | Pass through host CPU flags — needed for AVX/AES in containers |
+| `scsihw`  | `virtio-scsi-single` | Best performance for single-queue NVMe-backed RBD              |
+| `cache`   | `none`               | Let Ceph handle caching; guest-side cache adds no benefit      |
+| `discard` | `on`                 | Propagate TRIM to Ceph RBD thin provisioning                   |
+| `ssd`     | `1`                  | Hint guest that disk is SSD; enables rotational=0 in guest     |
+| `serial0` | `socket`             | Console access without VNC; required with `vga serial0`        |
+| `agent`   | `enabled=1`          | QEMU guest agent for clean shutdown, IP reporting              |
+| `onboot`  | `1`                  | Auto-start on PVE node boot (HA also handles this)             |
 
 ---
 
@@ -1002,14 +1028,14 @@ All K8s VMs and LXC containers are enrolled in Proxmox HA. HA provides automatic
 
 ### HA Resources
 
-| SID | Current Node | max_restart | max_relocate |
-|---|---|---|---|
-| vm:101 | pve1 | 3 | 2 |
-| vm:102 | pve2 | 3 | 2 |
-| vm:103 | pve3 | 3 | 2 |
-| vm:201 | pve1 | 3 | 2 |
-| vm:202 | pve2 | 3 | 2 |
-| vm:203 | pve3 | 3 | 2 |
+| SID    | Current Node | max_restart | max_relocate |
+| ------ | ------------ | ----------- | ------------ |
+| vm:101 | pve1         | 3           | 2            |
+| vm:102 | pve2         | 3           | 2            |
+| vm:103 | pve3         | 3           | 2            |
+| vm:201 | pve1         | 3           | 2            |
+| vm:202 | pve2         | 3           | 2            |
+| vm:203 | pve3         | 3           | 2            |
 
 ### HA Node Affinity Rules
 
@@ -1055,9 +1081,9 @@ Fencing is armed by default (`CRM watchdog active` in `ha-manager status`). The 
 
 ### Schedule
 
-| Job ID | VMs / CTs | Schedule | Storage | Mode | Retention |
-|---|---|---|---|---|---|
-| `k8s-vms-weekly` | 101,102,103,201,202,203 | Sunday 03:00 | cephfs | snapshot | 4 weekly, 2 monthly |
+| Job ID           | VMs / CTs               | Schedule     | Storage | Mode     | Retention           |
+| ---------------- | ----------------------- | ------------ | ------- | -------- | ------------------- |
+| `k8s-vms-weekly` | 101,102,103,201,202,203 | Sunday 03:00 | cephfs  | snapshot | 4 weekly, 2 monthly |
 
 Velero (in Kubernetes) runs at Sunday 02:00. Proxmox vzdump at 03:00 captures the full VM disk after Velero has completed its cluster-level backup.
 
@@ -1088,17 +1114,17 @@ The PVE node firewall is enabled on all three nodes. Rules allow management acce
 
 ### Rule Set (per node)
 
-| Proto | Port | Source | Purpose |
-|---|---|---|---|
-| TCP | 22 | 192.168.22.0/24, 192.168.11.0/24 | SSH |
-| TCP | 8006 | 192.168.22.0/24, 192.168.11.0/24 | PVE web UI |
-| ICMP | — | 192.168.22.0/24, 192.168.11.0/24 | Ping |
-| UDP | 5404:5412 | 192.168.22.0/24 | Corosync ring0 |
-| UDP | 5404:5412 | 10.10.0.0/16 | Corosync ring1 |
-| any | any | 10.10.0.0/16 | Ceph cluster network |
-| TCP | 3300 | 192.168.22.0/24 | Ceph mon v2 |
-| TCP | 6789 | 192.168.22.0/24 | Ceph mon v1 |
-| TCP | 6800:7300 | 192.168.22.0/24 | Ceph OSD |
+| Proto | Port      | Source                           | Purpose              |
+| ----- | --------- | -------------------------------- | -------------------- |
+| TCP   | 22        | 192.168.22.0/24, 192.168.11.0/24 | SSH                  |
+| TCP   | 8006      | 192.168.22.0/24, 192.168.11.0/24 | PVE web UI           |
+| ICMP  | —         | 192.168.22.0/24, 192.168.11.0/24 | Ping                 |
+| UDP   | 5404:5412 | 192.168.22.0/24                  | Corosync ring0       |
+| UDP   | 5404:5412 | 10.10.0.0/16                     | Corosync ring1       |
+| any   | any       | 10.10.0.0/16                     | Ceph cluster network |
+| TCP   | 3300      | 192.168.22.0/24                  | Ceph mon v2          |
+| TCP   | 6789      | 192.168.22.0/24                  | Ceph mon v1          |
+| TCP   | 6800:7300 | 192.168.22.0/24                  | Ceph OSD             |
 
 The cluster firewall is **not** enabled at the datacenter level (which would filter inter-VM traffic) — only node-level firewalls are active.
 
@@ -1241,6 +1267,7 @@ ceph osd primary-affinity osd.<id> 1.0
 **Current state (2026-06-23):** `election_strategy classic`. pve1 is the mon leader (rank 0 always wins in classic mode). The `disallowed_leaders` mechanism only works with `connectivity` strategy and is currently a no-op.
 
 **Root cause of recurring crashes (investigated 2026-06-23):**
+
 - `mon.pve1` and `mon.pve3` both crashed with `MonitorDBStore::apply_transaction: ceph_abort_msg("failed to write to db")` — a Ceph 19.2.3 bug where any RocksDB write error causes an abort rather than a retry.
 - The `connectivity` election strategy worsened this by writing connectivity scores to the mon DB on **every ping**, dramatically increasing write frequency and triggering the bug. Switching to `classic` eliminates that write path.
 - `osd.0` and `osd.3` crash with a null pointer in `RocksDB::InternalStats::HandleBaseLevel` — a separate Ceph 19.2.3 bug in BlueStore's compaction path.
