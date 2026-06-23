@@ -7,11 +7,11 @@ GitOps repository for Akan's homelab Kubernetes cluster. All infrastructure and 
 
 ## Repository Location
 - **Remote:** `github.com/akann/k8s-apps`
-- **Local on cluster:** `~/repo/k8s-apps` on `k8s-cp-1` (192.168.22.21)
+- **Local on cluster:** `~/repo/k8s-apps` on `k8s-cp-1` (192.168.33.21)
 - **ArgoCD:** `https://argocd.yanatech.co.uk` (v3.4.2)
 
 ## Cluster
-- **6-node Kubernetes** (kubeadm, v1.32): control planes k8s-cp-1/2/3 (192.168.22.21-23), workers k8s-worker-1/2/3 (192.168.22.31-33)
+- **6-node Kubernetes** (kubeadm, v1.32): control planes k8s-cp-1/2/3 (192.168.33.21-23), workers k8s-worker-1/2/3 (192.168.33.31-33)
 - **3-node Proxmox:** pve1-3 (192.168.22.11-13)
 - **Domain:** `yanatech.co.uk`
 - **kubectl alias on k8s-cp-1:** `argocd='argocd --grpc-web'`
@@ -71,9 +71,9 @@ k8s-apps/
 ### Networking
 - **CNI:** Cilium (native routing mode — no encapsulation)
 - **Load Balancer:** MetalLB, pool `192.168.22.200-249`
-  - `192.168.22.200` — ingress-nginx
-  - `192.168.22.201` — infisical bundled nginx (scaled to 0, do not use)
-  - `192.168.22.202` — Kong API Gateway
+  - `192.168.33.200` — ingress-nginx
+  - `192.168.33.201` — infisical bundled nginx (scaled to 0, do not use)
+  - `192.168.33.202` — Kong API Gateway
 - **Ingress:** ingress-nginx at `192.168.22.200`
 - **TLS:** cert-manager, Let's Encrypt wildcard `wildcard-yanatech-tls` via Cloudflare DNS-01, reflected to all namespaces via Reflector
 

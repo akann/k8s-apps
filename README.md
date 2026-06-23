@@ -40,8 +40,8 @@ A self-hosted, production-grade homelab running on a 6-node Kubernetes cluster a
 graph TB
     Internet["🌐 Internet"] --> CF["Cloudflare DNS<br/>yanatech.co.uk"]
     CF --> Router["Home Router / Firewall"]
-    Router --> NginxLB["ingress-nginx LB<br/>192.168.22.200"]
-    Router --> KongLB["Kong API Gateway<br/>192.168.22.202"]
+    Router --> NginxLB["ingress-nginx LB<br/>192.168.33.200"]
+    Router --> KongLB["Kong API Gateway<br/>192.168.33.202"]
 
     NginxLB --> Apps["Web Applications<br/>(*.yanatech.co.uk)"]
     KongLB --> YanaAPI["yana-stocks API<br/>(api-gateway.yanatech.co.uk/api)"]
@@ -77,12 +77,12 @@ All Kubernetes VMs run as Proxmox guests. Ceph monitors are co-located on the Pr
 
 | Node         | Role          | IP            | OS                 | K8s Version | CRI              |
 | ------------ | ------------- | ------------- | ------------------ | ----------- | ---------------- |
-| k8s-cp-1     | control-plane | 192.168.22.21 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
-| k8s-cp-2     | control-plane | 192.168.22.22 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
-| k8s-cp-3     | control-plane | 192.168.22.23 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
-| k8s-worker-1 | worker        | 192.168.22.31 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
-| k8s-worker-2 | worker        | 192.168.22.32 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
-| k8s-worker-3 | worker        | 192.168.22.33 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-cp-1     | control-plane | 192.168.33.21 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-cp-2     | control-plane | 192.168.33.22 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-cp-3     | control-plane | 192.168.33.23 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-1 | worker        | 192.168.33.31 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-2 | worker        | 192.168.33.32 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
+| k8s-worker-3 | worker        | 192.168.33.33 | Ubuntu 24.04.4 LTS | v1.32.13    | containerd 2.2.4 |
 
 The cluster uses **stacked etcd** — etcd runs on each control-plane node alongside the API server. kubeadm manages the cluster lifecycle.
 
@@ -154,11 +154,11 @@ MetalLB provides `LoadBalancer` type services in bare-metal mode.
 
 | VIP            | Service                                           |
 | -------------- | ------------------------------------------------- |
-| 192.168.22.200 | ingress-nginx (all web traffic)                   |
-| 192.168.22.201 | infisical bundled nginx (scaled to 0, do not use) |
-| 192.168.22.202 | Kong API Gateway (`kong-gateway-proxy`)           |
+| 192.168.33.200 | ingress-nginx (all web traffic)                   |
+| 192.168.33.201 | infisical bundled nginx (scaled to 0, do not use) |
+| 192.168.33.202 | Kong API Gateway (`kong-gateway-proxy`)           |
 
-Pool: `192.168.22.200–249` (active range: .200–.202 in use; .203–.249 reserved)
+Pool: `192.168.33.200–249` (active range: .200–.202 in use; .203–.249 reserved)
 
 ### 4.3 Ingress Controllers
 
@@ -166,9 +166,9 @@ Two ingress classes are active:
 
 | Class             | Controller              | VIP            | Purpose                                 |
 | ----------------- | ----------------------- | -------------- | --------------------------------------- |
-| `nginx`           | ingress-nginx           | 192.168.22.200 | All web UIs, TLS termination            |
-| `kong`            | Kong Ingress Controller | 192.168.22.202 | yana-stocks API routing, JWT validation |
-| `infisical-nginx` | infisical bundled nginx | 192.168.22.201 | Infisical internal (disabled)           |
+| `nginx`           | ingress-nginx           | 192.168.33.200 | All web UIs, TLS termination            |
+| `kong`            | Kong Ingress Controller | 192.168.33.202 | yana-stocks API routing, JWT validation |
+| `infisical-nginx` | infisical bundled nginx | 192.168.33.201 | Infisical internal (disabled)           |
 
 **Note:** `ingress-nginx` requires `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` for Authentik forward-auth `auth-snippet` annotations.
 

@@ -896,14 +896,14 @@ Six VMs across three nodes. Control-plane VMs have 4 cores / 8 GB; workers have 
 
 ### VM Inventory
 
-| VMID | Name         | Node | Cores | RAM   | Disk       | IP            |
-| ---- | ------------ | ---- | ----- | ----- | ---------- | ------------- |
-| 101  | k8s-cp-1     | pve1 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.21 |
-| 102  | k8s-cp-2     | pve2 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.22 |
-| 103  | k8s-cp-3     | pve3 | 4     | 8 GB  | 50 GB rbd  | 192.168.22.23 |
-| 201  | k8s-worker-1 | pve1 | 8     | 40 GB | 100 GB rbd | 192.168.22.31 |
-| 202  | k8s-worker-2 | pve2 | 8     | 40 GB | 100 GB rbd | 192.168.22.32 |
-| 203  | k8s-worker-3 | pve3 | 8     | 40 GB | 100 GB rbd | 192.168.22.33 |
+| VMID | Name         | Node | Cores | RAM   | Disk       | IP            | Bridge |
+| ---- | ------------ | ---- | ----- | ----- | ---------- | ------------- | ------ |
+| 101  | k8s-cp-1     | pve1 | 4     | 8 GB  | 50 GB rbd  | 192.168.33.21 | vmbr1  |
+| 102  | k8s-cp-2     | pve2 | 4     | 8 GB  | 50 GB rbd  | 192.168.33.22 | vmbr1  |
+| 103  | k8s-cp-3     | pve3 | 4     | 8 GB  | 50 GB rbd  | 192.168.33.23 | vmbr1  |
+| 201  | k8s-worker-1 | pve1 | 8     | 40 GB | 100 GB rbd | 192.168.33.31 | vmbr1  |
+| 202  | k8s-worker-2 | pve2 | 8     | 40 GB | 100 GB rbd | 192.168.33.32 | vmbr1  |
+| 203  | k8s-worker-3 | pve3 | 8     | 40 GB | 100 GB rbd | 192.168.33.33 | vmbr1  |
 
 ### Cloning from Template
 
@@ -922,8 +922,9 @@ qm disk resize 101 scsi0 50G
 qm set 101 \
   --cicustom "user=local:snippets/k8s-init.yaml" \
   --ciuser ubuntu \
-  --ipconfig0 "ip=192.168.22.21/24,gw=192.168.22.1" \
-  --nameserver 192.168.22.1 \
+  --net0 virtio,bridge=vmbr1 \
+  --ipconfig0 "ip=192.168.33.21/24,gw=192.168.33.1" \
+  --nameserver 192.168.33.1 \
   --onboot 1 \
   --tags "control-plane,k8s"
 
@@ -940,8 +941,9 @@ qm set 201 \
   --cores 8 --memory 40960 \
   --cicustom "user=local:snippets/k8s-init.yaml" \
   --ciuser ubuntu \
-  --ipconfig0 "ip=192.168.22.31/24,gw=192.168.22.1" \
-  --nameserver 192.168.22.1 \
+  --net0 virtio,bridge=vmbr1 \
+  --ipconfig0 "ip=192.168.33.31/24,gw=192.168.33.1" \
+  --nameserver 192.168.33.1 \
   --onboot 1 \
   --tags "k8s,worker"
 qm start 201
