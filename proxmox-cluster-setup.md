@@ -23,8 +23,9 @@ This document is a complete record of how this cluster is built. It is intended 
 10. [Kubernetes VMs](#10-kubernetes-vms)
 11. [High Availability](#11-high-availability)
 12. [Backups](#12-backups)
-13. [Notifications](#13-notifications)
-14. [Maintenance Reference](#14-maintenance-reference)
+13. [Firewall](#13-firewall)
+14. [Notifications](#14-notifications)
+15. [Maintenance Reference](#15-maintenance-reference)
 
 ---
 
@@ -1030,7 +1031,48 @@ Backups land in `/mnt/pve/cephfs/dump/` and are visible in the PVE UI under each
 
 ---
 
-## 13. Notifications
+## 13. Firewall
+
+The PVE node firewall is enabled on all three nodes. Rules allow management access from the cluster LAN (192.168.22.0/24) and the laptop network (192.168.11.0/24); all other inbound traffic is dropped.
+
+### Rule Set (per node)
+
+| Proto | Port | Source | Purpose |
+|---|---|---|---|
+| TCP | 22 | 192.168.22.0/24, 192.168.11.0/24 | SSH |
+| TCP | 8006 | 192.168.22.0/24, 192.168.11.0/24 | PVE web UI |
+| ICMP | — | 192.168.22.0/24, 192.168.11.0/24 | Ping |
+| UDP | 5404:5412 | 192.168.22.0/24 | Corosync ring0 |
+| UDP | 5404:5412 | 10.10.0.0/16 | Corosync ring1 |
+| any | any | 10.10.0.0/16 | Ceph cluster network |
+| TCP | 3300 | 192.168.22.0/24 | Ceph mon v2 |
+| TCP | 6789 | 192.168.22.0/24 | Ceph mon v1 |
+| TCP | 6800:7300 | 192.168.22.0/24 | Ceph OSD |
+
+The cluster firewall is **not** enabled at the datacenter level (which would filter inter-VM traffic) — only node-level firewalls are active.
+
+For the exact CLI commands to recreate rules on a replacement node, see `pve-node-operations.md` §2.10 (restore) and §3.8 (new node).
+
+### Verify
+
+```bash
+# List rules on a node
+pvesh get /nodes/pve1/firewall/rules
+
+# Check firewall is enabled
+pvesh get /nodes/pve1/firewall/options | grep enable
+
+# Check active iptables rules
+iptables -L PVEFW-HOST-IN -n --line-numbers
+```
+
+### TLS for PVE Web UI
+
+Handled via HAProxy reverse proxy — not using the built-in `pvenode acme` method. The Cloudflare DNS-01 + Let's Encrypt cert is terminated at HAProxy; PVE web UI behind it uses its self-signed cert on the internal side.
+
+---
+
+## 14. Notifications
 
 All Proxmox alerts (backup results, HA events, task failures) route to both local mail and Gotify.
 
@@ -1062,7 +1104,7 @@ pvesh create /cluster/notifications/targets/gotify/test
 
 ---
 
-## 14. Maintenance Reference
+## 15. Maintenance Reference
 
 ### Ceph Pool Operations
 
@@ -1232,5 +1274,4 @@ ha-manager status
 
 ### Maintenance Notes
 
-- **TLS for PVE web UI:** Handled via HAProxy — not using the built-in `pvenode acme` method.
 - **Gotify token rotation:** `pvesh set /cluster/notifications/endpoints/gotify/gotify --token <new-token>`
