@@ -13,10 +13,11 @@ spec:
     targetRevision: 0.24.0
     helm:
       releaseName: kong
-      skipCrds: true
       valuesObject:
         gateway:
           enabled: true
+          ingressController:
+            installCRDs: false
           env:
             role: traditional
             database: "off"
@@ -46,6 +47,7 @@ spec:
           enabled: true
           ingressController:
             enabled: true
+            installCRDs: false
             gatewayDiscovery:
               enabled: true
               generateAdminApiService: true
