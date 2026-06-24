@@ -105,3 +105,34 @@ sudo mv /etc/kubernetes/manifests/kube-controller-manager.yaml /tmp/ && sleep 5 
 ```
 
 Result: all 6 control plane components `1/1 Running`, clean leader election logs, full HA restored.
+
+---
+
+### alertmanager-gotify-bridge 401 Unauthorized (resolved)
+
+**Symptom:** `alertmanager-gotify-bridge` was `1/1 Running` but flooding logs with:
+```
+Non-200 response from gotify at http://gotify.gotify.svc.cluster.local/message. Code: 401, Status: 401 Unauthorized
+```
+
+**Root cause:** The token stored in Infisical at `/gotify/ALERTMANAGER_TOKEN` (`AvMQK99JPxH2tYh`) did not match any active application token in Gotify. The Gotify "Alert Manager" app (id:3) had been recreated/regenerated at some point with a new token (`A7bvx9Aev_TS8GJ`), but Infisical was never updated. ESO was faithfully syncing the stale token into `gotify-secret`. This was masked for 18+ days by a concurrent NetworkPolicy bug (i/o timeout) that was fixed first.
+
+**Token discovery:**
+```bash
+ADMIN_PASS=$(kubectl get secret gotify-secret -n gotify -o jsonpath='{.data.admin-password}' | base64 -d)
+curl -s -u "admin:$ADMIN_PASS" https://gotify.yanatech.co.uk/application
+# Returns all apps with their valid tokens
+```
+
+**Fix:**
+1. Patched `gotify-secret` directly with the correct token
+2. Restarted the bridge deployment
+3. **Updated Infisical `/gotify/ALERTMANAGER_TOKEN`** with `A7bvx9Aev_TS8GJ` (required — ESO refreshes every 1h and would overwrite the patch otherwise)
+
+```bash
+kubectl patch secret gotify-secret -n gotify --type='json' \
+  -p='[{"op":"replace","path":"/data/alertmanager-token","value":"<base64-of-token>"}]'
+kubectl rollout restart deployment alertmanager-gotify-bridge -n gotify
+```
+
+Result: bridge starts cleanly, no 401 errors, no i/o timeouts.
