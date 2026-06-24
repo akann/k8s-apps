@@ -145,7 +145,7 @@ No Proxmox subscription is used. Configure the no-subscription repositories on e
 
 ### `/etc/apt/sources.list.d/proxmox.sources`
 
-```
+```text
 Types: deb
 URIs: http://download.proxmox.com/debian/pve
 Suites: trixie
@@ -155,7 +155,7 @@ Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 ### `/etc/apt/sources.list.d/ceph.sources`
 
-```
+```text
 Types: deb
 URIs: http://download.proxmox.com/debian/ceph-squid
 Suites: trixie
@@ -167,7 +167,7 @@ Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
 
 Comment out the enterprise repo (requires subscription):
 
-```
+```text
 # Types: deb
 # URIs: https://enterprise.proxmox.com/debian/pve
 # Suites: trixie
@@ -177,7 +177,7 @@ Comment out the enterprise repo (requires subscription):
 
 ### `/etc/apt/sources.list.d/debian.sources`
 
-```
+```text
 Types: deb
 URIs: http://deb.debian.org/debian/
 Suites: trixie trixie-updates
@@ -240,7 +240,7 @@ The three nodes form a **full mesh** of point-to-point `/30` links on the X710 p
 
 ### Point-to-Point Link Topology
 
-```
+```text
 pve1 enp2s0f0np0 (10.10.10.1/30) ←→ pve2 enp2s0f0np0 (10.10.10.2/30)
 pve1 enp2s0f1np1 (10.10.20.1/30) ←→ pve3 enp2s0f0np0 (10.10.20.2/30)
 pve2 enp2s0f1np1 (10.10.30.1/30) ←→ pve3 enp2s0f1np1 (10.10.30.2/30)
@@ -250,7 +250,7 @@ Every pair of nodes has a direct 10GbE link. All Ceph replication and Corosync r
 
 ### `/etc/network/interfaces` — pve1
 
-```
+```text
 auto lo
 iface lo inet loopback
 
@@ -297,7 +297,7 @@ iface vmbr1 inet static
 
 Same structure, different addresses:
 
-```
+```text
 lo:ospf      10.255.255.2/32
 enp2s0f0np0  10.10.10.2/30    # link to pve1
 enp2s0f1np1  10.10.30.1/30    # link to pve3
@@ -309,7 +309,7 @@ vmbr1        192.168.33.12/24
 
 ### `/etc/network/interfaces` — pve3
 
-```
+```text
 lo:ospf      10.255.255.3/32
 enp2s0f0np0  10.10.20.2/30    # link to pve1
 enp2s0f1np1  10.10.30.2/30    # link to pve2
@@ -329,13 +329,13 @@ apt install frr
 
 Enable the OSPF daemon in `/etc/frr/daemons`:
 
-```
+```text
 ospfd=yes
 ```
 
 #### `/etc/frr/frr.conf` — pve1
 
-```
+```text
 frr version 10.3.1
 frr defaults traditional
 hostname pve1
@@ -365,7 +365,7 @@ exit
 
 #### `/etc/frr/frr.conf` — pve2
 
-```
+```text
 hostname pve2
 router ospf
  ospf router-id 10.255.255.2
@@ -377,7 +377,7 @@ router ospf
 
 #### `/etc/frr/frr.conf` — pve3
 
-```
+```text
 hostname pve3
 router ospf
  ospf router-id 10.255.255.3
@@ -523,7 +523,7 @@ Ring1 (the dedicated 10GbE mesh) carries all corosync heartbeat traffic. If it f
 
 ### `/etc/pve/corosync.conf`
 
-```
+```text
 logging {
   debug: off
   to_syslog: yes
@@ -604,7 +604,7 @@ Ceph 19.2.3 (Squid) runs natively on Proxmox. All daemons (mon, mgr, mds, osd) a
 
 ### Architecture
 
-```
+```text
 Cluster network: 10.10.0.0/16   (X710 mesh — OSD replication, heartbeats)
 Public network:  192.168.22.0/24 (clients — Kubernetes CSI, PVE UI)
 
@@ -853,7 +853,7 @@ Three MDS daemons run (one per node) with one active and two standby. CephFS is 
 
 ### `/etc/pve/storage.cfg`
 
-```
+```text
 dir: local
     path /var/lib/vz
     content iso,images,import,backup,vztmpl
