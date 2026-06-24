@@ -201,8 +201,8 @@ sequenceDiagram
 
 ```mermaid
 graph LR
-    Browser --> CF["Cloudflare<br/>A → 192.168.22.200"]
-    CF --> NX["ingress-nginx<br/>192.168.22.200:443"]
+    Browser --> CF["Cloudflare<br/>A → 192.168.33.200"]
+    CF --> NX["ingress-nginx<br/>192.168.33.200:443"]
     NX --> Auth{"Authentik<br/>forward auth?"}
     Auth -->|"Protected app"| AK["Authentik outpost<br/>authentik.yanatech.co.uk"]
     AK -->|"Authenticated"| App["Application Pod"]
@@ -213,8 +213,8 @@ graph LR
 
 ```mermaid
 graph LR
-    Client["Browser / App"] --> CF["Cloudflare<br/>A → 192.168.22.202"]
-    CF --> Kong["Kong Gateway<br/>192.168.22.202:80"]
+    Client["Browser / App"] --> CF["Cloudflare<br/>A → 192.168.33.202"]
+    CF --> Kong["Kong Gateway<br/>192.168.33.202:80"]
     Kong --> JWT{"JWT plugin<br/>(iss claim → HS256)"}
     JWT -->|"/api/auth/register|verify|login|refresh|logout<br/>no JWT"| AS["auth-service:3000"]
     JWT -->|"/api/auth/me<br/>JWT required"| AS
@@ -620,7 +620,7 @@ graph TB
     PS -->|"stocks.portfolio.events"| Kafka
 
     FE["frontend\n(Next.js 14, 2 replicas)"] --> PAPI
-    Browser["🌐 Browser"] --> Kong["Kong API Gateway\n192.168.22.202"]
+    Browser["🌐 Browser"] --> Kong["Kong API Gateway\n192.168.33.202"]
     Kong -->|"iss:yana-stocks HS256"| AS
     Kong -->|"/api/profile/*"| PFS
     Kong --> PAPI

@@ -70,11 +70,11 @@ k8s-apps/
 
 ### Networking
 - **CNI:** Cilium (native routing mode — no encapsulation)
-- **Load Balancer:** MetalLB, pool `192.168.22.200-249`
+- **Load Balancer:** MetalLB, pool `192.168.33.200-249`
   - `192.168.33.200` — ingress-nginx
   - `192.168.33.201` — infisical bundled nginx (scaled to 0, do not use)
   - `192.168.33.202` — Kong API Gateway
-- **Ingress:** ingress-nginx at `192.168.22.200`
+- **Ingress:** ingress-nginx at `192.168.33.200`
 - **TLS:** cert-manager, Let's Encrypt wildcard `wildcard-yanatech-tls` via Cloudflare DNS-01, reflected to all namespaces via Reflector
 
 ### Storage
@@ -298,7 +298,7 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 ## Kong API Gateway
 - **Namespace:** `kong`
 - **Chart:** `kong/ingress` 0.24.0 (Kong 3.9, DB-less)
-- **MetalLB VIP:** `192.168.22.202`
+- **MetalLB VIP:** `192.168.33.202`
 - **External URL:** `https://api-gateway.yanatech.co.uk`
 - **Mode:** DB-less — routes defined via Kubernetes Ingress with `ingressClassName: kong` or KongIngress CRDs
 - **No admin UI** in OSS mode
