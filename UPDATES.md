@@ -69,3 +69,39 @@ kubectl delete pvc pg-main-2 -n cnpg-clusters
 ```
 
 **Note:** CNPG increments instance numbers monotonically and never reuses them. After this incident the pg-main instances are `pg-main-1` (primary, kw2), `pg-main-4` (standby, kw2), `pg-main-5` (standby, kw1).
+
+---
+
+### kube-scheduler and kube-controller-manager on cp-2/cp-3 pointing to wrong API server (resolved)
+
+**Symptom:** `kube-scheduler-k8s-cp-2` and `kube-scheduler-k8s-cp-3` were `0/1 Running` (37 and 0 restarts over 12h respectively). `kube-controller-manager-k8s-cp-2/3` were `1/1 Running` but completely non-functional. All four components logged the same error:
+
+```
+dial tcp 192.168.22.22:6443: i/o timeout    # cp-2
+dial tcp 192.168.22.23:6443: i/o timeout    # cp-3
+```
+
+**Root cause:** `/etc/kubernetes/scheduler.conf` and `/etc/kubernetes/controller-manager.conf` on both cp-2 and cp-3 had `server: https://192.168.22.2x:6443` — the Proxmox management network IPs (vmbr0, VLAN 22), not the Kubernetes network IPs (vmbr1, VLAN 33). The cluster's Kubernetes workloads live entirely on `192.168.33.x`; the management IPs are unreachable from within the cluster. The misconfiguration was present since the control plane nodes joined (likely kubeadm picked up the primary NIC which was the management interface). `kubelet.conf` and `admin.conf` on the same nodes correctly pointed to `192.168.33.21:6443` and were unaffected.
+
+The cluster appeared healthy because cp-1's scheduler and controller-manager (both correctly configured) won leader election and handled all scheduling/control work. The other two replicas were silently dead, leaving the cluster with no HA on scheduler or controller-manager.
+
+**Fix:**
+
+```bash
+# On k8s-cp-2
+sudo sed -i 's|server: https://192.168.22.22:6443|server: https://192.168.33.21:6443|g' \
+  /etc/kubernetes/scheduler.conf /etc/kubernetes/controller-manager.conf
+
+# On k8s-cp-3
+sudo sed -i 's|server: https://192.168.22.23:6443|server: https://192.168.33.21:6443|g' \
+  /etc/kubernetes/scheduler.conf /etc/kubernetes/controller-manager.conf
+
+# Restart static pods by briefly moving manifests out then back (kubectl delete pod is a no-op for
+# static pods — kubelet recreates the mirror pod without restarting the container)
+sudo mv /etc/kubernetes/manifests/kube-scheduler.yaml /tmp/ && sleep 5 && \
+  sudo mv /tmp/kube-scheduler.yaml /etc/kubernetes/manifests/
+sudo mv /etc/kubernetes/manifests/kube-controller-manager.yaml /tmp/ && sleep 5 && \
+  sudo mv /tmp/kube-controller-manager.yaml /etc/kubernetes/manifests/
+```
+
+Result: all 6 control plane components `1/1 Running`, clean leader election logs, full HA restored.
