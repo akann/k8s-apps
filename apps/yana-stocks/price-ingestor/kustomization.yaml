@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - external-secret.yaml
   - deployment.yaml
-  - keda-scaledobject.yaml

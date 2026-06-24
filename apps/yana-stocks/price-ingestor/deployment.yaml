@@ -19,24 +19,17 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: price-ingestor
-          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:4b17a41afa51aaf163dc4d8fde7172cbce735fd8
+          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:latest
           env:
-            - name: ALPACA_API_KEY
+            - name: MASSIVE_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: price-ingestor-secret
-                  key: ALPACA_API_KEY
-            - name: ALPACA_API_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: price-ingestor-secret
-                  key: ALPACA_API_SECRET
-            - name: ALPACA_BASE_URL
-              value: "https://data.alpaca.markets"
+                  key: MASSIVE_API_KEY
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: SYMBOLS
-              value: '["AAPL","GOOGL","MSFT","AMZN","TSLA","NVDA","META","JPM","V","JNJ"]'
+              value: "AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ"
             - name: OTEL_SERVICE_NAME
               value: "price-ingestor"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
