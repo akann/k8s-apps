@@ -289,7 +289,7 @@ graph TB
 
 | Namespace       | PVC                                  | Size         | Consumer                            |
 | --------------- | ------------------------------------ | ------------ | ----------------------------------- |
-| `cnpg-clusters` | pg-main-1/2/4                        | 50 Gi × 3    | Shared PostgreSQL (pg-main)         |
+| `cnpg-clusters` | pg-main-1/4/5                        | 50 Gi × 3    | Shared PostgreSQL (pg-main)         |
 | `harbor`        | harbor-registry                      | 100 Gi       | Image layers                        |
 | `harbor`        | harbor-database                      | 10 Gi        | Harbor PostgreSQL                   |
 | `harbor`        | harbor-redis / trivy                 | 5 Gi / 10 Gi | Harbor cache/scanner                |
@@ -439,6 +439,8 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | `kafka`                              | Strimzi bootstrap Service patch timeout (upstream)                                                    |
 | `immich`                             | SharedResourceWarning (ingress shared between two apps)                                               |
 | `yana-stocks` (ml-predictor Rollout) | Cosmetic OutOfSync after SSA field-manager migration — `argocd app diff` is empty, Rollout is Healthy |
+
+**Kong `RepeatedResourceWarning` (resolved):** The `ingress` chart v0.24.0 embeds two aliases of the `kong` sub-chart (`controller` + `gateway`), each with its own `crds/` directory. ArgoCD renders against the live cluster, so the template's `lookup()` finds existing CRDs and renders a second copy, producing 12 duplicate CRD warnings. Fixed by setting `ingressController.installCRDs: false` on both aliases — templates skip CRD rendering, `crds/` is the single managed source.
 
 ---
 
@@ -994,6 +996,47 @@ After ArgoCD sync, infisical ingress may revert to `infisical-nginx` class. Manu
 kubectl patch ingress infisical-ingress -n infisical --type='json' \
   -p='[{"op":"replace","path":"/spec/ingressClassName","value":"nginx"},...]'
 ```
+
+### Kured Drain Blocked by CNPG PDB
+
+When kured cordons a node and tries to drain it, `kubectl drain` uses the eviction API which **respects PodDisruptionBudgets**. A CNPG primary pod always has `disruptionsAllowed: 0` (the PDB enforces `minAvailable: 1` against a single primary), so kured loops indefinitely without being able to evict it.
+
+**Symptom:** kured has cordoned the node for hours; `kubectl describe node <node>` shows kured annotation; the primary CNPG pod is on the cordoned node.
+
+**Fix:** Delete the primary pod directly — `kubectl delete pod` bypasses PDB (eviction API vs delete API). CNPG immediately promotes the most-up-to-date standby.
+
+```bash
+# Identify which CNPG pods are on the cordoned node
+kubectl get pods -A -o wide --field-selector spec.nodeName=<node>
+
+# Delete CNPG primary pods directly (bypasses PDB — safe, CNPG auto-promotes standby)
+kubectl delete pod <pg-main-N> -n cnpg-clusters
+kubectl delete pod <immich-postgres-N> -n immich
+
+# kured will proceed with drain and reboot automatically
+```
+
+After the node reboots and is uncordoned, the deleted primary is recreated as a standby replica.
+
+### CNPG Standby Stuck in WAL Replay (Timeline Mismatch)
+
+If a CNPG standby pod has experienced multiple restarts over a long period and is stuck replaying WAL with messages like `"waiting for WAL to become available at X"` and `"Refusing to restore future timeline history file"`, the pod's PVC contains stale data from a timeline the cluster has already advanced past. Deleting just the pod does **not** fix this — CNPG reattaches the same PVC and the pod loops again.
+
+**Fix:** Delete both the pod and its PVC. CNPG creates a new pod (with an incremented number) and a new PVC, then runs `pg_basebackup` from the primary to rebuild the standby fresh.
+
+```bash
+# Identify the stuck pod (0/1 Running, many restarts)
+kubectl get pods -n cnpg-clusters
+
+# Delete pod and wait for termination, then delete the PVC
+kubectl delete pod <pg-main-N> -n cnpg-clusters --wait=true
+kubectl delete pvc <pg-main-N> -n cnpg-clusters
+
+# CNPG creates pg-main-(N+k)-join-xxxxx, runs pg_basebackup (~30-60s),
+# then starts the new standby. Cluster returns to healthy state.
+```
+
+Note: CNPG increments instance numbers monotonically — after deleting pg-main-2, the replacement will be pg-main-3 or higher (never reuses numbers). Update the PVC inventory table in this README accordingly.
 
 ### Harbor: RWO PVC Rolling Update Deadlock
 
