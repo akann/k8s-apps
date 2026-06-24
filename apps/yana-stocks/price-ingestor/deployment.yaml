@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: price-ingestor
-          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:latest
+          image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:10c07b4ceb9f19e9b5f148c21fe88a8546442c28
           env:
             - name: MASSIVE_API_KEY
               valueFrom:
