@@ -65,6 +65,8 @@ graph TB
 
 All Kubernetes VMs run as Proxmox guests. Ceph monitors are co-located on the Proxmox hosts at `192.168.22.11-13:6789`.
 
+**Switch:** TP-Link SG2008 v4.20 (8-port managed 2.5GbE). VLAN 22 (native) = PVE management (192.168.22.x); VLAN 33 (native) = Kubernetes VM network (192.168.33.x). Inter-node 10GbE SFP+ links bypass the switch (direct DAC cables).
+
 ### 2.2 Physical Topology
 
 ![Proxmox cluster with Kubernetes nodes and Ceph OSDs](docs/proxmox_k8s_cluster_diagram.svg)

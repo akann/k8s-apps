@@ -65,6 +65,8 @@ All current nodes are identical. A replacement must use the same NIC model (or h
 | NVMe OSD large | Lexar NM790 2 TB (slot: nvme0)                                 |
 | NVMe OSD small | Lexar NM790 1 TB (slot: nvme2)                                 |
 
+**Switch:** TP-Link SG2008 v4.20 (8-port managed 2.5GbE). Both 2.5GbE ports on each node connect to this switch. VLAN 22 (native on enp87s0 ports) = PVE management; VLAN 33 (native on enp90s0 ports) = Kubernetes VM network. The X710 10GbE SFP+ inter-node links bypass the switch entirely (direct DAC cables).
+
 **NVMe slot order is fixed by physical slot, not by Lexar label.** Always verify with `lsblk -d -o NAME,SIZE,MODEL` before touching disks.
 
 ---
@@ -313,6 +315,8 @@ iface vmbr1 inet static
     bridge-fd 0
     bridge-vlan-aware yes
     bridge-vids 33
+    post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+    post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
 ```
 
 Apply:
@@ -383,6 +387,8 @@ vtysh -c "show ip route ospf"
 #### ECMP Routing Fix (pve2 and pve3 only)
 
 pve1 does not need this. For pve2 or pve3, the OSPF ECMP path via the direct pve2↔pve3 link causes Ceph OSD heartbeat deadlocks (see `proxmox-cluster-setup.md` §5 "ECMP Asymmetric Routing Fix"). These files are **not** in pmxcfs and must be recreated manually after a node rebuild.
+
+> **Also required on all three nodes (pve1, pve2, pve3):** The `post-up` routing lines in the `vmbr1` stanza of `/etc/network/interfaces` (see §2.7 above) force 192.168.33.0/24 traffic via pfsense rather than direct via vmbr1. This prevents Ceph monitor session drops caused by asymmetric routing through pfsense. The `post-up` lines persist through reboots automatically — no separate service is needed. See `proxmox-cluster-setup.md` §5 "pfsense Asymmetric Routing Fix" for root cause details.
 
 Create `/usr/local/sbin/ceph-routing-setup.sh`:
 
@@ -662,6 +668,8 @@ iface vmbr1 inet static
     bridge-fd 0
     bridge-vlan-aware yes
     bridge-vids 33
+    post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+    post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
 ```
 
 Also update `/etc/network/interfaces` on **pve2** and **pve3** to replace the affected link addresses, then `ifreload -a` on each node.

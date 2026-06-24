@@ -2,7 +2,7 @@
 
 > **Cluster:** cluster01  
 > **Nodes:** pve1 / pve2 / pve3  
-> **Last updated:** 2026-06-23 (hardware section)  
+> **Last updated:** 2026-06-24  
 > **PVE version:** 9.2.3 — Debian 13 (trixie) — kernel 7.0.6-2-pve
 
 This document is a complete record of how this cluster is built. It is intended to allow full recreation from bare metal.
@@ -56,6 +56,20 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 
 ![The Rack](docs/rack.png)
 
+### Switch — TP-Link SG2008 v4.20
+
+An 8-port managed 2.5GbE switch. All three PVE nodes connect via their two 2.5GbE NICs (enp87s0 and enp90s0). VLAN trunking separates management and Kubernetes traffic.
+
+| VLAN | Name       | Native VLAN | Subnet          | PVE interface              |
+| ---- | ---------- | ----------- | --------------- | -------------------------- |
+| 22   | Management | 22          | 192.168.22.0/24 | enp87s0 → vmbr0            |
+| 33   | Kubernetes | 33          | 192.168.33.0/24 | enp90s0 → vmbr1            |
+
+- Ports connected to **enp87s0** (vmbr0 — PVE management): native VLAN 22
+- Ports connected to **enp90s0** (vmbr1 — Kubernetes VM network): native VLAN 33
+- Loopback Control: **Disabled** (global setting)
+- The 10GbE SFP+ inter-node links (DAC cables on `enp2s0f*`) bypass the switch entirely — direct point-to-point connections for Ceph replication and Corosync ring1.
+
 ### Node Addressing
 
 | Node | Mgmt IP       | OSPF Loopback | PCI NVMe slots                               |
@@ -66,7 +80,7 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 
 ### Network Topology
 
-Each MS-01 connects to the network switch via its 2.5GbE port (management and VM traffic), and forms a **full-mesh** of direct 10GbE SFP+ links with the other two nodes (Ceph replication + Corosync ring1). No SFP+ traffic touches the switch.
+Each MS-01 connects to the **TP-Link SG2008 v4.20** switch via its two 2.5GbE ports (enp87s0 on VLAN 22 for PVE management, enp90s0 on VLAN 33 for Kubernetes VM traffic), and forms a **full-mesh** of direct 10GbE SFP+ links with the other two nodes (Ceph replication + Corosync ring1). No SFP+ traffic touches the switch.
 
 ![Proxmox MS-01 Cluster Network Diagram](docs/proxmox_ms01_cluster_network.svg)
 
@@ -265,6 +279,8 @@ iface vmbr1 inet static
     bridge-fd 0
     bridge-vlan-aware yes
     bridge-vids 33
+    post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+    post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
 ```
 
 ### `/etc/network/interfaces` — pve2
@@ -272,21 +288,25 @@ iface vmbr1 inet static
 Same structure, different addresses:
 
 ```
-lo:ospf   10.255.255.2/32
-enp2s0f0np0  10.10.10.2/30   # link to pve1
-enp2s0f1np1  10.10.30.1/30   # link to pve3
-vmbr0     192.168.22.12/24
-vmbr1     192.168.33.12/24
+lo:ospf      10.255.255.2/32
+enp2s0f0np0  10.10.10.2/30    # link to pve1
+enp2s0f1np1  10.10.30.1/30    # link to pve3
+vmbr0        192.168.22.12/24
+vmbr1        192.168.33.12/24
+             post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+             post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
 ```
 
 ### `/etc/network/interfaces` — pve3
 
 ```
-lo:ospf   10.255.255.3/32
-enp2s0f0np0  10.10.20.2/30   # link to pve1
-enp2s0f1np1  10.10.30.2/30   # link to pve2
-vmbr0     192.168.22.13/24
-vmbr1     192.168.33.13/24
+lo:ospf      10.255.255.3/32
+enp2s0f0np0  10.10.20.2/30    # link to pve1
+enp2s0f1np1  10.10.30.2/30    # link to pve2
+vmbr0        192.168.22.13/24
+vmbr1        192.168.33.13/24
+             post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+             post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
 ```
 
 ### OSPF via FRR
@@ -426,6 +446,45 @@ systemctl enable --now ceph-routing.service
 **pve1 does not need this fix** — its two X710 ports have direct kernel-connected routes to both pve2 (`10.10.10.0/30 dev enp2s0f0np0`) and pve3 (`10.10.20.0/30 dev enp2s0f1np1`), so no ECMP ambiguity exists.
 
 **Why the static route survives FRR restarts:** `ip route replace` installs a `proto boot` route with metric 0. FRR's OSPF routes use `proto ospf` with metric 20. Both coexist in the kernel RIB; the kernel always selects the lower metric. FRR cannot replace the static route.
+
+### pfsense Asymmetric Routing Fix (all three nodes)
+
+**Problem:** After migrating all Kubernetes VMs from the management network (192.168.22.x / vmbr0) to the Kubernetes network (192.168.33.x / vmbr1), Ceph monitor sessions dropped every 53–63 seconds. K8s worker nodes connect to Ceph monitors (192.168.22.11–13) by routing via pfsense (VLAN33 → VLAN22). The PVE hosts replied directly via vmbr1 (kernel-connected route to 192.168.33.0/24), bypassing pfsense entirely.
+
+pfsense is a stateful firewall — it only sees the outbound SYN from the K8s worker, never the returning SYN-ACK from the PVE host. TCP state stays in OPENING (~10s timeout). The libceph keepalive interval is also 10 seconds, so the conntrack state expires just before each alternating keepalive → keepalive silently dropped → monitor session lost after 30 seconds.
+
+**Root cause:** Asymmetric routing. Traffic path in: `kw1 → pfsense → pve1`. Traffic path out: `pve1 → vmbr1 → kw1` (direct, bypasses pfsense).
+
+**Fix:** Force symmetric routing on all three PVE hosts by removing the direct vmbr1 route to 192.168.33.0/24 and replacing it with a route via pfsense (192.168.22.1). pfsense then sees both the SYN and SYN-ACK, sets TCP state to ESTABLISHED (~5 day timeout), and keepalives pass without interruption.
+
+Applied via `post-up` lines in the `vmbr1` stanza of `/etc/network/interfaces` on **all three nodes**:
+
+```
+post-up ip route del 192.168.33.0/24 dev vmbr1 || true
+post-up ip route add 192.168.33.0/24 via 192.168.22.1 || true
+```
+
+These are already present in the pve1/pve2/pve3 configs above. To apply without rebooting:
+
+```bash
+# Run on each PVE host (pve1, pve2, pve3):
+ip route del 192.168.33.0/24 dev vmbr1
+ip route add 192.168.33.0/24 via 192.168.22.1
+```
+
+**Verification:**
+
+```bash
+# Confirm 192.168.33.0/24 routes via pfsense (not direct via vmbr1)
+ip route show 192.168.33.0/24
+# Expected: 192.168.33.0/24 via 192.168.22.1 dev vmbr0
+
+# Confirm conntrack shows ESTABLISHED for K8s→Ceph monitor connections
+conntrack -L 2>/dev/null | grep ':3300\|:6789' | grep ESTABLISHED
+# Expected: tcp ... ESTABLISHED src=192.168.33.x ... [ASSURED]
+```
+
+**Note:** This fix applies specifically to the topology where K8s VMs are on a different VLAN/subnet from Ceph monitors and a stateful firewall sits between them. pve1 with its direct management NIC (enp87s0 on 192.168.22.11) has a kernel-connected route to 192.168.22.0/24 via vmbr0, so the pfsense-routed return traffic is accepted on vmbr0 after this fix — pfsense is no longer bypassed.
 
 ---
 
