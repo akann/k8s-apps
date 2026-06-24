@@ -27,8 +27,6 @@ This document is a complete record of how this cluster is built. It is intended 
 14. [Notifications](#14-notifications)
 15. [Maintenance Reference](#15-maintenance-reference)
 
----
-
 ## 1. Hardware
 
 All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact Intel 12th-gen mini-PCs with dual SFP+ 10GbE and dual 2.5GbE, purpose-built for homelab clustering.
@@ -52,23 +50,29 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 | NVMe (OSD large) | Lexar NM790 — 2 TB                                               |
 | NVMe (OSD small) | Lexar NM790 — 1 TB                                               |
 
+---
+
 ### The rack
 
 ![The Rack](docs/rack.png)
+
+---
 
 ### Switch — TP-Link SG2008 v4.20
 
 An 8-port managed 2.5GbE switch. All three PVE nodes connect via their two 2.5GbE NICs (enp87s0 and enp90s0). VLAN trunking separates management and Kubernetes traffic.
 
-| VLAN | Name       | Native VLAN | Subnet          | PVE interface              |
-| ---- | ---------- | ----------- | --------------- | -------------------------- |
-| 22   | Management | 22          | 192.168.22.0/24 | enp87s0 → vmbr0            |
-| 33   | Kubernetes | 33          | 192.168.33.0/24 | enp90s0 → vmbr1            |
+| VLAN | Name       | Native VLAN | Subnet          | PVE interface   |
+| ---- | ---------- | ----------- | --------------- | --------------- |
+| 22   | Management | 22          | 192.168.22.0/24 | enp87s0 → vmbr0 |
+| 33   | Kubernetes | 33          | 192.168.33.0/24 | enp90s0 → vmbr1 |
 
 - Ports connected to **enp87s0** (vmbr0 — PVE management): native VLAN 22
 - Ports connected to **enp90s0** (vmbr1 — Kubernetes VM network): native VLAN 33
 - Loopback Control: **Disabled** (global setting)
 - The 10GbE SFP+ inter-node links (DAC cables on `enp2s0f*`) bypass the switch entirely — direct point-to-point connections for Ceph replication and Corosync ring1.
+
+---
 
 ### Node Addressing
 
@@ -78,11 +82,15 @@ An 8-port managed 2.5GbE switch. All three PVE nodes connect via their two 2.5Gb
 | pve2 | 192.168.22.12 | 10.255.255.2  | same slot order                              |
 | pve3 | 192.168.22.13 | 10.255.255.3  | same slot order                              |
 
+---
+
 ### Network Topology
 
 Each MS-01 connects to the **TP-Link SG2008 v4.20** switch via its two 2.5GbE ports (enp87s0 on VLAN 22 for PVE management, enp90s0 on VLAN 33 for Kubernetes VM traffic), and forms a **full-mesh** of direct 10GbE SFP+ links with the other two nodes (Ceph replication + Corosync ring1). No SFP+ traffic touches the switch.
 
 ![Proxmox MS-01 Cluster Network Diagram](docs/proxmox_ms01_cluster_network.svg)
+
+---
 
 **Cable summary** (3 × DAC SFP+ cables, no switch needed):
 
@@ -91,6 +99,8 @@ Each MS-01 connects to the **TP-Link SG2008 v4.20** switch via its two 2.5GbE po
 | DAC-1 | pve1 `enp2s0f0np0` | pve2 `enp2s0f0np0` | 10.10.10.0/30 | Ceph + Corosync ring1 |
 | DAC-2 | pve1 `enp2s0f1np1` | pve3 `enp2s0f0np0` | 10.10.20.0/30 | Ceph + Corosync ring1 |
 | DAC-3 | pve2 `enp2s0f1np1` | pve3 `enp2s0f1np1` | 10.10.30.0/30 | Ceph + Corosync ring1 |
+
+---
 
 ### Ceph OSD Assignment
 
