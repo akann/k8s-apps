@@ -52,6 +52,10 @@ All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact
 | NVMe (OSD large) | Lexar NM790 — 2 TB                                               |
 | NVMe (OSD small) | Lexar NM790 — 1 TB                                               |
 
+### The rack
+
+![The Rack](docs/rack.png)
+
 ### Node Addressing
 
 | Node | Mgmt IP       | OSPF Loopback | PCI NVMe slots                               |
