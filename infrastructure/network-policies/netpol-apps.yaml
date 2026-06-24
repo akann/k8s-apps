@@ -111,6 +111,12 @@ spec:
       ports:
         - port: 80
         - port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gotify
+      ports:
+        - port: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -127,6 +133,8 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+    - ports:
+        - port: 80   # alertmanager-gotify-bridge → gotify service
     - ports:
         - port: 443  # push notifications to FCM/APNs
 ---
