@@ -50,16 +50,16 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: SENTIMENT_MONGODB_URI
-            - name: ALPACA_API_KEY
+            - name: MASSIVE_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: portfolio-api-secret
-                  key: ALPACA_API_KEY
-            - name: ALPACA_API_SECRET
+                  key: MASSIVE_API_KEY
+            - name: FMP_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: portfolio-api-secret
-                  key: ALPACA_API_SECRET
+                  key: FMP_API_KEY
             - name: OTEL_SERVICE_NAME
               value: "portfolio-api"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

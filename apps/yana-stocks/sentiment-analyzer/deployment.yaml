@@ -21,16 +21,11 @@ spec:
         - name: sentiment-analyzer
           image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:4b17a41afa51aaf163dc4d8fde7172cbce735fd8
           env:
-            - name: ALPACA_API_KEY
+            - name: FMP_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: sentiment-analyzer-secret
-                  key: ALPACA_API_KEY
-            - name: ALPACA_API_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: sentiment-analyzer-secret
-                  key: ALPACA_API_SECRET
+                  key: FMP_API_KEY
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
