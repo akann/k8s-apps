@@ -38,6 +38,11 @@ spec:
                 secretKeyRef:
                   name: price-processor-secret
                   key: MASSIVE_API_KEY
+            - name: TWELVE_DATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: price-processor-secret
+                  key: TWELVE_DATA_API_KEY
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: OTEL_SERVICE_NAME
