@@ -60,6 +60,11 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: FMP_API_KEY
+            - name: TWELVE_DATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: TWELVE_DATA_API_KEY
             - name: OTEL_SERVICE_NAME
               value: "portfolio-api"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
