@@ -17,7 +17,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: frontend
-          image: harbor.yanatech.co.uk/yana-stocks/frontend:3870cea62e9bc613c377960a9f35a191d27d8af4
+          image: harbor.yanatech.co.uk/yana-stocks/frontend:7e9a986598eb152b0508b45960b87b20166d98b3
           ports:
             - containerPort: 3000
           env:
