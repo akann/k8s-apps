@@ -164,11 +164,6 @@ spec:
           config:
             global:
               resolve_timeout: 5m
-              smtp_smarthost: 'mail-eu.smtp2go.com:2525'
-              smtp_from: 'info@yanatech.co.uk'
-              smtp_auth_username: 'yanatech.co.uk'
-              smtp_auth_password_file: '/etc/alertmanager/smtp/smtp_password'
-              smtp_require_tls: true
             route:
               group_by: ['alertname', 'namespace']
               group_wait: 30s
@@ -192,9 +187,6 @@ spec:
                 webhook_configs:
                   - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook'
                     send_resolved: true
-                email_configs:
-                  - to: 'akan2000@gmail.com'
-                    send_resolved: true
             inhibit_rules:
               - source_matchers:
                   - severity = critical
@@ -211,14 +203,6 @@ spec:
                   - namespace
                   - alertname
           alertmanagerSpec:
-            volumes:
-              - name: smtp-secret
-                secret:
-                  secretName: grafana-smtp-secret
-            volumeMounts:
-              - name: smtp-secret
-                mountPath: /etc/alertmanager/smtp
-                readOnly: true
             storage:
               volumeClaimTemplate:
                 spec:
