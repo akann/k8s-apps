@@ -1,9 +1,28 @@
 # CiliumNetworkPolicy required for actions-runner pods to reach turbo-cache in yana-stocks.
 # Standard NetworkPolicy cross-namespace ClusterIP routing fails in Cilium native routing mode.
+# Both sides required: egress from actions-runner + ingress to turbo-cache.
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-runners-to-turbo-cache
+  name: allow-runners-to-turbo-cache-egress
+  namespace: actions-runner
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: yana-stocks
+            app: turbo-cache
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-runners-to-turbo-cache-ingress
   namespace: yana-stocks
 spec:
   endpointSelector:
