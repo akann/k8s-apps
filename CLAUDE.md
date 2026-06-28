@@ -210,6 +210,17 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 - **Never set `ServerSideApply=false` on a Rollout.** The Rollout CRD uses `x-kubernetes-preserve-unknown-fields` for `.spec.template`, so client-side structured merge diff fails with "field not declared in schema". The app-level `ServerSideApply=true` handles this correctly.
 - **Stray `spec.template` blocks in Service definitions** cause the same "field not declared in schema" error. Check multi-resource YAML files (Deployment + Service in one file) to ensure the Service section is not accidentally inheriting content from the Deployment's `spec.template`.
 - **`ComparisonError: field not declared in schema` on Rollout `.spec.template`**: Even with `ServerSideApply=true` and per-Application `ServerSideDiff=true` in syncOptions, ArgoCD v3.x requires the **global** `controller.diff.server.side: "true"` flag in `argocd-cmd-params-cm` (set via `configs.params` in the ArgoCD Helm values). Per-Application `ServerSideDiff=true` alone is insufficient — the controller ignores it without the global flag. Fix already applied in `infrastructure/argocd/values.yaml`.
+- **Argo Rollouts controller has high restart count (~2/day)** — suspected memory
+  leak or OOM. When the controller restarts mid-canary it sometimes fails to
+  re-evaluate an in-progress rollout whose timed pause has already expired,
+  leaving it permanently `Paused`. Diagnosis: check
+  `kubectl get rollout <name> -n <ns> -o jsonpath='{.status.phase} {.status.pauseConditions}'`
+  — if phase is `Paused` but the pause startTime is past its duration, the
+  controller is stuck. Fix: restart the controller pods and it re-evaluates
+  within ~15s:
+  ```bash
+  kubectl delete pod -n argo-rollouts -l app.kubernetes.io/name=argo-rollouts
+  ```
 
 ### Application source path discipline
 All manifests for an app (Deployments, Services, ExternalSecrets, etc.) MUST be inside the directory specified in the Application's `spec.source.path`. Files placed in a parent directory are silently ignored by ArgoCD. For apps with a `manifests/` subdirectory (e.g. `apps/gotify/manifests`), ensure every manifest — including ExternalSecrets — lives inside that subdirectory.
@@ -429,6 +440,9 @@ spec:
       steps:
         - setWeight: 10
         - pause: {duration: 5m}
+        - analysis:
+            templates:
+              - templateName: ml-predictor-success-rate
         - setWeight: 50
         - pause: {duration: 5m}
         - setWeight: 100
