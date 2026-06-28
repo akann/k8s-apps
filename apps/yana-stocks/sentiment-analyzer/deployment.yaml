@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: sentiment-analyzer
-          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:fe66f68b69eb214929ef04e741716183737d32c8
+          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:f309b991e9612c2c3877084dfc067a7ee9c1e20c
           env:
             - name: FMP_API_KEY
               valueFrom:

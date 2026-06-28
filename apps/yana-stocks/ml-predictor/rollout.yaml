@@ -20,7 +20,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: ml-predictor
-          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:fe66f68b69eb214929ef04e741716183737d32c8
+          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:f309b991e9612c2c3877084dfc067a7ee9c1e20c
           ports:
             - containerPort: 8000
           env:
