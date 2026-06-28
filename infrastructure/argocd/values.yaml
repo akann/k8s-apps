@@ -59,6 +59,13 @@ spec:
                   until wget -qO /dev/null https://authentik.yanatech.co.uk/application/o/argo-cd/.well-known/openid-configuration; do
                     sleep 5
                   done
+        controller:
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+              additionalLabels:
+                release: kube-prometheus-stack
         server:
           ingress:
             enabled: true
