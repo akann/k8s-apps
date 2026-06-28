@@ -17,7 +17,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: api-docs
-          image: harbor.yanatech.co.uk/yana-stocks/api-docs:7e9a986598eb152b0508b45960b87b20166d98b3
+          image: harbor.yanatech.co.uk/yana-stocks/api-docs:6cf7dacd0fafb94de2eb895c43c4afac14dba3a3
           ports:
             - containerPort: 80
           readinessProbe:
