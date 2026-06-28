@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://helm.goharbor.io
     chart: harbor
-    targetRevision: "*"
+    targetRevision: "1.19.1"
     helm:
       valuesObject:
         externalURL: https://harbor.yanatech.co.uk
@@ -68,6 +68,14 @@ spec:
 
         notary:
           enabled: false
+
+        jobservice:
+          updateStrategy:
+            type: Recreate
+
+        registry:
+          updateStrategy:
+            type: Recreate
 
         metrics:
           enabled: true
