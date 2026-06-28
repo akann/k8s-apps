@@ -19,7 +19,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: price-processor
-          image: harbor.yanatech.co.uk/yana-stocks/price-processor:6cf7dacd0fafb94de2eb895c43c4afac14dba3a3
+          image: harbor.yanatech.co.uk/yana-stocks/price-processor:ef55df445a4c5262e6aacad0cd2358c31f21279e
           ports:
             - containerPort: 3000
           env:
