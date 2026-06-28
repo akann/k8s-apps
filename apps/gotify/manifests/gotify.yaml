@@ -90,6 +90,11 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/auth-url: "https://gotify.yanatech.co.uk/outpost.goauthentik.io/auth/nginx"
+    nginx.ingress.kubernetes.io/auth-signin: "https://gotify.yanatech.co.uk/outpost.goauthentik.io/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Set-Cookie,X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
 spec:
   ingressClassName: nginx
   rules:
@@ -103,6 +108,65 @@ spec:
                 name: gotify
                 port:
                   number: 80
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - gotify.yanatech.co.uk
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gotify-api
+  namespace: gotify
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: gotify.yanatech.co.uk
+      http:
+        paths:
+          - path: /message
+            pathType: Prefix
+            backend:
+              service:
+                name: gotify
+                port:
+                  number: 80
+          - path: /stream
+            pathType: Prefix
+            backend:
+              service:
+                name: gotify
+                port:
+                  number: 80
+  tls:
+    - secretName: wildcard-yanatech-tls
+      hosts:
+        - gotify.yanatech.co.uk
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gotify-outpost
+  namespace: gotify
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: gotify.yanatech.co.uk
+      http:
+        paths:
+          - path: /outpost.goauthentik.io
+            pathType: Prefix
+            backend:
+              service:
+                name: ak-outpost-gotify
+                port:
+                  number: 9000
   tls:
     - secretName: wildcard-yanatech-tls
       hosts:
