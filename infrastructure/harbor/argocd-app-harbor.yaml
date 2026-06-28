@@ -69,13 +69,8 @@ spec:
         notary:
           enabled: false
 
-        jobservice:
-          updateStrategy:
-            type: Recreate
-
-        registry:
-          updateStrategy:
-            type: Recreate
+        updateStrategy:
+          type: Recreate
 
         metrics:
           enabled: true
