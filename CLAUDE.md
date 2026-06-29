@@ -364,7 +364,8 @@ apps/yana-stocks/
 ├── ml-predictor/                  # Python, Argo Rollouts canary
 ├── portfolio-service/             # NestJS
 ├── portfolio-api/                 # NestJS
-└── frontend/                      # Next.js, ingress stocks.yanatech.co.uk
+├── frontend/                      # Next.js, ingress stocks.yanatech.co.uk
+└── turbo-cache/                   # ducktors/turborepo-remote-cache → MinIO bucket `turborepocache`
 ```
 
 ### Images
