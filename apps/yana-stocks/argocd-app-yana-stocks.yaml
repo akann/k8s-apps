@@ -22,6 +22,11 @@ spec:
         - /spec/replicas
     - group: apps
       kind: Deployment
+      name: price-processor
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
       name: sentiment-analyzer
       jsonPointers:
         - /spec/replicas
