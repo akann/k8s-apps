@@ -6,7 +6,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: price-processor
-  minReplicaCount: 0
+  minReplicaCount: 1
   maxReplicaCount: 3
   pollingInterval: 30
   cooldownPeriod: 300
