@@ -235,8 +235,9 @@ spec:
         - .spec.storage
     - group: ""
       kind: Secret
-      managedFieldsManagers:
-        - helm
+      name: kube-prometheus-stack-grafana
+      jqPathExpressions:
+        - .data["admin-password"]
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
