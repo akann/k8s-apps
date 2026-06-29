@@ -8,4 +8,3 @@ config:
   claims_to_verify:
     - exp
   key_claim_name: iss
-  anonymous: null
