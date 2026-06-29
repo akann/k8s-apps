@@ -16,7 +16,7 @@ spec:
       values: |
         crds:
           upgradeJob:
-            enabled: true
+            enabled: false
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret
