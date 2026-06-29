@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: price-processor
+  namespace: yana-stocks
+spec:
+  scaleTargetRef:
+    name: price-processor
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        consumerGroup: price-processor
+        topic: stocks.prices.raw
+        lagThreshold: "100"
+        offsetResetPolicy: latest

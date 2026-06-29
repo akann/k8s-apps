@@ -1,0 +1,27 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: portfolio-service
+  namespace: yana-stocks
+spec:
+  scaleTargetRef:
+    name: portfolio-service
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        consumerGroup: portfolio-service
+        topic: stocks.prices.processed
+        lagThreshold: "100"
+        offsetResetPolicy: latest
+    - type: kafka
+      metadata:
+        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        consumerGroup: portfolio-service
+        topic: users.registered
+        lagThreshold: "100"
+        offsetResetPolicy: latest
