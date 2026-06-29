@@ -214,6 +214,29 @@ spec:
                   resources:
                     requests:
                       storage: 10Gi
+  ignoreDifferences:
+    - group: monitoring.coreos.com
+      kind: Prometheus
+      name: kube-prometheus-stack-prometheus
+      jqPathExpressions:
+        - .spec.affinity
+        - .spec.automountServiceAccountToken
+        - .spec.enableOTLPReceiver
+        - .spec.hostNetwork
+        - .spec.imagePullPolicy
+        - .spec.podMonitorNamespaceSelector
+        - .spec.podMonitorSelector
+        - .spec.probeNamespaceSelector
+        - .spec.probeSelector
+        - .spec.scrapeConfigNamespaceSelector
+        - .spec.scrapeConfigSelector
+        - .spec.serviceMonitorNamespaceSelector
+        - .spec.shards
+        - .spec.storage
+    - group: ""
+      kind: Secret
+      managedFieldsManagers:
+        - helm
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
