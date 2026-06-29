@@ -357,13 +357,13 @@ apps/yana-stocks/
 ├── argocd-app-yana-stocks.yaml    # app-of-apps
 ├── kong/                          # KongConsumer (auth-service), JWT/CORS plugins, ingress routes
 ├── auth-service/                  # Go, CNPG cluster (auth-service-pg), golang-migrate at startup
-├── profile-service/               # NestJS, MongoDB, consumes users.registered Kafka topic
+├── profile-service/               # NestJS, MongoDB, KEDA ScaledObject (min 1, users.registered)
 ├── price-ingestor/                # Python, KEDA ScaledObject
-├── price-processor/               # NestJS
-├── sentiment-analyzer/            # Python, KEDA ScaledObject
+├── price-processor/               # NestJS, KEDA ScaledObject (min 0, stocks.prices.raw)
+├── sentiment-analyzer/            # Python, KEDA ScaledObject (min 0, stocks.prices.processed)
 ├── ml-predictor/                  # Python, Argo Rollouts canary
-├── portfolio-service/             # NestJS
-├── portfolio-api/                 # NestJS
+├── portfolio-service/             # NestJS, KEDA ScaledObject (min 1, prices.processed + users.registered)
+├── portfolio-api/                 # NestJS, KEDA ScaledObject (min 1, prices.processed + signals)
 ├── frontend/                      # Next.js, ingress stocks.yanatech.co.uk
 └── turbo-cache/                   # ducktors/turborepo-remote-cache → MinIO bucket `turborepocache`
 ```
@@ -406,7 +406,7 @@ stocks.portfolio.events
 ```
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
-### KEDA ScaledObject pattern (price-ingestor, sentiment-analyzer)
+### KEDA ScaledObject pattern (price-ingestor, price-processor, sentiment-analyzer, profile-service, portfolio-service, portfolio-api)
 ```yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject

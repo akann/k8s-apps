@@ -4,6 +4,23 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-06-29
+
+### KEDA Kafka ScaledObjects added to remaining yana-stocks consumers
+
+**Change:** Added `keda-scaledobject.yaml` to `price-processor`, `profile-service`, `portfolio-service`, and `portfolio-api`. All use lag threshold 100 on their respective topics, matching the existing `sentiment-analyzer` pattern.
+
+| Service | min | max | Topic(s) |
+|---|---|---|---|
+| price-processor | 0 | 3 | `stocks.prices.raw` |
+| profile-service | 1 | 3 | `users.registered` |
+| portfolio-service | 1 | 3 | `stocks.prices.processed`, `users.registered` |
+| portfolio-api | 1 | 3 | `stocks.prices.processed`, `stocks.signals.sentiment`, `stocks.signals.prediction` |
+
+`price-processor` scales to 0 (pure pipeline, no user-facing cold start). `profile-service` keeps min 1 because profile creation must be near-immediate post-registration. `portfolio-service` and `portfolio-api` keep min 1 because they serve HTTP traffic.
+
+---
+
 ## 2026-06-24
 
 ### Kong `RepeatedResourceWarning` — 12 duplicate CRDs (resolved)
