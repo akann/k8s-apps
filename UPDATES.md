@@ -136,3 +136,96 @@ kubectl rollout restart deployment alertmanager-gotify-bridge -n gotify
 ```
 
 Result: bridge starts cleanly, no 401 errors, no i/o timeouts.
+
+---
+
+## 2026-06-28/29
+
+### Harbor Degraded — RWO PVC rolling update deadlock (resolved)
+
+**Symptom:** Harbor showed `Degraded` in ArgoCD for 94+ minutes. `harbor-jobservice` and `harbor-registry` had new RS pods stuck in `ContainerCreating` with no events (events expire after ~1h). kubelet on k8s-worker-2 logged:
+```
+unmounted volumes=[job-logs], unattached volumes=[job-logs], failed to process volumes=[]: context deadline exceeded
+```
+
+**Root cause:** Two compounding issues:
+1. `targetRevision: "*"` in `argocd-app-harbor.yaml` caused an uncontrolled chart upgrade when a new Harbor chart version was published.
+2. The upgrade triggered a rolling update. The new pods were scheduled on `k8s-worker-2`; the old pods (with RWO Ceph RBD PVCs) were on `k8s-worker-1`. Kubernetes deadlock: new pods can't mount the volume (held by old pods on another node), old pods won't terminate (rolling update waits for new pods to be Ready first).
+
+**Why kubectl rollout undo failed:** ArgoCD's `selfHeal: true` immediately re-applied the git state, overwriting the rollback within seconds.
+
+**Fix:**
+1. Patched `harbor-jobservice` and `harbor-registry` Deployments directly to `Recreate` strategy, breaking the deadlock:
+```bash
+kubectl patch deployment harbor-jobservice -n harbor \
+  -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+kubectl patch deployment harbor-registry -n harbor \
+  -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+```
+All pods Running within 1 minute.
+
+2. Updated git:
+   - `targetRevision: "*"` → `targetRevision: "1.19.1"` (pin chart version)
+   - Added top-level `updateStrategy: {type: Recreate}` to Helm values (Harbor chart uses `.Values.updateStrategy.type`, not per-component keys)
+
+**Key lesson:** Harbor's jobservice and registry use RWO PVCs. `updateStrategy: Recreate` must be set at the **top level** of Harbor Helm values — not under `jobservice:` or `registry:` (those keys are silently ignored by the chart template).
+
+```yaml
+# argocd-app-harbor.yaml (correct location)
+helm:
+  valuesObject:
+    updateStrategy:
+      type: Recreate
+```
+
+---
+
+### Gotify Authentik forward auth — attempted, reverted
+
+**Context:** Added Authentik forward auth to Gotify to avoid exposing it with only its own login. Configured an Authentik provider, application, and outpost via the Authentik UI, then added auth annotations and an outpost ingress to `gotify.yaml`.
+
+**Problem:** Authentik forward auth and application-level auth are orthogonal concerns. Authentik acts as an access gate (decides who can reach the URL). Once through, Gotify still presents its own login screen. Gotify is a React SPA using `localStorage` tokens — nginx/Authentik cannot inject credentials or bypass the app's internal auth flow. The result was two sequential login screens, which is worse UX than no Authentik at all.
+
+**Revert:** Removed auth annotations and outpost ingress from `gotify.yaml`, removed `ak-outpost-svc.yaml` (ExternalName service). The `/message` and `/stream` bypass ingress (`gotify-api`) was retained for the alertmanager bridge.
+
+**Conclusion:** Forward auth is only appropriate for apps that either (a) have no auth of their own, or (b) support header-based SSO injection. Gotify's SPA architecture makes it incompatible with forward auth as an SSO replacement.
+
+---
+
+### Alertmanager email notifications removed
+
+**Change:** Removed all email routing from Alertmanager. Previously `critical-alerts` receiver sent to both Gotify and SMTP2GO; now all alerts route to Gotify only.
+
+Removed from `argocd-app-monitoring.yaml`:
+- `global.smtp_*` settings
+- `email_configs` from `critical-alerts` receiver
+- `grafana-smtp-secret` volume + volume mount from `alertmanagerSpec`
+
+The `external-secret-smtp.yaml` and `grafana-smtp-secret` secret still exist but are no longer referenced by Alertmanager. The `grafana-smtp-secret` ESO resource can be deleted if Grafana SMTP is also not needed.
+
+---
+
+### ArgoCD app health alerts → Gotify via Prometheus
+
+**Problem:** No visibility into ArgoCD app health changes (Degraded, Missing, OutOfSync) — discovered Harbor was Degraded only by chance.
+
+**Fix:**
+
+1. **ArgoCD controller metrics** — enabled via `infrastructure/argocd/values.yaml`:
+```yaml
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+```
+This creates a `Service` on port 8082 and a `ServiceMonitor` so Prometheus scrapes `argocd_app_info` from the ArgoCD application controller.
+
+2. **PrometheusRule** — `infrastructure/monitoring/rules/prometheusrule-argocd.yaml`:
+   - `ArgoCDAppDegraded` (critical, 5m) — fires when `health_status="Degraded"`
+   - `ArgoCDAppMissing` (critical, 5m) — fires when `health_status="Missing"`
+   - `ArgoCDAppOutOfSync` (warning, 15m) — fires when `sync_status="OutOfSync"`
+
+3. **Alertmanager routing** — critical alerts → Gotify (already configured). The PrometheusRule labels `severity: critical` for Degraded/Missing, so they route to the `critical-alerts` receiver → Gotify bridge.

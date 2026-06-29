@@ -47,22 +47,22 @@ argocd app sync monitoring --grpc-web
 |----------|---------|---------|
 | `null` | `Watchdog`, `InfoInhibitor` | discarded |
 | `gotify` | all other alerts (default) | Gotify push (`alertmanager-gotify-bridge`) |
-| `critical-alerts` | `severity=critical` | Gotify push + email to `akan2000@gmail.com` |
+| `critical-alerts` | `severity=critical` | Gotify push (`alertmanager-gotify-bridge`) |
 
-SMTP relay: SMTP2GO (`mail-eu.smtp2go.com:2525`, STARTTLS).
+All alerts route to Gotify only. Email notifications were removed 2026-06-29.
 
 ## Secrets
 
-Three secrets are required before the Grafana and Alertmanager pods start:
+Two secrets are required before the Grafana pod starts:
 
 | Secret | Managed by | Contents |
 |--------|-----------|---------|
 | `grafana-authentik-secret` | ESO (Infisical) | `client_id`, `client_secret` |
-| `grafana-smtp-secret` | ESO (Infisical) | `smtp_username`, `smtp_password`, `smtp_from` |
 | `grafana-pg-secret` | ESO (Kubernetes provider → yana-stocks) | `password` (CNPG auth-service-pg) |
 
-SMTP credentials are sourced from `/yana-stocks/auth-service/SMTP_*` in Infisical.
 PostgreSQL password is synced from the `auth-service-pg-app` secret in the `yana-stocks` namespace via a Kubernetes-provider ClusterSecretStore (`k8s-yana-stocks`).
+
+Note: `grafana-smtp-secret` and `external-secret-smtp.yaml` still exist in the cluster but are no longer referenced by Alertmanager.
 
 ## Files in This Directory
 
@@ -87,4 +87,30 @@ kubectl apply -f infrastructure/monitoring/<file>.yaml
 - Grafana → Prometheus: `CiliumNetworkPolicy` required (`ciliumnetpol-grafana-prometheus.yaml`) — standard NetworkPolicy ClusterIP routing fails in Cilium native routing mode
 - Grafana → PostgreSQL (yana-stocks): `CiliumNetworkPolicy` required (`ciliumnetpol-grafana-pg.yaml`) — same reason
 - Alertmanager → Gotify: standard NetworkPolicy sufficient (`allow-alertmanager-egress`)
-- Alertmanager → SMTP2GO (port 2525): requires `allow-alertmanager-egress` to include port 2525 egress
+
+## ArgoCD Metrics Scraping
+
+The ArgoCD application controller exposes `argocd_app_info` on port 8082. Prometheus scrapes it via a `ServiceMonitor` created by the ArgoCD Helm chart.
+
+**Enabled in `infrastructure/argocd/values.yaml`:**
+```yaml
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+```
+
+The `additionalLabels: {release: kube-prometheus-stack}` is required for the kube-prometheus-stack Prometheus operator to discover the ServiceMonitor.
+
+**PrometheusRules:** `infrastructure/monitoring/rules/prometheusrule-argocd.yaml` defines three alerts (all route to Gotify via Alertmanager):
+
+| Alert | Condition | Severity | For |
+|-------|-----------|----------|-----|
+| `ArgoCDAppDegraded` | `health_status="Degraded"` | critical | 5m |
+| `ArgoCDAppMissing` | `health_status="Missing"` | critical | 5m |
+| `ArgoCDAppOutOfSync` | `sync_status="OutOfSync"` | warning | 15m |
+
+Note: Apps listed in the README.md "Known Permanent OutOfSync" section will fire `ArgoCDAppOutOfSync` continuously. Silence them in Alertmanager or add `unless` matchers to the rule if needed.

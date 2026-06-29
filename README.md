@@ -805,7 +805,6 @@ graph LR
 
     subgraph Notifications["Notifications"]
         Gotify["Gotify\ngotify.yanatech.co.uk"]
-        Email["Email\nakan2000@gmail.com\n(critical only)"]
     end
 
     Pods -->|"metrics /metrics"| Prom
@@ -819,7 +818,6 @@ graph LR
     Tempo --> Grafana
     Prom --> Alert
     Alert -->|"all alerts"| Gotify
-    Alert -->|"severity=critical"| Email
 ```
 
 ### 11.2 Grafana Datasources
@@ -841,9 +839,11 @@ graph LR
 | ----------------- | -------------------------------------- | -------------------------------------------------- |
 | `null`            | `alertname =~ Watchdog\|InfoInhibitor` | discarded                                          |
 | `gotify`          | default (all other alerts)             | `alertmanager-gotify-bridge` in `gotify` namespace |
-| `critical-alerts` | `severity = critical`                  | Gotify + email to `akan2000@gmail.com` via SMTP2GO |
+| `critical-alerts` | `severity = critical`                  | `alertmanager-gotify-bridge` in `gotify` namespace |
 
-Email relay: SMTP2GO (`mail-eu.smtp2go.com:2525`, MandatoryStartTLS). Credentials in `grafana-smtp-secret` (ESO-managed from Infisical).
+All alerts route to Gotify only. Email notifications were removed 2026-06-29.
+
+ArgoCD app health alerts (`ArgoCDAppDegraded`, `ArgoCDAppMissing`, `ArgoCDAppOutOfSync`) are defined in `infrastructure/monitoring/rules/prometheusrule-argocd.yaml`. The ArgoCD controller metrics are scraped via a ServiceMonitor enabled in `infrastructure/argocd/values.yaml`.
 
 ### 11.4 Network Observability
 
@@ -1001,13 +1001,15 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 
 **Symptom:** New pods stuck in `ContainerCreating` with no events (events expire after ~1h).
 
-**Fix:** Delete the old running pods to release the PVCs:
+**Emergency fix:** Delete the old running pods to release the PVCs:
 
 ```bash
 kubectl delete pod -n harbor <old-jobservice-pod> <old-registry-pod>
 ```
 
 Kubernetes will garbage-collect the old ReplicaSet once the new pods become Ready.
+
+**Permanent fix:** Set `updateStrategy: {type: Recreate}` at the **top level** of the Harbor Helm values (not under `jobservice:` or `registry:` — those are silently ignored by the chart template). Also pin `targetRevision` to a specific chart version to prevent uncontrolled upgrades. Both are set in `infrastructure/harbor/argocd-app-harbor.yaml`.
 
 ### ArgoCD ComparisonError on Argo Rollouts `.spec.template`
 
