@@ -359,7 +359,7 @@ apps/yana-stocks/
 ├── auth-service/                  # Go, CNPG cluster (auth-service-pg), golang-migrate at startup
 ├── profile-service/               # NestJS, MongoDB, KEDA ScaledObject (min 1, users.registered)
 ├── price-ingestor/                # Python, KEDA ScaledObject
-├── price-processor/               # NestJS, KEDA ScaledObject (min 0, stocks.prices.raw)
+├── price-processor/               # NestJS, KEDA ScaledObject (min 1, stocks.prices.raw)
 ├── sentiment-analyzer/            # Python, KEDA ScaledObject (min 0, stocks.prices.processed)
 ├── ml-predictor/                  # Python, Argo Rollouts canary
 ├── portfolio-service/             # NestJS, KEDA ScaledObject (min 1, prices.processed + users.registered)
