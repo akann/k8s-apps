@@ -67,6 +67,8 @@ spec:
       kind: ValidatingWebhookConfiguration
       name: kong-controller-kong-validations
       jsonPointers:
+        - /webhooks/0/timeoutSeconds
+        - /webhooks/1/timeoutSeconds
         - /webhooks/2/timeoutSeconds
   syncPolicy:
     automated:

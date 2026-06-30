@@ -328,11 +328,19 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 - **No admin UI** in OSS mode
 
 ### Webhook timeout (IMPORTANT)
-The `kong-controller-kong-validations` ValidatingWebhookConfiguration intercepts all Service CREATE/UPDATE cluster-wide. Due to Cilium native routing, the kube-apiserver→webhook call takes ~10s, which exceeds Strimzi's fabric8 HTTP client timeout and causes the operator to crash-loop.
+The `kong-controller-kong-validations` ValidatingWebhookConfiguration has three webhooks, all with `timeoutSeconds: 10` by default. Due to Cilium native routing, the kube-apiserver→webhook call takes ~10s each, causing timeouts in multiple operators.
 
-**Fix applied:** `timeoutSeconds` patched to `5` on the services webhook so it fails-open (failurePolicy: Ignore) before Strimzi times out. `ignoreDifferences` in `argocd-app-kong.yaml` prevents ArgoCD from reverting this.
+**All three webhooks must have `timeoutSeconds: 5`:**
 
-**Do not increase `timeoutSeconds` back to 10** — it will break the Strimzi operator again.
+| Index | Name | Why 5s matters |
+|-------|------|----------------|
+| 0 | `secrets.credentials.validation.*` | Intercepts ALL secrets cluster-wide — was blocking cert-manager SSA PATCH on TLS secrets (`context deadline exceeded` after two sequential 10s calls = 20s total) |
+| 1 | `secrets.plugins.validation.*` | Same — also intercepts all secrets cluster-wide |
+| 2 | `services.validation.*` | Intercepts all Service CREATE/UPDATE — was breaking Strimzi (fabric8 HTTP client timeout) |
+
+**Fix applied:** `timeoutSeconds` patched to `5` on all three webhook entries. `ignoreDifferences` in `argocd-app-kong.yaml` (indices 0, 1, 2) prevents ArgoCD from reverting this.
+
+**Do not increase `timeoutSeconds` back to 10** — it will break cert-manager secret writes AND the Strimzi operator.
 
 ### Adding a Kong route
 ```yaml
