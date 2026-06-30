@@ -38,11 +38,16 @@ spec:
             volumeMounts:
               - mountPath: /target
                 name: plugins
+        deployNodeAgent: true
+        nodeAgent:
+          podVolumePath: /var/lib/kubelet/pods
+          privileged: false
         schedules:
           weekly-backup:
             schedule: "0 2 * * 0"
             template:
               ttl: 720h
+              defaultVolumesToFsBackup: true
               excludedNamespaces:
                 - kube-system
                 - kube-public

@@ -15,6 +15,22 @@ spec:
       postInitSQL:
         - CREATE SCHEMA IF NOT EXISTS auth
         - ALTER ROLE app SET search_path = auth
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://cnpg-backups/auth-service-pg
+      endpointURL: http://minio.minio.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-minio-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-minio-credentials
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: 7d
   storage:
     size: 10Gi
     storageClass: ceph-rbd
