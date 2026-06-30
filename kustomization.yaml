@@ -69,6 +69,7 @@ resources:
   - infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
   - infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
   - infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
+  - infrastructure/actions-runner/argocd-app-runners-shared-services.yaml
 
   # Apps
   - apps/vaultwarden/argocd-app-vaultwarden.yaml
