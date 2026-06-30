@@ -17,3 +17,11 @@ spec:
         selector:
           dnsZones:
             - yanatech.co.uk
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-nkweini
+              key: api-token
+        selector:
+          dnsZones:
+            - nkweini.org
