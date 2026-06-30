@@ -23,6 +23,9 @@ spec:
           rebootDelay: 60s
           # Notify Gotify when a node reboots
           notifyUrl: "http://gotify.gotify.svc.cluster.local/message?token=AvMQK99JPxH2tYh"
+          # Abort drain after 5m and reboot anyway — CNPG recovers via WAL archiving
+          drainTimeout: 5m
+          forceReboot: true
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
