@@ -352,6 +352,10 @@ spec:
         - port: 9022
     - ports:
         - port: 9443  # webhook
+    - from:
+        - podSelector: {}  # metrics-apiserver → operator gRPC
+      ports:
+        - port: 9666
   egress:
     - {} # KEDA reads ScaledObjects across all namespaces + connects to scalers (Kafka, Prometheus)
 ---
