@@ -85,3 +85,4 @@ resources:
   - apps/immich/argocd-app-immich-helm.yaml
   - apps/yana-stocks/argocd-app-yana-stocks.yaml
   - apps/akan/argocd-app-akan.yaml
+  - apps/shared-services/argocd-app-shared-services.yaml

@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - kafka-cluster.yaml
   - yana-stocks-topics.yaml
+  - shared-services-topics.yaml
