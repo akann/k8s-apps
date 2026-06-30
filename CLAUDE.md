@@ -113,11 +113,23 @@ spec:
 - **Vaultwarden:** `vault.yanatech.co.uk` — bootstrap source of truth for manual secrets
 
 ### Databases
-- **CNPG pg-main:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` — shared cluster for vaultwarden, authentik, nextcloud, infisical, apicurio
-- **Immich postgres:** `immich-postgres-rw.immich.svc.cluster.local:5432` — dedicated CNPG cluster using `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1`
+- **CNPG pg-main:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` — shared cluster for vaultwarden, authentik, nextcloud, infisical, apicurio (4 instances; barman backup to MinIO `s3://cnpg-backups/pg-main/`)
+- **Immich postgres:** `immich-postgres-rw.immich.svc.cluster.local:5432` — dedicated CNPG cluster using `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (2 instances)
 - **MongoDB:** `mongodb-headless.mongodb.svc.cluster.local:27017` (replicaSet=rs0)
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
+
+### Backup Strategy
+- **CNPG clusters (pg-main, auth-service-pg, immich-postgres):** barman WAL streaming + daily ScheduledBackup → MinIO `s3://cnpg-backups/` — provides PITR to any second
+- **harbor-database** (plain StatefulSet, not CNPG): daily pg_dump CronJob (`harbor-db-backup` in `harbor` ns) → MinIO `s3://cnpg-backups/harbor-db/`, rolling 7-day filenames (`harbor-Monday.sql.gz` … `harbor-Sunday.sql.gz`)
+- **PVC data (all workloads):** Velero node-agent (Kopia fs-backup) on all nodes, daily schedule → Backblaze B2 `s3://yanatech-velero/`; `defaultVolumesToFsBackup: true` covers all PVCs
+- **MinIO credentials for backup jobs:** Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`, provisioned via ExternalSecret in each namespace
+
+### kured (node reboot daemon)
+- **Config:** `infrastructure/kured/argocd-app-kured.yaml`
+- **drainTimeout: 5m** — drain attempt times out after 5 minutes rather than waiting forever
+- **forceReboot: true** — reboots the node even if drain didn't fully complete (CNPG primary recovers via WAL replay after reboot)
+- **IMPORTANT:** CNPG clusters must have `instances ≥ 2` for kured drains to succeed. A single-instance CNPG cluster sets its primary PDB to `ALLOWED DISRUPTIONS: 0`, permanently blocking drain. If a worker self-cordon and kured is stuck, first check CNPG PDB status: `kubectl get pdb -A`
 
 ### SSO
 - **Authentik:** `https://authentik.yanatech.co.uk` — SSO for all services
@@ -175,7 +187,7 @@ spec:
 - Wave 5: Loki, Promtail, Headlamp, Goldilocks, Redis, MongoDB, MinIO, Kong
 - Wave 6: ESO, Infisical, Redis-Insight, Mongo-Express
 - Wave 7: CNPG operator, CNPG clusters
-- Wave 8: Harbor, Actions Runner
+- Wave 8: Harbor, Harbor-backup (pg_dump CronJob), Actions Runner
 - Wave 9+: Applications (Vaultwarden, Kafka, Immich, etc.)
 - Wave 10+: yana-stocks services
 
@@ -267,6 +279,7 @@ kubectl rollout restart deployment harbor-core -n harbor
 3. **Ceph CSI OSD egress** requires `CiliumNetworkPolicy` with `toCIDR` — NOT standard NetworkPolicy
 4. **Cross-namespace ClusterIP routing** requires `CiliumNetworkPolicy` in Cilium native routing mode — standard NetworkPolicy doesn't work. Confirmed for: Grafana → Prometheus, Grafana → PostgreSQL (yana-stocks). Use `toEndpoints` with pod labels.
 5. **ESO webhook disabled** — was blocking syncs. Do NOT re-enable without also adding CiliumNetworkPolicy for node IP ingress
+6. **KEDA intra-namespace gRPC (port 9666):** `metrics-apiserver` → `keda-operator` requires an explicit `podSelector: {}` ingress rule on port 9666 in the `allow-keda` policy — `default-deny-all` blocks it otherwise
 
 ### Files
 - `infrastructure/network-policies/netpol-infrastructure.yaml` — all infrastructure namespaces
@@ -374,26 +387,7 @@ All pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 ### CNPG for auth-service
 Separate CNPG cluster `auth-service-pg` in `yana-stocks` namespace (not shared with pg-main).
 Migrations run at pod startup via golang-migrate (no initContainer needed).
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: auth-service-pg
-  namespace: yana-stocks
-spec:
-  instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:16
-  bootstrap:
-    initdb:
-      database: yana_stocks
-      owner: yana_stocks
-      secret:
-        name: auth-service-pg-credentials
-  storage:
-    size: 10Gi
-    storageClass: ceph-rbd
-```
+Cluster has 2 instances (primary + 1 replica) with barman backup to MinIO `s3://cnpg-backups/auth-service-pg/` and a daily ScheduledBackup at 01:00. MinIO credentials provisioned via ExternalSecret `cnpg-minio-credentials` (Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`).
 
 ### Kafka topics (already created)
 ```

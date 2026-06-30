@@ -4,6 +4,97 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-06-30
+
+### kured permanently stuck on k8s-worker-2 — drainTimeout + forceReboot fix
+
+**Symptom:** `k8s-worker-2` was cordoned by kured (`node.kubernetes.io/unschedulable: kured`) but never rebooted. kured was stuck in an infinite drain-eviction loop, retrying every 60s.
+
+**Root cause:** All CNPG clusters had `instances: 1`. A single-instance CNPG cluster creates two PDBs:
+- `<name>` — allows 0 disruptions on the replica set (empty, no replicas)
+- `<name>-primary` — `minAvailable: 1` on the primary, meaning `ALLOWED DISRUPTIONS: 0`
+
+kured's drain cannot evict the primary pod; the node never drains, so reboot never happens, so the node stays cordoned.
+
+**Fix — two parts:**
+1. Scale all CNPG clusters to ≥ 2 instances so the primary can failover during drain:
+   - `auth-service-pg`: 1 → 2 instances (`apps/yana-stocks/auth-service/cnpg-cluster.yaml`)
+   - `immich-postgres`: 1 → 2 instances (`apps/immich/postgres-cluster.yaml`)
+   - `pg-main`: 3 → 4 instances (`infrastructure/cnpg-clusters/pg-main.yaml`)
+2. Add drain timeout + force-reboot to kured so primary nodes get rebooted even if drain times out (CNPG recovers via WAL replay):
+   - `infrastructure/kured/argocd-app-kured.yaml`:
+     ```yaml
+     drainTimeout: 5m
+     forceReboot: true
+     ```
+
+---
+
+### CNPG backups — auth-service-pg had no backup coverage
+
+**Problem:** `auth-service-pg` had no barman configuration and no ScheduledBackup. Data loss risk: entire DB.
+
+**Fix:**
+- Added barman backup block to `apps/yana-stocks/auth-service/cnpg-cluster.yaml`:
+  - WAL streaming + daily base backup → MinIO `s3://cnpg-backups/auth-service-pg/`
+  - 7-day retention, gzip compression
+- New `apps/yana-stocks/auth-service/external-secret-minio.yaml` — provisions `cnpg-minio-credentials` from Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` and `/cnpg-clusters/MINIO_SECRET_KEY`
+- New `apps/yana-stocks/auth-service/scheduled-backup.yaml` — daily ScheduledBackup at 01:00
+
+---
+
+### Velero — PVC data not being backed up
+
+**Problem:** Velero had `snapshotsEnabled: false` and no `node-agent` DaemonSet. Only Kubernetes API objects (Deployments, Services, CRDs, etc.) were backed up — no PVC contents.
+
+**Fix:** Updated `infrastructure/velero/argocd-app-velero.yaml`:
+- `deployNodeAgent: true` — enables Kopia fs-backup DaemonSet on all nodes
+- `defaultVolumesToFsBackup: true` in the daily schedule template — all PVCs included by default
+
+---
+
+### harbor-database — no backup coverage
+
+**Problem:** `harbor-database` is a plain StatefulSet (`goharbor/harbor-db`), not managed by CNPG. No backup existed.
+
+**Fix:**
+- New `infrastructure/harbor/db-backup-cronjob.yaml` — CronJob `harbor-db-backup` runs daily at 04:00:
+  - initContainer: `postgres:16-alpine` pg_dumps the `registry` DB → `/backup/harbor-$(date +%A).sql.gz` (rolling 7-day filenames)
+  - main container: `amazon/aws-cli` uploads to MinIO `s3://cnpg-backups/harbor-db/`
+- New `infrastructure/harbor/external-secret-minio.yaml` — provisions `minio-backup-credentials` in `harbor` namespace
+- New `infrastructure/harbor/argocd-app-harbor-backup.yaml` — new ArgoCD Application `harbor-backup` (wave 9) pointing to `infrastructure/harbor/`
+- Added `infrastructure/harbor/argocd-app-harbor-backup.yaml` to root `kustomization.yaml`
+
+---
+
+### Loki chunks-cache excessive memory usage
+
+**Problem:** Default `chunksCache.allocatedMemory: 8192` (8Gi) caused Loki to reserve 8Gi of RAM on k8s-worker-1, contributing to high memory pressure.
+
+**Fix:** Set `chunksCache.allocatedMemory: 2048` (2Gi) in `infrastructure/loki/argocd-app-loki.yaml`. Saved ~6Gi working memory on worker-1.
+
+---
+
+### KEDA gRPC timeout — metrics-apiserver blocked by NetworkPolicy
+
+**Problem:** KEDA `metrics-apiserver` could not reach the KEDA operator gRPC endpoint (port 9666) within the `keda` namespace. The `default-deny-all` NetworkPolicy blocked intra-namespace traffic not explicitly whitelisted.
+
+**Fix:** Added intra-namespace ingress rule for port 9666 to the `allow-keda` policy in `infrastructure/network-policies/netpol-infrastructure.yaml`:
+```yaml
+- from:
+    - podSelector: {}   # metrics-apiserver → operator gRPC
+  ports:
+    - port: 9666
+```
+
+---
+
+### Empty MinIO buckets deleted
+
+Deleted stale empty buckets `yana-stocks-datasets` and `yana-stocks-exports` from MinIO (`minio-console.yanatech.co.uk`). These were never populated; no data lost.
+
+---
+
 ## 2026-06-29
 
 ### KEDA Kafka ScaledObjects added to remaining yana-stocks consumers
