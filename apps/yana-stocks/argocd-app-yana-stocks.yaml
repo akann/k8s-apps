@@ -30,6 +30,21 @@ spec:
       name: sentiment-analyzer
       jsonPointers:
         - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: profile-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: portfolio-service
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: portfolio-api
+      jsonPointers:
+        - /spec/replicas
     - group: argoproj.io
       kind: Rollout
       jsonPointers:
