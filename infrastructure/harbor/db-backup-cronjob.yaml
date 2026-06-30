@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: harbor-db-backup
+  namespace: harbor
+spec:
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          initContainers:
+            - name: dump
+              image: postgres:16-alpine
+              command:
+                - sh
+                - -c
+                - |
+                  pg_dump -h harbor-database -U postgres -d registry \
+                    | gzip > /backup/harbor-$(date +%A).sql.gz
+                  echo "Dump complete: $(ls -lh /backup/)"
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: harbor-database
+                      key: POSTGRES_PASSWORD
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          containers:
+            - name: upload
+              image: amazon/aws-cli:2.27.16
+              command:
+                - sh
+                - -c
+                - |
+                  aws s3 cp /backup/ s3://cnpg-backups/harbor-db/ \
+                    --recursive \
+                    --endpoint-url http://minio.minio.svc.cluster.local:9000 \
+                    --no-sign-request
+                  echo "Upload complete"
+              env:
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-backup-credentials
+                      key: ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-backup-credentials
+                      key: ACCESS_SECRET_KEY
+                - name: AWS_DEFAULT_REGION
+                  value: us-east-1
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              emptyDir: {}

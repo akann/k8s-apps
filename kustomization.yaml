@@ -63,6 +63,7 @@ resources:
 
   # Wave 8 — harbor and CI runners
   - infrastructure/harbor/argocd-app-harbor.yaml
+  - infrastructure/harbor/argocd-app-harbor-backup.yaml
   - infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
   - infrastructure/actions-runner/argocd-app-actions-runner-apps.yaml
   - infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
