@@ -4,6 +4,24 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-01
+
+### shared-services added — email-api + email-service
+
+**Change:** New standalone repo `shared-services` (`github.com/akann/shared-services`, own Turborepo) deployed alongside yana-stocks/yanatech, to centralize email-sending (previously duplicated SMTP2GO logic in `auth-service` and `yanatech`'s contact form). Two NestJS apps: `email-api` (HTTP, validates + queues onto Kafka) and `email-service` (consumes the queue, sends via a swappable provider — SMTP2GO first), plus a `shared-api-docs` Redocly hub.
+
+Cross-repo resources added here in `k8s-apps` (manifests for the apps themselves live in the `shared-services` repo's own `k8s/`, yanatech-style):
+- `apps/kafka/shared-services-topics.yaml` — `KafkaTopic` CRDs `notifications-email-send` (24h retention) and `notifications-email-failed` (30d, DLQ)
+- `apps/shared-services/argocd-app-shared-services.yaml` — ArgoCD Application, `repoURL` points at the `shared-services` repo, `directory.recurse: true` (its `k8s/` has nested subfolders, unlike yanatech's flat one)
+- `infrastructure/network-policies/netpol-apps.yaml` — new `shared-services` namespace block: default-deny, Kong-only ingress to `email-api` (forces all callers through Kong's `key-auth` plugin rather than allowing a direct ClusterIP bypass), ingress-nginx ingress to `shared-api-docs`, kafka/SMTP2GO egress
+- `infrastructure/network-policies/netpol-apiserver-egress.yaml` — apiserver egress for the new namespace (mirrors yana-stocks, needed since `email-service` uses a KEDA ScaledObject)
+
+`email-api` is routed through Kong (`https://api-gateway.yanatech.co.uk/api/email/send`) with a `key-auth` plugin instead of an in-app auth check — same pattern as the JWT plugin already used for yana-stocks.
+
+**Still outstanding (manual, not git-managed):** Infisical folder/secrets provisioning (`/shared-services/email-api/EMAIL_API_KEY`, `/shared-services/email-service/SMTP_*`, `/shared-services/harbor/HARBOR_*`) — blocked on an expired `infisical` CLI session on `kc1` needing interactive re-login; GitHub repo secrets (`HARBOR_USERNAME`/`HARBOR_PASSWORD`) on the `shared-services` repo; Authentik provider/application for `shared-api-docs`.
+
+---
+
 ## 2026-06-30
 
 ### kured permanently stuck on k8s-worker-2 — drainTimeout + forceReboot fix

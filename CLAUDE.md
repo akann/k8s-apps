@@ -32,7 +32,8 @@ k8s-apps/
 │   ├── gotify/
 │   ├── apicurio/
 │   ├── kubernetes-dashboard/
-│   └── yana-stocks/               # yana-stocks microservices (Phase 4)
+│   ├── yana-stocks/               # yana-stocks microservices (Phase 4)
+│   └── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
 └── infrastructure/
     ├── argocd/
     ├── authentik/
@@ -464,6 +465,37 @@ spec:
         - name: ml-predictor
           image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:latest
 ```
+
+## shared-services
+
+### Repo
+`github.com/akann/shared-services` — standalone Turborepo (own remote, not a yana-stocks subdirectory). App manifests live in **its own repo** (`k8s/`), yanatech-style — only cluster-wide resources (Kafka topics, the ArgoCD Application, NetworkPolicies) live here in `k8s-apps`.
+
+### Namespace
+`shared-services`
+
+### Apps
+```
+email-api          # NestJS HTTP — POST /api/email/send, validates + queues onto Kafka, returns 202
+email-service       # NestJS Kafka consumer — sends via swappable EmailProvider (SMTP2GO first), retry+DLQ
+shared-api-docs     # Redocly OpenAPI hub for email-api, Authentik-protected (shared-api-docs.yanatech.co.uk)
+```
+
+### Kafka topics (in `apps/kafka/shared-services-topics.yaml`)
+```
+notifications.email.send     # 24h retention — producer: email-api, consumer: email-service
+notifications.email.failed   # 30d retention — DLQ, producer: email-service
+```
+Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` (same cluster-wide Strimzi broker as yana-stocks)
+
+### Routing
+`email-api` is reached only via Kong (`https://api-gateway.yanatech.co.uk/api/email/send`), gated by a `key-auth` plugin (not an in-app guard) — same pattern as the JWT plugin for yana-stocks. A `CiliumNetworkPolicy`-free plain `NetworkPolicy` restricts ingress to `email-api`'s ClusterIP to the `kong` namespace only, so callers can't bypass the key-auth check by hitting the Service directly.
+
+### KEDA ScaledObject (email-service)
+Same shape as yana-stocks' pattern above — `minReplicaCount: 0`, triggers on `notifications.email.send` consumer lag.
+
+### Images
+`harbor.yanatech.co.uk/shared-services/<app>:<tag>` — `email-api`, `email-service`, `shared-api-docs`
 
 ## Useful Commands
 
