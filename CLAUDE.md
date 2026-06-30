@@ -21,6 +21,7 @@ GitOps repository for Akan's homelab Kubernetes cluster. All infrastructure and 
 k8s-apps/
 ├── bootstrap.sh                    # Ordered app deployment for fresh cluster
 ├── apps/                           # Application ArgoCD apps
+│   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/)
 │   ├── immich/
 │   ├── kafka/
 │   ├── kafka-ui/
@@ -75,7 +76,9 @@ k8s-apps/
   - `192.168.33.201` — infisical bundled nginx (scaled to 0, do not use)
   - `192.168.33.202` — Kong API Gateway
 - **Ingress:** ingress-nginx at `192.168.33.200`
-- **TLS:** cert-manager, Let's Encrypt wildcard `wildcard-yanatech-tls` via Cloudflare DNS-01, reflected to all namespaces via Reflector
+- **TLS:** cert-manager, Let's Encrypt wildcards via Cloudflare DNS-01, reflected to all namespaces via Reflector:
+  - `wildcard-yanatech-tls` (`*.yanatech.co.uk`) — Cloudflare token from Infisical `/cert-manager/api-token`
+  - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)
 
 ### Storage
 - **Ceph RBD** (`ceph-rbd` StorageClass) — default StorageClass
@@ -511,3 +514,4 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | pgAdmin | https://pgadmin.yanatech.co.uk |
 | Apicurio | https://apicurio.yanatech.co.uk |
 | yana-stocks | https://stocks.yanatech.co.uk |
+| Akan personal site | https://akan.nkweini.org |

@@ -105,6 +105,43 @@ Deleted stale empty buckets `yana-stocks-datasets` and `yana-stocks-exports` fro
 
 ---
 
+### akan personal site deployment + nkweini.org wildcard TLS
+
+**Change:** Added ArgoCD Application `akan-deployment` (wave 9) pointing at `github.com/akann/akan` path `k8s/` — deploys the personal site to `akan.nkweini.org` in its own `akan` namespace.
+
+Added cert-manager resources for `*.nkweini.org`:
+- `infrastructure/cert-manager/certificate-nkweini.yaml` — Certificate for `nkweini.org` + `*.nkweini.org`, secret `wildcard-nkweini-tls` in `ingress-nginx` ns, Reflector auto-propagated to all namespaces
+- `infrastructure/cert-manager/external-secret-nkweini.yaml` — pulls Cloudflare API token scoped to nkweini.org from Infisical `/cert-manager/api-token-nkweini`
+- `infrastructure/cert-manager/clusterissuer.yaml` — updated to add a second DNS-01 solver for `nkweini.org` zone using the `cloudflare-api-token-nkweini` secret
+
+---
+
+### Reflector annotation keys corrected in wildcard-nkweini certificate
+
+**Problem:** Initial commit used incorrect Reflector annotation keys (`reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces` instead of `reflection-auto-namespaces`), so Reflector wasn't propagating the `wildcard-nkweini-tls` secret.
+
+**Fix:** Updated `infrastructure/cert-manager/certificate-nkweini.yaml` to use:
+```yaml
+reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: ".*"
+```
+
+---
+
+### Kong ValidatingWebhookConfiguration — timeoutSeconds reduced to 5
+
+**Problem:** `kong-controller-kong-validations` ValidatingWebhookConfiguration had `timeoutSeconds: 10` on all three webhook entries. In Cilium native routing mode, each kube-apiserver→webhook call takes ~10s. Two sequential calls (webhooks 0 and 1 both intercept all Secrets cluster-wide) consumed 20s total, exceeding cert-manager's context deadline and blocking TLS secret SSA PATCHes.
+
+All three webhooks affected:
+- index 0 — `secrets.credentials.validation.*` (all secrets cluster-wide)
+- index 1 — `secrets.plugins.validation.*` (all secrets cluster-wide)
+- index 2 — `services.validation.*` (all Service CREATE/UPDATE — was also breaking Strimzi)
+
+**Fix:** Patched `timeoutSeconds: 5` on all three webhook entries. Added indices 0, 1, 2 to `ignoreDifferences` in `infrastructure/kong/argocd-app-kong.yaml` so ArgoCD doesn't revert the live patch.
+
+---
+
 ## 2026-06-29
 
 ### KEDA Kafka ScaledObjects added to remaining yana-stocks consumers
