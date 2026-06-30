@@ -95,6 +95,16 @@ Deleted stale empty buckets `yana-stocks-datasets` and `yana-stocks-exports` fro
 
 ---
 
+### yana-stocks OutOfSync — KEDA replica drift on portfolio-api, portfolio-service, profile-service
+
+**Symptom:** `yana-stocks` app showing OutOfSync for three deployments — live `replicas: 2`, git `replicas: 1`.
+
+**Root cause:** KEDA ScaledObjects scale these deployments at runtime. ArgoCD sees the live replica count diverge from the manifest's static value and flags it as OutOfSync. Same cosmetic issue as `price-ingestor`, `price-processor`, `sentiment-analyzer` (already fixed).
+
+**Fix:** Added `/spec/replicas` to `ignoreDifferences` for all three in `apps/yana-stocks/argocd-app-yana-stocks.yaml`.
+
+---
+
 ## 2026-06-29
 
 ### KEDA Kafka ScaledObjects added to remaining yana-stocks consumers
