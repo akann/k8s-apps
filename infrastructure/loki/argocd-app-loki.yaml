@@ -48,6 +48,8 @@ spec:
             enabled: false
           lokiCanary:
             enabled: false
+        chunksCache:
+          allocatedMemory: 2048
         test:
           enabled: false
   destination:
