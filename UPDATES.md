@@ -6,6 +6,20 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-07-01
 
+### ml.yanatech.co.uk had no public DNS record — ingest-docs CI silently failed
+
+**Symptom:** The `ingest-docs.yml` workflow (in this repo, triggered on any `.md` change) failed with `curl` exit code 6 ("Could not resolve host") when POSTing to `https://ml.yanatech.co.uk/k8s-docs/ingest/webhook` — but the exact same URL worked fine from every other place it was tested (a homelab-connected machine, `kc1` directly, the `akan` pod). Every other `*.yanatech.co.uk` subdomain (`stocks`, `photos`, etc.) already has an explicit Cloudflare `CNAME` record → `yanatech.co.uk`, `proxied: true` — DNS here is **not wildcarded**, each public subdomain needs its own record added manually. `ml.yanatech.co.uk` simply never got one when the app was set up; every manual test up to that point happened to run from a network/host that could already resolve the internal ingress-nginx path some other way, masking the gap. GitHub Actions' hosted runner, with no such shortcut, was the first thing to actually exercise the real public path — and immediately failed.
+
+**Fix:** Added the missing record via the Cloudflare API (same token cert-manager already uses, `/cert-manager/api-token`), identical shape to the working `stocks.yanatech.co.uk` record:
+```bash
+curl -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+  -H "Authorization: Bearer $CF_TOKEN" \
+  --data '{"type":"CNAME","name":"ml.yanatech.co.uk","content":"yanatech.co.uk","ttl":1,"proxied":true}'
+```
+Confirmed via `dig @8.8.8.8`/`dig @1.1.1.1` before and after — genuinely nothing publicly resolvable beforehand, resolving correctly (matching the other subdomains' Cloudflare proxy IPs) afterward. Re-ran the failed workflow, then did a one-off full re-ingest of all `.md` files to make sure nothing from the intervening commits (a `git diff HEAD^ HEAD` on a multi-commit push only diffs the last commit — see the shared-services entry below on this exact class of gap) was silently missed.
+
+**Lesson for any new public-facing subdomain on `yanatech.co.uk`:** the Kubernetes-side Ingress/TLS being correctly configured says nothing about whether the DNS record actually exists — that's a separate, manual Cloudflare step, easy to forget because everything still "works" from inside the homelab network regardless.
+
 ### shared-services added — email-api + email-service
 
 **Change:** New standalone repo `shared-services` (`github.com/akann/shared-services`, own Turborepo) deployed alongside yana-stocks/yanatech, to centralize email-sending (previously duplicated SMTP2GO logic in `auth-service` and `yanatech`'s contact form). Two NestJS apps: `email-api` (HTTP, validates + queues onto Kafka) and `email-service` (consumes the queue, sends via a swappable provider — SMTP2GO first), plus a `shared-api-docs` Redocly hub.
