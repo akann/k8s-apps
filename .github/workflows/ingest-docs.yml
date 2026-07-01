@@ -13,9 +13,7 @@ on:
     branches:
       - main
     paths:
-      - 'CLAUDE.md'
-      - 'docs/**/*.md'
-      - 'README.md'
+      - '**/*.md'
 
 jobs:
   ingest-docs:
@@ -32,8 +30,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          CHANGED=$(git diff --name-only --diff-filter=ACM HEAD^ HEAD -- 'CLAUDE.md' 'docs/**/*.md' 'README.md' || true)
-          DELETED=$(git diff --name-only --diff-filter=D HEAD^ HEAD -- 'CLAUDE.md' 'docs/**/*.md' 'README.md' || true)
+          CHANGED=$(git diff --name-only --diff-filter=ACM HEAD^ HEAD -- '*.md' '**/*.md' || true)
+          DELETED=$(git diff --name-only --diff-filter=D HEAD^ HEAD -- '*.md' '**/*.md' || true)
 
           if [ -z "$CHANGED" ] && [ -z "$DELETED" ]; then
             echo "No doc changes, skipping ingest."
