@@ -516,9 +516,7 @@ spec:
       ports:
         - port: 4318  # Tempo OTLP HTTP
     - ports:
-        - port: 2525  # SMTP2GO (auth-service email verification, STARTTLS)
-    - ports:
-        - port: 443  # Alpaca, NewsAPI, HuggingFace
+        - port: 443  # Alpaca, NewsAPI, HuggingFace, api-gateway.yanatech.co.uk (email-api)
 ---
 # shared-services
 apiVersion: networking.k8s.io/v1

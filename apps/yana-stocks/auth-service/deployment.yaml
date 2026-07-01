@@ -35,6 +35,8 @@ spec:
                   key: uri
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+            - name: EMAIL_API_URL
+              value: "https://api-gateway.yanatech.co.uk/api/email/send"
             - name: JWT_EXPIRES_IN
               value: "15m"
             - name: JWT_REFRESH_EXPIRES_IN
