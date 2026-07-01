@@ -16,6 +16,12 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: shared-services
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: email-service
+      jsonPointers:
+        - /spec/replicas
   syncPolicy:
     automated:
       prune: true
