@@ -33,7 +33,8 @@ k8s-apps/
 │   ├── apicurio/
 │   ├── kubernetes-dashboard/
 │   ├── yana-stocks/               # yana-stocks microservices (Phase 4)
-│   └── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
+│   ├── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
+│   └── ml/                        # ml repo apps (k8s-docs RAG chatbot, source: akann/ml k8s/, directory.recurse: true)
 └── infrastructure/
     ├── argocd/
     ├── authentik/
@@ -119,6 +120,7 @@ spec:
 ### Databases
 - **CNPG pg-main:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` — shared cluster for vaultwarden, authentik, nextcloud, infisical, apicurio (4 instances; barman backup to MinIO `s3://cnpg-backups/pg-main/`)
 - **Immich postgres:** `immich-postgres-rw.immich.svc.cluster.local:5432` — dedicated CNPG cluster using `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (2 instances)
+- **k8s-docs postgres:** `k8s-docs-pg-rw.k8s-docs.svc.cluster.local:5432` — dedicated CNPG cluster, same `cloudnative-vectorchord` image as Immich (2 instances) but not shared with it — separate instance reserved for future ML work too
 - **MongoDB:** `mongodb-headless.mongodb.svc.cluster.local:27017` (replicaSet=rs0)
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
@@ -286,6 +288,7 @@ kubectl rollout restart deployment harbor-core -n harbor
 4. **Cross-namespace ClusterIP routing** requires `CiliumNetworkPolicy` in Cilium native routing mode — standard NetworkPolicy doesn't work. Confirmed for: Grafana → Prometheus, Grafana → PostgreSQL (yana-stocks). Use `toEndpoints` with pod labels.
 5. **ESO webhook disabled** — was blocking syncs. Do NOT re-enable without also adding CiliumNetworkPolicy for node IP ingress
 6. **KEDA intra-namespace gRPC (port 9666):** `metrics-apiserver` → `keda-operator` requires an explicit `podSelector: {}` ingress rule on port 9666 in the `allow-keda` policy — `default-deny-all` blocks it otherwise
+7. **The first policy to select a pod flips its default from allow to deny — for that whole direction, not just what the new rule covers.** A namespace with zero NetworkPolicies/CiliumNetworkPolicies is fully open. The moment any policy's `endpointSelector`/`podSelector` matches a pod for a given `policyTypes` direction, that pod becomes default-deny for that direction except what's explicitly allowed — by *any* policy selecting it, not just the new one. Adding a narrow `CiliumNetworkPolicy` to a previously-unrestricted namespace (e.g. to let one app reach a new internal-only Service) can silently break every *other* egress path that app had — DNS included. If the target namespace has no prior policies, either scope the new rule to only the specific pods that need it, or pair it with a `toEntities: [all]` / `egress: [{}]` catch-all rule restoring the original open posture (see `ciliumnetpol-akan-k8s-docs.yaml` — this exact mistake broke `akan`'s contact form on 2026-07-01, see UPDATES.md).
 
 ### Files
 - `infrastructure/network-policies/netpol-infrastructure.yaml` — all infrastructure namespaces
@@ -506,6 +509,34 @@ Same shape as yana-stocks' pattern above — `minReplicaCount: 0`, triggers on `
 ### CI runner
 `runners-shared-services` — a dedicated per-repo ARC runner scale set (`infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`), same pattern as `runners-yana-stocks`/`runners-k8s-apps`. GitHub-hosted `ubuntu-latest` **cannot** build/push here — `harbor.yanatech.co.uk` doesn't resolve outside the homelab network. Only the `docker` job needs the self-hosted runner; `quality`/`gitops` stay on `ubuntu-latest`.
 
+## ml (RAG chatbot over homelab docs)
+
+### Repo
+`github.com/akann/ml` — standalone Turborepo, meant to grow into more than one ML app over time (each future app gets its own path under `ml.yanatech.co.uk/<app>`, path-based routing on one shared domain — a deliberate deviation from this cluster's usual one-subdomain-per-app convention). App manifests live in **its own repo** (`k8s/`), shared-services-style. Needs its own `repo-ml` git credential Secret in `argocd` (same shape/PAT-reuse as `repo-akan`) and its own `runners-ml` ARC scale set — same two prerequisites every new private repo needs (see shared-services section above).
+
+### Namespace
+`k8s-docs` (not `ml` — each app in this repo gets its own namespace, matching the one-namespace-per-app convention; the repo name and the namespace name are intentionally different)
+
+### Apps
+```
+k8s-docs   # NestJS — RAG chatbot over k8s-apps' docs. Ingest webhook (public) + query endpoint (internal-only, see below)
+```
+
+### Content scope — deliberately narrow
+Only `k8s-apps` is ingested, not the other private repos in this workspace. `k8s-apps` is the only one of them that's public on GitHub, and the chat page (`akan.nkweini.org/k8s-docs`) is public with no page-level auth — indexing a private repo's docs would let anyone read them via the chatbot as a side channel. **Guardrail:** adding another (private) repo to `k8s-apps/.github/workflows/ingest-docs.yml`'s pattern without first gating the chat page behind Authentik reopens this. The ingest workflow triggers on any `**/*.md` change anywhere in the repo, not just `CLAUDE.md`/`docs/`/`README.md` — it was scoped too narrowly at first and missed 12 real files (per-app/infra READMEs, `UPDATES.md`, etc.) until caught and fixed.
+
+### `/query` is not on the public Ingress at all
+`ml.yanatech.co.uk/k8s-docs` only routes `/ingest/webhook` and `/health`. The query endpoint is reachable only from the `akan` namespace, over internal Service DNS (`k8s-docs.k8s-docs.svc.cluster.local:3000`), enforced by `infrastructure/cilium/ciliumnetpol-akan-k8s-docs.yaml` — see Network Policies rule 7 above for the regression this caused the first time. An API key is checked in-app too, but it's defense-in-depth; the network policy is what actually keeps it unreachable from the internet. `akan`'s Next.js server (`apps/akan/app/api/k8s-docs/query/route.ts`) is the only caller, holding the key server-side.
+
+### CNPG
+Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases section above). `bootstrap.initdb.secret` names a secret CNPG does **not** auto-generate — it must be pre-created via its own `ExternalSecret` (`k8s-docs-db-credentials`, type `kubernetes.io/basic-auth`), same pattern as `apps/immich/external-secret.yaml`'s `immich-db-credentials`. Missing this hangs the bootstrap job indefinitely on `secret not found`, not an obvious error to trace back to a missing manifest.
+
+### Images
+`harbor.yanatech.co.uk/ml/<app>:<tag>` — `k8s-docs`. Pushed via a project-scoped Harbor robot account (`robot$ml+ci`), same per-project-credential pattern as `shared-services`.
+
+### CI runner
+`runners-ml` — same pattern as `runners-shared-services`.
+
 ## Useful Commands
 
 ```bash
@@ -556,3 +587,4 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | Apicurio | https://apicurio.yanatech.co.uk |
 | yana-stocks | https://stocks.yanatech.co.uk |
 | Akan personal site | https://akan.nkweini.org |
+| K8s Docs Chat (k8s-docs, public UI) | https://akan.nkweini.org/k8s-docs |

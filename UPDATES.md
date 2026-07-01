@@ -207,6 +207,35 @@ All three webhooks affected:
 
 ---
 
+### ml added — k8s-docs RAG chatbot
+
+**Change:** New standalone repo `ml` (`github.com/akann/ml`, own Turborepo, meant to grow into more ML apps over time) deployed as this workspace's first RAG chatbot: answers questions about `k8s-apps`' docs, indexed via pgvector, served at `akan.nkweini.org/k8s-docs`. First app, `k8s-docs` (NestJS), in namespace `k8s-docs`.
+
+Cross-repo resources added here in `k8s-apps` (app manifests live in the `ml` repo's own `k8s/`, shared-services-style):
+- `apps/ml/argocd-app-ml.yaml` — ArgoCD Application, `directory.recurse: true`, includes `ignoreDifferences` for both `ExternalSecret` (ESO-injected defaults) and CNPG `Cluster` (admission-webhook-injected defaults) — copied verbatim from `apps/immich/argocd-app-immich.yaml` since it's the same two CRDs
+- `infrastructure/actions-runner/argocd-app-runners-ml.yaml` — dedicated per-repo ARC runner, same pattern as `runners-shared-services`
+- `infrastructure/cilium/ciliumnetpol-akan-k8s-docs.yaml` — lets `akan`'s server reach `k8s-docs`'s Service internally (see the network policy regression entry below)
+- `infrastructure/network-policies/netpol-apps.yaml` — new `k8s-docs` namespace block: default-deny, ingress-nginx-only for `/ingest`+`/health` (not `/query` — see below), `akan`-namespace-only ingress on port 3000 for `/query`, CNPG operator ingress
+- `infrastructure/network-policies/netpol-cnpg.yaml` — added `k8s-docs` to `cnpg-system`'s operator egress allowlist (same list `immich`/`yana-stocks` are already in)
+
+**Design decisions worth remembering:**
+- **`/query` is not on the public Ingress.** Only `/ingest/webhook` and `/health` are. The chat page's server (`akan`) reaches `/query` over internal Service DNS, restricted by the CiliumNetworkPolicy above — an API key is checked in-app too, but the network policy is the actual control keeping it unreachable from the internet.
+- **Content scope is deliberately just `k8s-apps`**, not the other private repos in this workspace, because the chat page is public with no page-level auth — indexing a private repo would let anyone read it via the chatbot as a side channel. Don't add another repo to the ingestion workflow without gating the page behind Authentik first.
+
+**Still outstanding (manual, not git-managed):** none currently — Harbor project/robot, ArgoCD repo credential, and all Infisical secrets for this app were provisioned directly against the live cluster during setup.
+
+### k8s-docs first-deploy issues hit and fixed
+
+Same story as shared-services' first deploy: three real bugs, none caught by code review, all caught by actually running the thing.
+
+1. **CNPG's `bootstrap.initdb.secret` doesn't auto-generate the secret it names.** Assumed it would, like most operators' reference-or-create pattern. It doesn't — the bootstrap job hung for 9 minutes on `secret not found`. Fix: a dedicated `ExternalSecret` (`k8s-docs-db-credentials`, type `kubernetes.io/basic-auth`) has to pre-create it, same pattern as `apps/immich/external-secret.yaml`'s `immich-db-credentials` — which I'd copied the `Cluster` manifest from but missed the second file it depends on.
+2. **A correctly-declared dependency was unreachable at runtime.** `express` (a real dependency of `@nestjs/platform-express`, correctly resolved in the lockfile) wasn't linked into that package's own `node_modules` after a `pnpm install --frozen-lockfile --prod` in the Docker production stage — the app crashed on boot with `Cannot find module 'express'`. Type-check, lint, and `nest build` all passed; none of them load the compiled code, so none caught it. Reproduced outside Docker too (plain local install, same failure) — not Docker- or `--prod`-specific. Fixed with `shamefully-hoist=true` in `.npmrc`. Only found by actually running the built image.
+3. **A new NetworkPolicy broke a feature it had nothing to do with.** `ciliumnetpol-akan-k8s-docs.yaml` was the *only* policy ever selecting `app: akan` pods. The moment it applied, Cilium switched those pods to default-deny egress except the one explicit rule — silently breaking DNS and the contact form's call to `api-gateway.yanatech.co.uk`, not just adding the intended k8s-docs access. Fixed with a `toEntities: [all]` rule alongside the specific one, restoring `akan`'s original fully-open posture. See Network Policies rule 7 in CLAUDE.md — this is now a documented gotcha, not just a one-off fix.
+
+Also caught after the fact: the `ingest-docs.yml` workflow's `paths:` trigger only matched `CLAUDE.md`, `docs/**/*.md`, and root `README.md` — missing 12 real files (9 per-app/infra `README.md`s, `proxmox-cluster-setup.md`, `pve-node-operations.md`, `README_AWS.md`, `UPDATES.md`). Widened to `**/*.md` and backfilled all previously-missed files via a one-off call to the ingest webhook.
+
+---
+
 ## 2026-06-29
 
 ### KEDA Kafka ScaledObjects added to remaining yana-stocks consumers
