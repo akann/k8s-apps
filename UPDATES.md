@@ -37,6 +37,20 @@ End-to-end verified after these fixes: `curl -X POST https://api-gateway.yanatec
 
 `yanatech`'s contact form (`app/api/contact/route.ts`) now POSTs to `email-api` instead of talking to SMTP2GO directly via `nodemailer`. Removed: `nodemailer`/`@types/nodemailer` deps, `SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TO` env vars, and the now-unused SMTP2GO port-2525 egress rule in `netpol-infrastructure.yaml` (yanatech's existing port-443 egress already covers the `api-gateway.yanatech.co.uk` call). Added: `EMAIL_API_URL`/`CONTACT_TO_EMAIL` (plain) and `EMAIL_API_KEY` (secret, ExternalSecret now pulls `/shared-services/email-api/EMAIL_API_KEY` instead of `/yana-stocks/auth-service/SMTP_PASSWORD`).
 
+Follow-up fix: `email-api`'s Deployment was missing `PORT=3000` — the app falls back to its local-dev default (3010) when unset, while the Service/probes target 3000, so probes failed with connection refused post-deploy until this was added.
+
+### akan contact form migrated to email-api
+
+`akan`'s contact form (`app/api/contact/route.ts`) previously used Resend — but `RESEND_API_KEY` was never wired into `k8s/deployment.yaml`, so submissions were silently just `console.log`'d in production, never actually sent. Replaced with the same `email-api` pattern as yanatech. Also added the request hardening this route was missing entirely (yanatech already had it): origin check, per-IP rate limiting, `zod` validation, newline stripping. `zod` added as a new dependency. `k8s/external-secret.yaml` now also pulls `EMAIL_API_KEY`; `deployment.yaml` gets `SITE_URL`, `CONTACT_TO_EMAIL`, `EMAIL_API_URL`, `EMAIL_API_KEY`.
+
+### auth-service (yana-stocks) migrated to email-api
+
+`auth-service`'s `internal/email/email.go` now POSTs to `email-api` over HTTP instead of dialing SMTP2GO directly via `gomail` — `SendPasswordReset`/`SendVerification` keep identical signatures, so no callers in `internal/service/auth.go` needed to change. Removed the `gomail` dependency (`go mod tidy`) and all `SMTP_*` config; replaced with `EMAIL_API_URL` (plain) and `EMAIL_API_KEY` (secret, ExternalSecret now pulls from `/shared-services/email-api/EMAIL_API_KEY` — the old `SMTP_*` keys under `/yana-stocks/auth-service/` are left in place, unreferenced). Removed the now-unused SMTP2GO port-2525 egress rule from `netpol-apps.yaml`'s yana-stocks section — auth-service was its only consumer (`email-service`'s own rule for its direct SMTP2GO connection, in the shared-services section, is untouched).
+
+All three original SMTP2GO callers (`auth-service`, `yanatech`, `akan`) are now migrated — nothing calls SMTP2GO directly except `email-service` itself.
+
+**ArgoCD gotcha hit during this rollout:** after pushing, `yana-stocks`' ArgoCD Application stayed `Synced` at the *old* revision for several minutes despite `argocd.argoproj.io/refresh: hard` — the repo-server's local git clone was stale (evidenced by suspiciously fast `git_ms` timings in the controller logs, consistent with a cache hit rather than a real fetch). Fix: `kubectl rollout restart deployment argocd-repo-server -n argocd`, then refresh again. Also: re-patching the `refresh` annotation to the *same* value (`hard` → `hard`) is a no-op — Kubernetes only fires a change event if the value actually differs, so alternate between e.g. `hard`/`hard-2` or remove-then-reapply.
+
 ---
 
 ## 2026-06-30

@@ -237,6 +237,8 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
   ```bash
   kubectl delete pod -n argo-rollouts -l app.kubernetes.io/name=argo-rollouts
   ```
+- **`argocd.argoproj.io/refresh` annotation is a no-op if the value doesn't change.** Patching it to the same value twice (e.g. `hard` → `hard`) fires no watch event, so the app never actually refreshes. Alternate values (`hard` → `hard-2`) or remove-then-reapply.
+- **Stuck on a stale git revision despite `refresh: hard`?** The `argocd-repo-server`'s local git clone can go stale (suspiciously fast `git_ms` in controller logs — a cache hit, not a real fetch — is the tell). No webhook is configured for these repos, so ArgoCD relies purely on polling + its local clone cache. Fix: `kubectl rollout restart deployment argocd-repo-server -n argocd`, then refresh the Application again.
 
 ### Application source path discipline
 All manifests for an app (Deployments, Services, ExternalSecrets, etc.) MUST be inside the directory specified in the Application's `spec.source.path`. Files placed in a parent directory are silently ignored by ArgoCD. For apps with a `manifests/` subdirectory (e.g. `apps/gotify/manifests`), ensure every manifest — including ExternalSecrets — lives inside that subdirectory.

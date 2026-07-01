@@ -424,8 +424,8 @@ graph LR
 
 - **Turborepo** only builds services whose source changed (`--filter=[HEAD^1]`)
 - **Harbor** stores images tagged with git SHA + `latest`
-- **Runners** are self-hosted ARC runners in the `actions-runner` namespace
-- **Secret:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT` in GitHub Actions
+- **Runners** are self-hosted ARC runners in the `actions-runner` namespace — one dedicated runner scale set **per repo** (`runners-yana-stocks`, `runners-k8s-apps`, `runners-yana-ecommerce`, `runners-shared-services`), since Harbor isn't publicly resolvable and GitHub-hosted runners can't reach it
+- **Secret:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT` in GitHub Actions (`GH_PAT` only needed by repos whose gitops step pushes to a *different* repo, e.g. yana-stocks → k8s-apps; `shared-services` patches its own repo, so its `gitops` job needs no PAT)
 
 ### 7.4 Known Permanent OutOfSync (cosmetic, all Healthy)
 
@@ -504,9 +504,9 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 ### 8.3 Container Registry — Harbor
 
-- **URL:** `harbor.yanatech.co.uk`
-- **Project:** `yana-stocks`
-- **Image format:** `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
+- **URL:** `harbor.yanatech.co.uk` (not publicly resolvable — only reachable from inside the homelab network, including self-hosted GitHub Actions runners)
+- **Projects:** `yana-stocks`, `shared-services` — each project has its own project-scoped robot account (e.g. `robot$shared-services+ci`); robot accounts don't carry access across projects, so a new project needs its own project + robot account (`POST /api/v2.0/projects`, then `POST /api/v2.0/robots` with `level: project`)
+- **Image format:** `harbor.yanatech.co.uk/<project>/<service>:<tag>`
 - **Storage:** 100 Gi registry PVC + 10 Gi database PVC (ceph-rbd)
 - **Vulnerability scanning:** Trivy (10 Gi PVC)
 
@@ -535,7 +535,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | Infisical     | https://infisical.yanatech.co.uk     | Native            | Secrets manager          |
 | Harbor        | https://harbor.yanatech.co.uk        | Native            | Container registry       |
 | Nextcloud     | https://cloud.yanatech.co.uk         | Native            | Cloud storage            |
-| Kong API GW   | https://api-gateway.yanatech.co.uk   | JWT (per-route)   | yana-stocks API          |
+| Kong API GW   | https://api-gateway.yanatech.co.uk   | JWT/key-auth (per-route) | yana-stocks API, shared-services email-api |
 | MinIO Console | https://minio-console.yanatech.co.uk | Native            | Object storage UI        |
 | MongoDB UI    | https://mongo.yanatech.co.uk         | Authentik forward | Mongo Express            |
 | Redis UI      | https://redis.yanatech.co.uk         | Authentik forward | Redis Insight            |
@@ -552,6 +552,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | yana-stocks   | https://stocks.yanatech.co.uk        | JWT (in-app)      | Stock market app         |
 | API Docs      | https://api-docs.yanatech.co.uk      | Authentik forward | yana-stocks Swagger hub  |
 | yanatech      | https://yanatech.co.uk               | Public            | Landing page             |
+| shared-api-docs | https://shared-api-docs.yanatech.co.uk | Authentik forward | shared-services Swagger hub |
 
 **Note on Headlamp:** Authentik SSO is broken upstream; use a long-lived ServiceAccount token:
 
@@ -639,7 +640,7 @@ sequenceDiagram
 
     C->>Kong: POST /api/auth/register
     Kong->>AS: Forward (no JWT check)
-    AS-->>C: { message } + sends verification email (SMTP2GO)
+    AS-->>C: { message } + sends verification email (via shared-services' email-api)
     AS->>AS: publish users.registered → Kafka (profile-service creates profile)
 
     C->>Kong: POST /api/auth/verify { token }
@@ -747,7 +748,7 @@ graph LR
 yana-stocks/                    # github.com/akann/yana-stocks
 ├── apps/
 │   ├── frontend/               # Next.js 14 (App Router), TailwindCSS, Recharts
-│   ├── auth-service/           # Go (Chi), pgx, golang-migrate, JWT, SMTP2GO
+│   ├── auth-service/           # Go (Chi), pgx, golang-migrate, JWT, email via shared-services' email-api
 │   ├── profile-service/        # NestJS, Mongoose, KafkaJS (users.registered consumer)
 │   ├── price-processor/        # NestJS, Mongoose, ioredis, KafkaJS
 │   ├── portfolio-service/      # NestJS, Mongoose, KafkaJS
