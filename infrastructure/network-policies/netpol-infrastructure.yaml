@@ -658,10 +658,7 @@ spec:
         - port: 53
           protocol: TCP
     - ports:
-        - port: 443
-    - ports:
-        - port: 2525
-          protocol: TCP  # SMTP2GO STARTTLS (contact form)
+        - port: 443  # includes api-gateway.yanatech.co.uk (Kong, contact form email)
 ---
 # immich (placeholder — removed, pending redeploy)
 apiVersion: networking.k8s.io/v1

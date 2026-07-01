@@ -18,7 +18,24 @@ Cross-repo resources added here in `k8s-apps` (manifests for the apps themselves
 
 `email-api` is routed through Kong (`https://api-gateway.yanatech.co.uk/api/email/send`) with a `key-auth` plugin instead of an in-app auth check — same pattern as the JWT plugin already used for yana-stocks.
 
-**Still outstanding (manual, not git-managed):** Infisical folder/secrets provisioning (`/shared-services/email-api/EMAIL_API_KEY`, `/shared-services/email-service/SMTP_*`, `/shared-services/harbor/HARBOR_*`) — blocked on an expired `infisical` CLI session on `kc1` needing interactive re-login; GitHub repo secrets (`HARBOR_USERNAME`/`HARBOR_PASSWORD`) on the `shared-services` repo; Authentik provider/application for `shared-api-docs`.
+**Still outstanding (manual, not git-managed):** Authentik provider/application for `shared-api-docs`.
+
+---
+
+### shared-services deployment — first-deploy issues hit and fixed
+
+Getting `shared-services` from "code merged" to "actually running and healthy" surfaced several gaps not visible from file review alone:
+
+1. **Harbor unreachable from GitHub-hosted runners.** `harbor.yanatech.co.uk` doesn't resolve outside the homelab network — CI's `docker` job failed with a DNS lookup error on `ubuntu-latest`. Fix: added `infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`, a dedicated per-repo ARC runner scale set (same pattern as `runners-yana-stocks`), and pointed only the `docker` job at it.
+2. **No Harbor project/credential for `shared-services`.** The project didn't exist in Harbor, and (once created) the copied yana-stocks credential got a `401`/`403` — Harbor robot accounts are project-scoped, not portable. Fix: created the `shared-services` Harbor project and a dedicated robot account `robot$shared-services+ci` via the Harbor API (`POST /api/v2.0/projects`, `POST /api/v2.0/robots` with `level: project`), stored the credential in Infisical at `/shared-services/harbor/*`, and updated the GitHub repo secrets. Note: `GET/POST /api/v2.0/projects/{id}/robots` 404s on this Harbor version (v2.15.1) — use the system-wide `/api/v2.0/robots` endpoint instead, which handles both system- and project-level robots.
+3. **ArgoCD couldn't clone the repo.** `shared-services` is private and had no registered credential — `ComparisonError: ... Repository not found`. Fix: added a `repository`-type Secret `repo-shared-services` in the `argocd` namespace (same shape as `repo-yanatech`/`repo-akan`: `type/url/username/password`), using a fine-grained PAT scoped to just that repo.
+4. **`email-api` failing liveness/readiness probes post-deploy.** The app defaults to port 3010 (its local-dev default) when `PORT` isn't set; the k8s Service/probes target 3000. Fix: added `PORT=3000` to the Deployment env — a one-line manifest fix, no rebuild needed.
+
+End-to-end verified after these fixes: `curl -X POST https://api-gateway.yanatech.co.uk/api/email/send` (through Kong, `key-auth` enforced) → Kafka → `email-service` → SMTP2GO, delivered successfully.
+
+### yanatech contact form migrated to email-api
+
+`yanatech`'s contact form (`app/api/contact/route.ts`) now POSTs to `email-api` instead of talking to SMTP2GO directly via `nodemailer`. Removed: `nodemailer`/`@types/nodemailer` deps, `SMTP_HOST/PORT/USERNAME/PASSWORD/FROM/TO` env vars, and the now-unused SMTP2GO port-2525 egress rule in `netpol-infrastructure.yaml` (yanatech's existing port-443 egress already covers the `api-gateway.yanatech.co.uk` call). Added: `EMAIL_API_URL`/`CONTACT_TO_EMAIL` (plain) and `EMAIL_API_KEY` (secret, ExternalSecret now pulls `/shared-services/email-api/EMAIL_API_KEY` instead of `/yana-stocks/auth-service/SMTP_PASSWORD`).
 
 ---
 

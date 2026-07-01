@@ -471,6 +471,8 @@ spec:
 ### Repo
 `github.com/akann/shared-services` — standalone Turborepo (own remote, not a yana-stocks subdirectory). App manifests live in **its own repo** (`k8s/`), yanatech-style — only cluster-wide resources (Kafka topics, the ArgoCD Application, NetworkPolicies) live here in `k8s-apps`.
 
+Since this repo is private, ArgoCD needs its own `repository`-type Secret to clone it (`repo-shared-services` in the `argocd` namespace, same shape as `repo-yanatech`/`repo-akan` — `type: git`, `username`/`password` (fine-grained PAT), `url`). Without it, the Application shows `ComparisonError: ... authentication required: Repository not found.` The `argocd-app-shared-services.yaml` Application also sets `source.directory.recurse: true` since `k8s/` has nested subfolders (`email-api/kong/`, etc.) — yanatech's flat `k8s/` doesn't need this.
+
 ### Namespace
 `shared-services`
 
@@ -495,7 +497,10 @@ Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` (same clust
 Same shape as yana-stocks' pattern above — `minReplicaCount: 0`, triggers on `notifications.email.send` consumer lag.
 
 ### Images
-`harbor.yanatech.co.uk/shared-services/<app>:<tag>` — `email-api`, `email-service`, `shared-api-docs`
+`harbor.yanatech.co.uk/shared-services/<app>:<tag>` — `email-api`, `email-service`, `shared-api-docs`. Pushed via a project-scoped Harbor robot account (`robot$shared-services+ci`), not a borrowed/shared credential — Harbor's per-project robot accounts don't carry access to other projects, so a new project needs its own project + robot account (`POST /api/v2.0/projects`, then `POST /api/v2.0/robots` with `level: project` + `permissions[].namespace` — note `GET/POST .../projects/{id}/robots` 404s on this Harbor version (v2.15.1); the system-wide `/api/v2.0/robots` endpoint works for both system- and project-level robots).
+
+### CI runner
+`runners-shared-services` — a dedicated per-repo ARC runner scale set (`infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`), same pattern as `runners-yana-stocks`/`runners-k8s-apps`. GitHub-hosted `ubuntu-latest` **cannot** build/push here — `harbor.yanatech.co.uk` doesn't resolve outside the homelab network. Only the `docker` job needs the self-hosted runner; `quality`/`gitops` stay on `ubuntu-latest`.
 
 ## Useful Commands
 
