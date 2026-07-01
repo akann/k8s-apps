@@ -9,3 +9,4 @@ resources:
   - ciliumnetpol-grafana-pg.yaml
   - ciliumnetpol-authentik-pg.yaml
   - ciliumnetpol-turbo-cache.yaml
+  - ciliumnetpol-akan-k8s-docs.yaml

@@ -1,0 +1,61 @@
+name: Ingest Docs
+
+# Feeds changed docs into the k8s-docs RAG chatbot (ml.yanatech.co.uk/k8s-docs).
+# k8s-apps is the only source repo in scope — it's the only one of this
+# workspace's repos that's public, and the chatbot's chat page
+# (akan.nkweini.org/k8s-docs) is public with no page-level auth. Adding
+# another (private) repo here without first gating that page behind
+# Authentik would let anyone read private-repo content via the chatbot as a
+# side channel — see ml repo's plan doc for the full rationale.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'CLAUDE.md'
+      - 'docs/**/*.md'
+      - 'README.md'
+
+jobs:
+  ingest-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect and POST changed docs
+        env:
+          INGEST_WEBHOOK_SECRET: ${{ secrets.INGEST_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+
+          CHANGED=$(git diff --name-only --diff-filter=ACM HEAD^ HEAD -- 'CLAUDE.md' 'docs/**/*.md' 'README.md' || true)
+          DELETED=$(git diff --name-only --diff-filter=D HEAD^ HEAD -- 'CLAUDE.md' 'docs/**/*.md' 'README.md' || true)
+
+          if [ -z "$CHANGED" ] && [ -z "$DELETED" ]; then
+            echo "No doc changes, skipping ingest."
+            exit 0
+          fi
+
+          FILES_JSON="[]"
+          for f in $CHANGED; do
+            CONTENT=$(jq -Rs . < "$f")
+            FILES_JSON=$(echo "$FILES_JSON" | jq --arg path "$f" --argjson content "$CONTENT" '. + [{path: $path, content: $content}]')
+          done
+
+          DELETED_JSON=$(printf '%s\n' $DELETED | jq -R . | jq -s 'map(select(length > 0))')
+
+          PAYLOAD=$(jq -n \
+            --arg repo "k8s-apps" \
+            --arg sha "${{ github.sha }}" \
+            --argjson files "$FILES_JSON" \
+            --argjson deleted "$DELETED_JSON" \
+            '{sourceRepo: $repo, commitSha: $sha, files: $files, deletedPaths: $deleted}')
+
+          curl -sf -X POST https://ml.yanatech.co.uk/k8s-docs/ingest/webhook \
+            -H "Authorization: Bearer $INGEST_WEBHOOK_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"

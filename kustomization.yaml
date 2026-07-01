@@ -70,6 +70,7 @@ resources:
   - infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
   - infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
   - infrastructure/actions-runner/argocd-app-runners-shared-services.yaml
+  - infrastructure/actions-runner/argocd-app-runners-ml.yaml
 
   # Apps
   - apps/vaultwarden/argocd-app-vaultwarden.yaml
@@ -87,3 +88,4 @@ resources:
   - apps/yana-stocks/argocd-app-yana-stocks.yaml
   - apps/akan/argocd-app-akan.yaml
   - apps/shared-services/argocd-app-shared-services.yaml
+  - apps/ml/argocd-app-ml.yaml
