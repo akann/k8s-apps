@@ -110,6 +110,7 @@ The cluster uses **stacked etcd** — etcd runs on each control-plane node along
 | `immich`           | Photo management (self-hosted Google Photos)     |
 | `infisical`        | Secrets manager                                  |
 | `ingress-nginx`    | HTTP/S ingress controller                        |
+| `k8s-docs`         | k8s-docs RAG chatbot (ml repo)                   |
 | `kafka`            | Strimzi Kafka cluster + operator                 |
 | `keda`             | Kubernetes Event-Driven Autoscaling              |
 | `kong`             | API gateway                                      |
@@ -295,6 +296,7 @@ graph TB
 | `harbor`        | harbor-redis / trivy                 | 5 Gi / 10 Gi | Harbor cache/scanner                |
 | `immich`        | immich-library                       | 200 Gi       | Photo library                       |
 | `immich`        | immich-postgres-1                    | 20 Gi        | Immich CNPG PostgreSQL              |
+| `k8s-docs`      | k8s-docs-pg-1                        | 10 Gi        | k8s-docs CNPG PostgreSQL (pgvector) |
 | `kafka`         | data-kafka-cluster-dual-role-{0,1,2} | 20 Gi × 3    | Kafka log data                      |
 | `minio`         | minio                                | 50 Gi        | Object storage                      |
 | `mongodb`       | datadir-mongodb-{0,1}                | 10 Gi × 2    | MongoDB replicas                    |
@@ -453,9 +455,11 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | `pg-main`         | `cnpg-clusters` | 3         | pg-main-1         | 50 Gi × 3 | vaultwarden, authentik, nextcloud, infisical, apicurio |
 | `immich-postgres` | `immich`        | 1         | immich-postgres-1 | 20 Gi     | Immich (pgvector/VectorChord)                          |
 | `auth-service-pg` | `yana-stocks`   | 1         | auth-service-pg-1 | 10 Gi     | yana-stocks auth-service                               |
+| `k8s-docs-pg`     | `k8s-docs`      | 2         | k8s-docs-pg-1     | 10 Gi     | k8s-docs RAG chatbot (pgvector/VectorChord)             |
 
 **pg-main connection:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`  
-**Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)
+**Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)  
+**k8s-docs:** same `cloudnative-vectorchord` image as Immich, but a separate dedicated instance — not shared, reserved for future ML work too
 
 #### MongoDB
 
@@ -553,6 +557,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | API Docs      | https://api-docs.yanatech.co.uk      | Authentik forward | yana-stocks Swagger hub  |
 | yanatech      | https://yanatech.co.uk               | Public            | Landing page             |
 | shared-api-docs | https://shared-api-docs.yanatech.co.uk | Authentik forward | shared-services Swagger hub |
+| K8s Docs Chat | https://akan.nkweini.org/k8s-docs | Public | RAG chatbot over k8s-apps' docs |
 
 **Note on Headlamp:** Authentik SSO is broken upstream; use a long-lived ServiceAccount token:
 
