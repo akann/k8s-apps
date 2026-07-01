@@ -435,6 +435,8 @@ spec:
         lagThreshold: "10"
 ```
 
+**Don't forget:** if the target Deployment's manifest also declares a static `replicas:` field (all of these do), the owning ArgoCD Application needs an `ignoreDifferences` entry for that Deployment's `/spec/replicas` — otherwise self-heal resets it to the static value on every sync, which KEDA then scales back down moments later (visible as pod churn right after every routine sync). See `argocd-app-yana-stocks.yaml` for the six existing entries; missing this for a new KEDA-scaled service in `shared-services` caused exactly this on 2026-07-01 (see UPDATES.md).
+
 ### Argo Rollouts pattern (ml-predictor)
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -481,7 +483,7 @@ Since this repo is private, ArgoCD needs its own `repository`-type Secret to clo
 ### Apps
 ```
 email-api          # NestJS HTTP — POST /api/email/send, validates + queues onto Kafka, returns 202
-email-service       # NestJS Kafka consumer — sends via swappable EmailProvider (SMTP2GO first), retry+DLQ
+email-service       # NestJS Kafka consumer — sends via swappable EmailProvider (SMTP2GO first), single attempt + DLQ on failure (no retry — see UPDATES.md)
 shared-api-docs     # Redocly OpenAPI hub for email-api, Authentik-protected (shared-api-docs.yanatech.co.uk)
 ```
 

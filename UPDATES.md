@@ -49,7 +49,23 @@ Follow-up fix: `email-api`'s Deployment was missing `PORT=3000` — the app fall
 
 All three original SMTP2GO callers (`auth-service`, `yanatech`, `akan`) are now migrated — nothing calls SMTP2GO directly except `email-service` itself.
 
-**ArgoCD gotcha hit during this rollout:** after pushing, `yana-stocks`' ArgoCD Application stayed `Synced` at the *old* revision for several minutes despite `argocd.argoproj.io/refresh: hard` — the repo-server's local git clone was stale (evidenced by suspiciously fast `git_ms` timings in the controller logs, consistent with a cache hit rather than a real fetch). Fix: `kubectl rollout restart deployment argocd-repo-server -n argocd`, then refresh again. Also: re-patching the `refresh` annotation to the *same* value (`hard` → `hard`) is a no-op — Kubernetes only fires a change event if the value actually differs, so alternate between e.g. `hard`/`hard-2` or remove-then-reapply.
+**ArgoCD gotcha hit during this rollout:** after pushing, `yana-stocks`' ArgoCD Application stayed `Synced` at the *old* revision for several minutes despite `argocd.argoproj.io/refresh: hard` — the repo-server's local git clone was stale (evidenced by suspiciously fast `git_ms` timings in the controller logs, consistent with a cache hit rather than a real fetch). Fix: `kubectl rollout restart deployment argocd-repo-server -n argocd`, then refresh again. Also: re-patching the `refresh` annotation to the *same* value (`hard` → `hard`) is a no-op — Kubernetes only fires a change event if the value actually differs, so alternate between e.g. `hard`/`hard-2` or remove-then-reapply. Hit this same staleness two more times later the same day when pushing further `shared-services` and `yana-stocks` fixes — same fix each time (`kubectl rollout restart deployment argocd-repo-server -n argocd`).
+
+### email-service: dropped the retry loop
+
+Removed the 3-attempt retry-then-DLQ logic in `email-consumer.service.ts`, down to a single attempt straight to the DLQ on failure. Retry only ever covered the `email-service`↔SMTP2GO hop (SMTP2GO's own best-effort delivery already owns the SMTP2GO↔recipient hop, which this app has no visibility into anyway); it also couldn't distinguish a permanent failure (bad address, auth) from a transient one, and risked a duplicate send if a prior attempt actually succeeded but timed out waiting for the ack. Given the traffic volume, correctly classifying SMTP error codes to retry selectively wasn't worth the added fragility. The DLQ (`notifications.email.failed`) is unaffected and still does the real work.
+
+### shared-services: ArgoCD self-heal was fighting KEDA's scale-to-zero
+
+`email-service` scales 0→3 via a KEDA `ScaledObject`, but its Deployment manifest also declares a static `replicas: 1`. Every ArgoCD sync reset `replicas` back to 1 (self-heal working as designed), which KEDA then scaled back down moments later — visible as a new pod being created and torn down right after every routine sync. Fix: added an `ignoreDifferences` entry for `/spec/replicas` on `email-service` to `argocd-app-shared-services.yaml` — yana-stocks' Application already has this for all six of its KEDA-scaled Deployments; it was just missed when scaffolding this one.
+
+### OpenAPI specs were missing an explicit `servers` entry
+
+`email-api` and all four yana-stocks NestJS services (`profile-service`, `portfolio-service`, `portfolio-api`, `price-processor`) generate their OpenAPI specs with `DocumentBuilder` but never called `.addServer(...)`. With `servers: []`, Redoc/Swagger UI default the "try it" base URL to the hosted docs page's own origin (`shared-api-docs.yanatech.co.uk` / `api-docs.yanatech.co.uk`) instead of the real API host. Fixed by adding `.addServer('https://api-gateway.yanatech.co.uk', ...)` to both `main.ts` (live Swagger UI) and `generate-openapi.ts` (static hosted docs) for each service, plus a second `http://localhost:<dev-port>` entry so the hosted docs can also target a local dev instance. `auth-service` (Go/swaggo) got the equivalent `@host`/`@schemes` annotations — Swagger 2.0 only supports one host, so no localhost alternative there.
+
+### CI gotcha: a cancelled run can silently drop a change from ever being built
+
+Pushed a fix to `auth-service` (the `@host` annotation above), then pushed a second unrelated fix before the first CI run finished — `concurrency.cancel-in-progress` correctly killed the first run. The second run's `changes` job (dorny/paths-filter) only diffs against the commit immediately before *that* push, so a file only changed in the *cancelled* run's commit doesn't register as changed the second time either — `auth-service` silently never got rebuilt. Caught by checking which `docker/*` jobs actually ran in the successful workflow. Recovery: `gh workflow run ci.yml -f build_all=true` (the workflow already has a `workflow_dispatch` input for this) forces every service to rebuild regardless of detected changes.
 
 ---
 
