@@ -21,7 +21,7 @@ GitOps repository for Akan's homelab Kubernetes cluster. All infrastructure and 
 k8s-apps/
 ├── bootstrap.sh                    # Ordered app deployment for fresh cluster
 ├── apps/                           # Application ArgoCD apps
-│   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/)
+│   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/akan/ — akan repo is now a Turborepo, app moved to apps/akan/)
 │   ├── immich/
 │   ├── kafka/
 │   ├── kafka-ui/
