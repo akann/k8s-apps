@@ -449,6 +449,7 @@ Replace Ceph RBD PVCs with EBS gp3. Remove MinIO PVC (use S3). Remove Harbor PVC
 | `vaultwarden` | vaultwarden-data | 5 Gi | Vault data |
 | `uptime-kuma` | uptime-kuma-pvc | 5 Gi | Uptime monitoring |
 | `yana-stocks` | auth-service-pg-1 | 10 Gi | yana-stocks auth-service PostgreSQL |
+| `k8s-docs` | k8s-docs-pg-1 | 10 Gi | k8s-docs RAG chatbot PostgreSQL (pgvector) |
 
 ---
 
@@ -653,6 +654,8 @@ aws rds create-db-cluster \
 
 **Immich PostgreSQL:** Immich requires `pgvector` / VectorChord. Aurora PostgreSQL supports `pgvector` natively as of Aurora 15.5+ — no custom image needed. Create a separate Aurora cluster for Immich or use an RDS PostgreSQL instance.
 
+**k8s-docs PostgreSQL:** Same `pgvector` requirement as Immich (RAG chunk embeddings). Aurora's native `pgvector` support covers this too — use a separate Aurora cluster or RDS instance, kept dedicated and not shared with Immich's, matching the homelab's isolation.
+
 **yana-stocks auth-service-pg:** Single-instance CNPG → RDS PostgreSQL (`db.t4g.micro`) or Aurora Serverless v2 (cheaper at low load with ACU min 0.5).
 
 **Alternative — keep CNPG on EKS:** CNPG runs unchanged on EKS with EBS gp3 PVCs. Choose this if you want identical operational behaviour and WAL archiving to S3 via Barman Cloud.
@@ -772,6 +775,7 @@ All URLs unchanged — Route 53 replaces Cloudflare DNS, pointing to ALB/NLB ins
 | Uptime Kuma | https://status.yanatech.co.uk | Cognito / Authentik forward | Uptime monitoring |
 | yana-stocks | https://stocks.yanatech.co.uk | JWT (in-app) | Stock market app |
 | yanatech | https://yanatech.co.uk | Public | Landing page |
+| K8s Docs Chat | https://akan.nkweini.org/k8s-docs | Public | RAG chatbot over k8s-apps' docs |
 
 ---
 
