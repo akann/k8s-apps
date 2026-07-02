@@ -6,6 +6,21 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-07-02
 
+### Cilium 1.17.3 → 1.18.11: HA apiserver access via k8s.apiServerURLs
+
+**Problem:** `k8sServiceHost` was pinned to `192.168.33.21` (k8s-cp-1) — required with `kubeProxyReplacement` since the agent can't bootstrap via the in-cluster `10.96.0.1` VIP it itself implements. Consequence: any Cilium agent that (re)started while cp-1 was down crash-looped (`Start hook failed ... dial tcp 192.168.33.21:6443: connect: no route to host`) — observed on worker-3 during the 2026-07-02 pve1 reboot (3 crash-loop restarts until cp-1's apiserver returned). A single control-plane outage could take CNI management down cluster-wide with it.
+
+**Fix:** Upgraded the chart to 1.18.11 (one-minor step, latest patch) and replaced `k8sServiceHost`/`k8sServicePort` with the 1.18 feature built for exactly this:
+
+```yaml
+k8s:
+  apiServerURLs: "https://192.168.33.21:6443 https://192.168.33.22:6443 https://192.168.33.23:6443"
+```
+
+The agent load-balances/fails over across all three control planes at runtime and at bootstrap. No cert changes needed — the node IPs are already in the apiserver serving cert SANs (unlike a VIP/localhost-haproxy approach, which would have required adding SANs and regenerating certs on every control plane). 1.18 upgrade notes reviewed: no impact (no BGP/IPsec/ENI/clustermesh here; requires kernel ≥ 5.10, nodes run 6.8; no `v2alpha1` Cilium CRs in the repo).
+
+**Residual gap (deliberate):** kubelets and kubeconfigs still point at cp-1 directly (kubeadm cluster has no `controlPlaneEndpoint`) — running workloads survive a cp-1 outage, but node heartbeats/scheduling of *new* pods on affected kubelets would stall until cp-1 returns. Fixing that properly means a VIP (kube-vip) + cert SAN regeneration + kubelet.conf updates — separate project.
+
 ### k8s-docs-pg failover deadlocked after pve1 reboot — missing apiserver-egress NetworkPolicy
 
 **Symptom:** During a planned pve1 reboot (drain of k8s-cp-1 + k8s-worker-1), the `k8s-docs` app pods went `Init:CrashLoopBackOff` (migrate container: `EPERM` connecting to `k8s-docs-pg-rw:5432`) and the CNPG cluster sat in "Failing over" indefinitely. Chain of causes:
