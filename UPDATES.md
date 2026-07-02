@@ -6,6 +6,18 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-07-02
 
+### pve1 RAM confirmed bad — automated memtest (verdict for the June mon/OSD crash spree)
+
+**Context:** ~15 daemon crashes on pve1 during June (mon.pve1 `MonitorDBStore::apply_transaction` aborts + a SIGBUS in `fn_monstore`, osd.0 AvlAllocator assert, osd.3 BlueStore spurious read errors) — all memory-corruption signatures, all confined to pve1, NVMe SMART clean. pve1 runs non-ECC DDR5 (2×32GB Crucial CT32G48C40S5), so EDAC sees nothing.
+
+**Test (fully automated, no console access needed):** VMs drained/stopped, then (1) `memtester 50536M 1` on the bare host — OSDs/mon stayed up, cluster kept full redundancy; (2) on completion the host set `noout` and rebooted itself with `memtest=17` staged in GRUB (kernel early memtest over ~all RAM, then normal boot); (3) VMs restarted, nodes uncordoned, param removed. Logs: `pve1:/root/memtester.log`, `/root/memtest-orchestration.log`. Note: PassMark MemTest86 Free can't run unattended (config file is Pro-only) and memtest86+ never exits — the two-stage in-OS + kernel approach is the only closed-loop option.
+
+**Verdict: FAILED.** memtester's Block Sequential test hit **2,561 failures — a contiguous ~16KB region with bit 0 stuck low** (wrote `0x1b1b…`, read `0x1a1a…`, 2,049 consecutive 8-byte offsets from buffer offset `0x504aea7e8`). Kernel early memtest found 0 bad pages (different access pattern; misses it). Hardware fault confirmed → **replace the DIMM(s)**. Until then, expect occasional pve1 daemon crashes; the failing physical region moves around VM/daemon address spaces between boots.
+
+**Side effect worth knowing:** during memtester's initial 50GB lock/fill, pve1's sshd was starved for ~10 min (host looked down) while the kernel, OSDs, corosync and the HA watchdog all stayed healthy — check `ceph osd tree`/corosync from another node before assuming a host under memory test is dead.
+
+**Bonus validation:** this reboot exercised the Ceph loopback cluster_network fix from earlier today — pve2 logged **zero** `heartbeat_check`/slow-ops lines during the window (vs 1,000+ blocked ops in the afternoon incident). The fix works.
+
 ### Total platform outage during pve1 reboot — Ceph OSDs bound to mesh link IPs, not loopbacks
 
 **Symptom:** During the planned pve1 reboot, *everything* went offline (yana-stocks included) until pve1 returned — despite k8s pods being properly drained to worker-2/3 and Ceph having 2/3 hosts up. Prometheus has a total metrics gap 17:05–17:15Z; pve2's OSD logs show `heartbeat_check: no reply ... since back 17:59:40+0100` (front channel fine) and 1000+ blocked ops, "most affected pool ['rbd']".
