@@ -300,3 +300,26 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+---
+# k8s-docs: the CNPG instance manager (k8s-docs-pg pods) watches the Cluster CR
+# via the apiserver. Without this, failover/promotion silently deadlocks once the
+# instance manager's pre-policy API connections die (e.g. after a control-plane
+# reboot) — the namespace's allow-egress only covers 443, apiserver is 6443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: k8s-docs
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

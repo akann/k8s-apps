@@ -4,6 +4,21 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-02
+
+### k8s-docs-pg failover deadlocked after pve1 reboot — missing apiserver-egress NetworkPolicy
+
+**Symptom:** During a planned pve1 reboot (drain of k8s-cp-1 + k8s-worker-1), the `k8s-docs` app pods went `Init:CrashLoopBackOff` (migrate container: `EPERM` connecting to `k8s-docs-pg-rw:5432`) and the CNPG cluster sat in "Failing over" indefinitely. Chain of causes:
+
+1. Cordoning worker-1 triggered a CNPG *switchover* (pg-1 → pg-2), but the drain deleted pg-1's pod before it could demote — the operator then waited forever ("Old primary pod not found … waiting for the operation to complete") while refusing to recreate pg-1. Cleared by patching `status.targetPrimary` back to `k8s-docs-pg-1` (`kubectl patch cluster k8s-docs-pg -n k8s-docs --subresource=status --type=merge -p '{"status":{"targetPrimary":"k8s-docs-pg-1"}}'`), which made the operator re-evaluate and start a proper *failover* to pg-2.
+2. The failover then also hung: pg-2's instance manager never promoted because it couldn't reach the apiserver (`cilium monitor` showed egress `Policy denied`, remote ID `kube-apiserver`). The `k8s-docs` namespace has `default-deny-all` but was never added to `netpol-apiserver-egress.yaml` (Network Policies rule 2/3) — its `allow-egress` covers 443 (LLM APIs), but the apiserver is 6443, and even ClusterIP `10.96.0.1:443` traffic is DNAT-translated to backend `:6443` *before* policy evaluation, so the 443 rule never matches.
+
+The gap was invisible for the cluster's first 26h because the instance manager's API watch connections predated policy enforcement and stayed alive — the reboot killed them, and every reconnect was dropped. Promotion completed within seconds of the policy landing.
+
+**Fix:** Added `allow-kube-apiserver-egress` for `k8s-docs` to `infrastructure/network-policies/netpol-apiserver-egress.yaml`. Lesson: any namespace hosting a CNPG cluster needs apiserver egress for the *instance* pods, not just the operator namespace — and a policy gap on watch-style connections only bites when those connections are re-established (node reboot), far from when the policy was introduced.
+
+---
+
 ## 2026-07-01
 
 ### ml.yanatech.co.uk had no public DNS record — ingest-docs CI silently failed
