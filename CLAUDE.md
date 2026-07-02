@@ -1,27 +1,31 @@
 # k8s-apps — Claude Code Instructions
 
 ## Overview
+
 GitOps repository for Akan's homelab Kubernetes cluster. All infrastructure and applications are defined here and deployed via ArgoCD. Everything must be committed to git — nothing deployed manually without a follow-up commit.
 
 **Principle:** GitOps-first. Correctness over speed. If it's not in git, it doesn't exist.
 
 ## Repository Location
+
 - **Remote:** `github.com/akann/k8s-apps`
 - **Local on cluster:** `~/repo/k8s-apps` on `k8s-cp-1` (192.168.33.21)
 - **ArgoCD:** `https://argocd.yanatech.co.uk` (v3.4.2)
 
 ## Cluster
+
 - **6-node Kubernetes** (kubeadm, v1.32): control planes k8s-cp-1/2/3 (192.168.33.21-23), workers k8s-worker-1/2/3 (192.168.33.31-33)
 - **3-node Proxmox:** pve1-3 (192.168.22.11-13)
 - **Domain:** `yanatech.co.uk`
 - **kubectl alias on k8s-cp-1:** `argocd='argocd --grpc-web'`
 
 ## Repo Structure
+
 ```
 k8s-apps/
 ├── bootstrap.sh                    # Ordered app deployment for fresh cluster
 ├── apps/                           # Application ArgoCD apps
-│   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/akan/ — akan repo is now a Turborepo, app moved to apps/akan/)
+│   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/akan/)
 │   ├── immich/
 │   ├── kafka/
 │   ├── kafka-ui/
@@ -32,7 +36,7 @@ k8s-apps/
 │   ├── gotify/
 │   ├── apicurio/
 │   ├── kubernetes-dashboard/
-│   ├── yana-stocks/               # yana-stocks microservices (Phase 4)
+│   ├── yana-stocks/               # yana-stocks microservices
 │   ├── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
 │   └── ml/                        # ml repo apps (k8s-docs RAG chatbot, source: akann/ml k8s/, directory.recurse: true)
 └── infrastructure/
@@ -72,6 +76,7 @@ k8s-apps/
 ## Core Infrastructure
 
 ### Networking
+
 - **CNI:** Cilium (native routing mode — no encapsulation)
 - **Load Balancer:** MetalLB, pool `192.168.33.200-249`
   - `192.168.33.200` — ingress-nginx
@@ -83,12 +88,14 @@ k8s-apps/
   - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)
 
 ### Storage
+
 - **Ceph RBD** (`ceph-rbd` StorageClass) — default StorageClass
 - **Ceph cluster:** 8.4TiB raw, 6 OSDs, monitors at 192.168.22.11-13:6789
 - **Cluster ID:** `&lt;see Vaultwarden&gt;`
 - **CRITICAL:** Ceph CSI egress to OSD ports (6802-6809) requires `CiliumNetworkPolicy` with `toCIDR` — standard `NetworkPolicy` does NOT work in Cilium native routing mode. See `infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`
 
 ### Secrets
+
 - **ESO:** External Secrets Operator syncs from Infisical
   - Webhook disabled (`webhook.create: false`, `certController.create: false`) — Cilium native routing blocks kube-apiserver node IP connections to in-cluster services
   - ClusterSecretStore: `infisical` (Infisical provider — main store for all app secrets)
@@ -96,6 +103,7 @@ k8s-apps/
   - Project: `k8s-homelab` (ID `&lt;see Vaultwarden&gt;`)
   - Environment: `prod`
 - **ExternalSecret format:**
+
 ```yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -115,9 +123,11 @@ spec:
       remoteRef:
         key: /my-folder/MY_SECRET_NAME
 ```
+
 - **Vaultwarden:** `vault.yanatech.co.uk` — bootstrap source of truth for manual secrets
 
 ### Databases
+
 - **CNPG pg-main:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` — shared cluster for vaultwarden, authentik, nextcloud, infisical, apicurio (4 instances; barman backup to MinIO `s3://cnpg-backups/pg-main/`)
 - **Immich postgres:** `immich-postgres-rw.immich.svc.cluster.local:5432` — dedicated CNPG cluster using `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (2 instances)
 - **k8s-docs postgres:** `k8s-docs-pg-rw.k8s-docs.svc.cluster.local:5432` — dedicated CNPG cluster, same `cloudnative-vectorchord` image as Immich (2 instances) but not shared with it — separate instance reserved for future ML work too
@@ -126,18 +136,21 @@ spec:
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
 
 ### Backup Strategy
+
 - **CNPG clusters (pg-main, auth-service-pg, immich-postgres):** barman WAL streaming + daily ScheduledBackup → MinIO `s3://cnpg-backups/` — provides PITR to any second
 - **harbor-database** (plain StatefulSet, not CNPG): daily pg_dump CronJob (`harbor-db-backup` in `harbor` ns) → MinIO `s3://cnpg-backups/harbor-db/`, rolling 7-day filenames (`harbor-Monday.sql.gz` … `harbor-Sunday.sql.gz`)
 - **PVC data (all workloads):** Velero node-agent (Kopia fs-backup) on all nodes, daily schedule → Backblaze B2 `s3://yanatech-velero/`; `defaultVolumesToFsBackup: true` covers all PVCs
 - **MinIO credentials for backup jobs:** Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`, provisioned via ExternalSecret in each namespace
 
 ### kured (node reboot daemon)
+
 - **Config:** `infrastructure/kured/argocd-app-kured.yaml`
 - **drainTimeout: 5m** — drain attempt times out after 5 minutes rather than waiting forever
 - **forceReboot: true** — reboots the node even if drain didn't fully complete (CNPG primary recovers via WAL replay after reboot)
 - **IMPORTANT:** CNPG clusters must have `instances ≥ 2` for kured drains to succeed. A single-instance CNPG cluster sets its primary PDB to `ALLOWED DISRUPTIONS: 0`, permanently blocking drain. If a worker self-cordon and kured is stuck, first check CNPG PDB status: `kubectl get pdb -A`
 
 ### SSO
+
 - **Authentik:** `https://authentik.yanatech.co.uk` — SSO for all services
 - **Forward auth pattern** (for apps without native OIDC):
   1. Create Authentik provider (Proxy, Forward auth, single application)
@@ -145,6 +158,7 @@ spec:
   3. Create ExternalName Service in app namespace pointing to outpost
   4. Create outpost Ingress routing `/outpost.goauthentik.io` on app hostname
   5. Add auth annotations to main Ingress:
+
 ```yaml
 nginx.ingress.kubernetes.io/auth-url: "https://<hostname>/outpost.goauthentik.io/auth/nginx"
 nginx.ingress.kubernetes.io/auth-signin: "https://<hostname>/outpost.goauthentik.io/start?rd=$escaped_request_uri"
@@ -152,12 +166,14 @@ nginx.ingress.kubernetes.io/auth-response-headers: "Set-Cookie,X-authentik-usern
 nginx.ingress.kubernetes.io/auth-snippet: |
   proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
 ```
+
 - **CRITICAL:** `auth-url` must use the external hostname, NOT the internal service URL. The outpost matches by external host.
 - **ingress-nginx** requires `allowSnippetAnnotations: true` AND `annotations-risk-level: Critical` for `auth-snippet`
 
 ## ArgoCD Conventions
 
 ### Application format
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -185,6 +201,7 @@ spec:
 ```
 
 ### Sync waves
+
 - Wave 0: MetalLB, Ceph CSI
 - Wave 1: Cilium, cert-manager, ingress-nginx
 - Wave 2: MetalLB config, cert-manager config
@@ -198,7 +215,9 @@ spec:
 - Wave 10+: yana-stocks services
 
 ### Helm values
+
 Use `valuesObject:` (not `values: |`) to avoid YAML indentation issues:
+
 ```yaml
 helm:
   valuesObject:
@@ -206,25 +225,32 @@ helm:
 ```
 
 ### infrastructure/monitoring/ bootstrap caveat
+
 Files in `infrastructure/monitoring/` are applied once during the initial bootstrap (when the monitoring ArgoCD app first synced from the directory before converting itself to a Helm chart source). New files added to that directory are **not auto-synced** by any running ArgoCD app — apply them manually:
+
 ```bash
 kubectl apply -f infrastructure/monitoring/<file>.yaml
 ```
+
 The child apps `argocd-app-monitoring-rules.yaml` and `argocd-app-grafana-dashboards.yaml` are exceptions — they create their own persistent child ArgoCD apps that do continuously sync. For new persistent extras (ExternalSecrets, ClusterSecretStores, RBAC), either apply manually or create a dedicated `monitoring-extras` ArgoCD Application.
 
 ### Known permanent OutOfSync (cosmetic, all Healthy — do not fix)
+
 - `actions-runner-controller` — OCI registry limitation
 - `argo-rollouts` — cluster-scoped CRDs tracked twice
 - `infisical` — bundled nginx chart mutation
 - `yana-stocks` / `ml-predictor` Rollout — cosmetic OutOfSync after SSA field-manager migration; diff is always empty, Rollout is Healthy
 
 ### immich ignoreDifferences pattern (SSA + ESO + CNPG)
+
 The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifferences`:
+
 - **ExternalSecret**: ESO injects default fields (`conversionStrategy`, `decodingStrategy`, `metadataPolicy`, `nullBytePolicy`, `deletionPolicy`, `engineVersion`, `mergePolicy`) — use `jqPathExpressions`
 - **CNPG Cluster**: The CNPG admission webhook injects ~20 default spec fields (affinity, enablePDB, logLevel, etc.) that aren't in the manifest — use `jqPathExpressions` listing each field. `managedFieldsManagers` does NOT work here because CNPG uses `Update` (not `Apply`) operation, so the injected fields are not tracked under any named field manager.
 - The `immich-app-server` Ingress is owned exclusively by the `immich-app` Helm chart — do not add an `immich-ingress.yaml` duplicate to the `immich` kustomization.
 
 ### ArgoCD + Argo Rollouts pitfalls
+
 - **Never set `ServerSideApply=false` on a Rollout.** The Rollout CRD uses `x-kubernetes-preserve-unknown-fields` for `.spec.template`, so client-side structured merge diff fails with "field not declared in schema". The app-level `ServerSideApply=true` handles this correctly.
 - **Stray `spec.template` blocks in Service definitions** cause the same "field not declared in schema" error. Check multi-resource YAML files (Deployment + Service in one file) to ensure the Service section is not accidentally inheriting content from the Deployment's `spec.template`.
 - **`ComparisonError: field not declared in schema` on Rollout `.spec.template`**: Even with `ServerSideApply=true` and per-Application `ServerSideDiff=true` in syncOptions, ArgoCD v3.x requires the **global** `controller.diff.server.side: "true"` flag in `argocd-cmd-params-cm` (set via `configs.params` in the ArgoCD Helm values). Per-Application `ServerSideDiff=true` alone is insufficient — the controller ignores it without the global flag. Fix already applied in `infrastructure/argocd/values.yaml`.
@@ -243,38 +269,49 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 - **Stuck on a stale git revision despite `refresh: hard`?** The `argocd-repo-server`'s local git clone can go stale (suspiciously fast `git_ms` in controller logs — a cache hit, not a real fetch — is the tell). No webhook is configured for these repos, so ArgoCD relies purely on polling + its local clone cache. Fix: `kubectl rollout restart deployment argocd-repo-server -n argocd`, then refresh the Application again.
 
 ### Application source path discipline
+
 All manifests for an app (Deployments, Services, ExternalSecrets, etc.) MUST be inside the directory specified in the Application's `spec.source.path`. Files placed in a parent directory are silently ignored by ArgoCD. For apps with a `manifests/` subdirectory (e.g. `apps/gotify/manifests`), ensure every manifest — including ExternalSecrets — lives inside that subdirectory.
 
 ### Harbor: RWO PVC rolling update deadlock
+
 Harbor's `harbor-jobservice` and `harbor-registry` Deployments use `ReadWriteOnce` Ceph RBD PVCs. During a rolling update, if the new pod is scheduled on a different node than the old pod, Kubernetes enters a deadlock:
+
 - The new pod can't start (can't mount the RWO volume held by the old pod on another node)
 - The old pod won't terminate (rolling update waits for the new pod to be ready first)
 
 **Symptom:** New RS pods stuck in `ContainerCreating` for hours with no events (events expire after ~1h).
 
 **Fix:** Manually delete the old running pods. Kubernetes releases the PVC, the new pods can mount it, and the old RS is garbage-collected once the new pods become Ready:
+
 ```bash
 kubectl delete pod -n harbor <old-jobservice-pod> <old-registry-pod>
 ```
+
 To identify old vs new pods: the new RS pods are the ones in `ContainerCreating`; the old RS pods are the ones `Running` from a different ReplicaSet name.
 
 If both RS have competing pods, check RS revision numbers to confirm which is current:
+
 ```bash
 kubectl get rs -n harbor <rs-name> -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}'
 ```
+
 Scale down the old RS to 0 to break the deadlock: `kubectl scale rs -n harbor <old-rs-name> --replicas=0`
 
 ### Harbor: jobservice/core CORE_SECRET mismatch after cluster restart
+
 After a cluster restart, ArgoCD may sync and update the `harbor-core` Kubernetes secret shortly after harbor-core pods have already started. This creates a mismatch: harbor-core is running with the old `CORE_SECRET` value, but newly-started jobservice pods read the new value → `401 UNAUTHORIZED` on `/api/v2.0/internalconfig`.
 
 **Symptom:** `harbor-jobservice` CrashLoopBackOff with `http error: code 401, message {"errors":[{"code":"UNAUTHORIZED","message":"only internal service is allowed to call this API"}]}`
 
 **Confirm:** Compare the running harbor-core env vs the current k8s secret:
+
 ```bash
 kubectl exec -n harbor <harbor-core-pod> -- sh -c 'echo $CORE_SECRET'
 kubectl get secret harbor-core -n harbor -o jsonpath='{.data.secret}' | base64 -d
 ```
+
 **Fix:** Restart harbor-core so it reloads the current secret value:
+
 ```bash
 kubectl rollout restart deployment harbor-core -n harbor
 ```
@@ -282,15 +319,17 @@ kubectl rollout restart deployment harbor-core -n harbor
 ## Network Policies
 
 ### Critical rules
+
 1. **Every namespace** gets `default-deny-all` NetworkPolicy
 2. **Every operator/controller namespace** needs `allow-kube-apiserver-egress` (ports 443+6443+53)
 3. **Ceph CSI OSD egress** requires `CiliumNetworkPolicy` with `toCIDR` — NOT standard NetworkPolicy
 4. **Cross-namespace ClusterIP routing** requires `CiliumNetworkPolicy` in Cilium native routing mode — standard NetworkPolicy doesn't work. Confirmed for: Grafana → Prometheus, Grafana → PostgreSQL (yana-stocks). Use `toEndpoints` with pod labels.
 5. **ESO webhook disabled** — was blocking syncs. Do NOT re-enable without also adding CiliumNetworkPolicy for node IP ingress
 6. **KEDA intra-namespace gRPC (port 9666):** `metrics-apiserver` → `keda-operator` requires an explicit `podSelector: {}` ingress rule on port 9666 in the `allow-keda` policy — `default-deny-all` blocks it otherwise
-7. **The first policy to select a pod flips its default from allow to deny — for that whole direction, not just what the new rule covers.** A namespace with zero NetworkPolicies/CiliumNetworkPolicies is fully open. The moment any policy's `endpointSelector`/`podSelector` matches a pod for a given `policyTypes` direction, that pod becomes default-deny for that direction except what's explicitly allowed — by *any* policy selecting it, not just the new one. Adding a narrow `CiliumNetworkPolicy` to a previously-unrestricted namespace (e.g. to let one app reach a new internal-only Service) can silently break every *other* egress path that app had — DNS included. If the target namespace has no prior policies, either scope the new rule to only the specific pods that need it, or pair it with a `toEntities: [all]` / `egress: [{}]` catch-all rule restoring the original open posture (see `ciliumnetpol-akan-k8s-docs.yaml` — this exact mistake broke `akan`'s contact form on 2026-07-01, see UPDATES.md).
+7. **The first policy to select a pod flips its default from allow to deny — for that whole direction, not just what the new rule covers.** A namespace with zero NetworkPolicies/CiliumNetworkPolicies is fully open. The moment any policy's `endpointSelector`/`podSelector` matches a pod for a given `policyTypes` direction, that pod becomes default-deny for that direction except what's explicitly allowed — by _any_ policy selecting it, not just the new one. Adding a narrow `CiliumNetworkPolicy` to a previously-unrestricted namespace (e.g. to let one app reach a new internal-only Service) can silently break every _other_ egress path that app had — DNS included. If the target namespace has no prior policies, either scope the new rule to only the specific pods that need it, or pair it with a `toEntities: [all]` / `egress: [{}]` catch-all rule restoring the original open posture (see `ciliumnetpol-akan-k8s-docs.yaml` for an example that gets this right).
 
 ### Files
+
 - `infrastructure/network-policies/netpol-infrastructure.yaml` — all infrastructure namespaces
 - `infrastructure/network-policies/netpol-cnpg.yaml` — CNPG operator + clusters
 - `infrastructure/network-policies/netpol-monitoring.yaml` — monitoring stack
@@ -302,33 +341,39 @@ kubectl rollout restart deployment harbor-core -n harbor
 - `infrastructure/cilium/ciliumnetpol-eso-webhook.yaml` — ESO webhook (currently unused — webhook disabled)
 
 ### Adding a new namespace
+
 1. Add `default-deny-all` to appropriate netpol file
 2. Add specific ingress/egress policies
 3. Add `allow-kube-apiserver-egress` to `netpol-apiserver-egress.yaml` if namespace has operators
 4. Apply and commit
 
 ## Infisical Webhook (CRITICAL)
+
 The infisical bundled nginx creates `infisical-ingress-nginx-admission` ValidatingWebhookConfiguration which blocks ALL ingress and ExternalSecret creation cluster-wide when it times out.
 
 **Permanent fix applied:**
+
 - `infisical-ingress-nginx-controller` scaled to 0 replicas
 - `admissionWebhooks.enabled: false` in infisical values
 - `failurePolicy: Ignore` patched on the webhook (in `ignoreDifferences`)
 - Admission service deleted
 
 **If webhook reappears and blocks:**
+
 ```bash
 kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission 2>/dev/null; true
 kubectl delete service infisical-ingress-nginx-controller-admission -n infisical 2>/dev/null; true
 ```
 
 **If infisical ingress breaks** (reverts to `infisical-nginx` class after sync):
+
 ```bash
 kubectl patch ingress infisical-ingress -n infisical --type='json' \
   -p='[{"op":"replace","path":"/spec/ingressClassName","value":"nginx"},{"op":"add","path":"/spec/tls","value":[{"hosts":["infisical.yanatech.co.uk"],"secretName":"wildcard-yanatech-tls"}]},{"op":"replace","path":"/spec/rules","value":[{"host":"infisical.yanatech.co.uk","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"infisical-infisical-standalone-infisical","port":{"number":8080}}}}]}}]}]'
 ```
 
 ## Kong API Gateway
+
 - **Namespace:** `kong`
 - **Chart:** `kong/ingress` 0.24.0 (Kong 3.9, DB-less)
 - **MetalLB VIP:** `192.168.33.202`
@@ -337,21 +382,23 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 - **No admin UI** in OSS mode
 
 ### Webhook timeout (IMPORTANT)
+
 The `kong-controller-kong-validations` ValidatingWebhookConfiguration has three webhooks, all with `timeoutSeconds: 10` by default. Due to Cilium native routing, the kube-apiserver→webhook call takes ~10s each, causing timeouts in multiple operators.
 
 **All three webhooks must have `timeoutSeconds: 5`:**
 
-| Index | Name | Why 5s matters |
-|-------|------|----------------|
-| 0 | `secrets.credentials.validation.*` | Intercepts ALL secrets cluster-wide — was blocking cert-manager SSA PATCH on TLS secrets (`context deadline exceeded` after two sequential 10s calls = 20s total) |
-| 1 | `secrets.plugins.validation.*` | Same — also intercepts all secrets cluster-wide |
-| 2 | `services.validation.*` | Intercepts all Service CREATE/UPDATE — was breaking Strimzi (fabric8 HTTP client timeout) |
+| Index | Name                               | Why 5s matters                                                                                                                                                    |
+| ----- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | `secrets.credentials.validation.*` | Intercepts ALL secrets cluster-wide — was blocking cert-manager SSA PATCH on TLS secrets (`context deadline exceeded` after two sequential 10s calls = 20s total) |
+| 1     | `secrets.plugins.validation.*`     | Same — also intercepts all secrets cluster-wide                                                                                                                   |
+| 2     | `services.validation.*`            | Intercepts all Service CREATE/UPDATE — was breaking Strimzi (fabric8 HTTP client timeout)                                                                         |
 
 **Fix applied:** `timeoutSeconds` patched to `5` on all three webhook entries. `ignoreDifferences` in `argocd-app-kong.yaml` (indices 0, 1, 2) prevents ArgoCD from reverting this.
 
 **Do not increase `timeoutSeconds` back to 10** — it will break cert-manager secret writes AND the Strimzi operator.
 
 ### Adding a Kong route
+
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -375,12 +422,14 @@ spec:
                   number: 3000
 ```
 
-## yana-stocks (Phase 4)
+## yana-stocks
 
 ### Namespace
+
 `yana-stocks`
 
-### Services to deploy
+### Services
+
 ```
 apps/yana-stocks/
 ├── namespace.yaml
@@ -399,14 +448,17 @@ apps/yana-stocks/
 ```
 
 ### Images
+
 All pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 
 ### CNPG for auth-service
+
 Separate CNPG cluster `auth-service-pg` in `yana-stocks` namespace (not shared with pg-main).
 Migrations run at pod startup via golang-migrate (no initContainer needed).
 Cluster has 2 instances (primary + 1 replica) with barman backup to MinIO `s3://cnpg-backups/auth-service-pg/` and a daily ScheduledBackup at 01:00. MinIO credentials provisioned via ExternalSecret `cnpg-minio-credentials` (Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`).
 
-### Kafka topics (already created)
+### Kafka topics
+
 ```
 users.registered
 stocks.prices.raw
@@ -415,9 +467,11 @@ stocks.signals.sentiment
 stocks.signals.prediction
 stocks.portfolio.events
 ```
+
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
 ### KEDA ScaledObject pattern (price-ingestor, price-processor, sentiment-analyzer, profile-service, portfolio-service, portfolio-api)
+
 ```yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -438,9 +492,10 @@ spec:
         lagThreshold: "10"
 ```
 
-**Don't forget:** if the target Deployment's manifest also declares a static `replicas:` field (all of these do), the owning ArgoCD Application needs an `ignoreDifferences` entry for that Deployment's `/spec/replicas` — otherwise self-heal resets it to the static value on every sync, which KEDA then scales back down moments later (visible as pod churn right after every routine sync). See `argocd-app-yana-stocks.yaml` for the six existing entries; missing this for a new KEDA-scaled service in `shared-services` caused exactly this on 2026-07-01 (see UPDATES.md).
+**Don't forget:** if the target Deployment's manifest also declares a static `replicas:` field (all of these do), the owning ArgoCD Application needs an `ignoreDifferences` entry for that Deployment's `/spec/replicas` — otherwise self-heal resets it to the static value on every sync, which KEDA then scales back down moments later (visible as pod churn right after every routine sync). See `argocd-app-yana-stocks.yaml` for the six existing entries.
 
 ### Argo Rollouts pattern (ml-predictor)
+
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
@@ -453,12 +508,12 @@ spec:
     canary:
       steps:
         - setWeight: 10
-        - pause: {duration: 5m}
+        - pause: { duration: 5m }
         - analysis:
             templates:
               - templateName: ml-predictor-success-rate
         - setWeight: 50
-        - pause: {duration: 5m}
+        - pause: { duration: 5m }
         - setWeight: 100
   selector:
     matchLabels:
@@ -476,14 +531,17 @@ spec:
 ## shared-services
 
 ### Repo
+
 `github.com/akann/shared-services` — standalone Turborepo (own remote, not a yana-stocks subdirectory). App manifests live in **its own repo** (`k8s/`), yanatech-style — only cluster-wide resources (Kafka topics, the ArgoCD Application, NetworkPolicies) live here in `k8s-apps`.
 
 Since this repo is private, ArgoCD needs its own `repository`-type Secret to clone it (`repo-shared-services` in the `argocd` namespace, same shape as `repo-yanatech`/`repo-akan` — `type: git`, `username`/`password` (fine-grained PAT), `url`). Without it, the Application shows `ComparisonError: ... authentication required: Repository not found.` The `argocd-app-shared-services.yaml` Application also sets `source.directory.recurse: true` since `k8s/` has nested subfolders (`email-api/kong/`, etc.) — yanatech's flat `k8s/` doesn't need this.
 
 ### Namespace
+
 `shared-services`
 
 ### Apps
+
 ```
 email-api          # NestJS HTTP — POST /api/email/send, validates + queues onto Kafka, returns 202
 email-service       # NestJS Kafka consumer — sends via swappable EmailProvider (SMTP2GO first), single attempt + DLQ on failure (no retry — see UPDATES.md)
@@ -491,50 +549,64 @@ shared-api-docs     # Redocly OpenAPI hub for email-api, Authentik-protected (sh
 ```
 
 ### Kafka topics (in `apps/kafka/shared-services-topics.yaml`)
+
 ```
 notifications.email.send     # 24h retention — producer: email-api, consumer: email-service
 notifications.email.failed   # 30d retention — DLQ, producer: email-service
 ```
+
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` (same cluster-wide Strimzi broker as yana-stocks)
 
 ### Routing
+
 `email-api` is reached only via Kong (`https://api-gateway.yanatech.co.uk/api/email/send`), gated by a `key-auth` plugin (not an in-app guard) — same pattern as the JWT plugin for yana-stocks. A `CiliumNetworkPolicy`-free plain `NetworkPolicy` restricts ingress to `email-api`'s ClusterIP to the `kong` namespace only, so callers can't bypass the key-auth check by hitting the Service directly.
 
 ### KEDA ScaledObject (email-service)
+
 Same shape as yana-stocks' pattern above — `minReplicaCount: 0`, triggers on `notifications.email.send` consumer lag.
 
 ### Images
+
 `harbor.yanatech.co.uk/shared-services/<app>:<tag>` — `email-api`, `email-service`, `shared-api-docs`. Pushed via a project-scoped Harbor robot account (`robot$shared-services+ci`), not a borrowed/shared credential — Harbor's per-project robot accounts don't carry access to other projects, so a new project needs its own project + robot account (`POST /api/v2.0/projects`, then `POST /api/v2.0/robots` with `level: project` + `permissions[].namespace` — note `GET/POST .../projects/{id}/robots` 404s on this Harbor version (v2.15.1); the system-wide `/api/v2.0/robots` endpoint works for both system- and project-level robots).
 
 ### CI runner
+
 `runners-shared-services` — a dedicated per-repo ARC runner scale set (`infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`), same pattern as `runners-yana-stocks`/`runners-k8s-apps`. GitHub-hosted `ubuntu-latest` **cannot** build/push here — `harbor.yanatech.co.uk` doesn't resolve outside the homelab network. Only the `docker` job needs the self-hosted runner; `quality`/`gitops` stay on `ubuntu-latest`.
 
 ## ml (RAG chatbot over homelab docs)
 
 ### Repo
+
 `github.com/akann/ml` — standalone Turborepo, meant to grow into more than one ML app over time (each future app gets its own path under `ml.yanatech.co.uk/<app>`, path-based routing on one shared domain — a deliberate deviation from this cluster's usual one-subdomain-per-app convention). App manifests live in **its own repo** (`k8s/`), shared-services-style. Needs its own `repo-ml` git credential Secret in `argocd` (same shape/PAT-reuse as `repo-akan`) and its own `runners-ml` ARC scale set — same two prerequisites every new private repo needs (see shared-services section above).
 
 ### Namespace
+
 `k8s-docs` (not `ml` — each app in this repo gets its own namespace, matching the one-namespace-per-app convention; the repo name and the namespace name are intentionally different)
 
 ### Apps
+
 ```
 k8s-docs   # NestJS — RAG chatbot over k8s-apps' docs. Ingest webhook (public) + query endpoint (internal-only, see below)
 ```
 
 ### Content scope — deliberately narrow
-Only `k8s-apps` is ingested, not the other private repos in this workspace. `k8s-apps` is the only one of them that's public on GitHub, and the chat page (`akan.nkweini.org/k8s-docs`) is public with no page-level auth — indexing a private repo's docs would let anyone read them via the chatbot as a side channel. **Guardrail:** adding another (private) repo to `k8s-apps/.github/workflows/ingest-docs.yml`'s pattern without first gating the chat page behind Authentik reopens this. The ingest workflow triggers on any `**/*.md` change anywhere in the repo, not just `CLAUDE.md`/`docs/`/`README.md` — it was scoped too narrowly at first and missed 12 real files (per-app/infra READMEs, `UPDATES.md`, etc.) until caught and fixed.
+
+Only `k8s-apps` is ingested, not the other private repos in this workspace. `k8s-apps` is the only one of them that's public on GitHub, and the chat page (`akan.nkweini.org/k8s-docs`) is public with no page-level auth — indexing a private repo's docs would let anyone read them via the chatbot as a side channel. **Guardrail:** adding another (private) repo to `k8s-apps/.github/workflows/ingest-docs.yml`'s pattern without first gating the chat page behind Authentik reopens this. The ingest workflow triggers on any `**/*.md` change anywhere in the repo, not just `CLAUDE.md`/`docs/`/`README.md`, so per-app/infra READMEs and `UPDATES.md` get indexed too.
 
 ### `/query` is not on the public Ingress at all
-`ml.yanatech.co.uk/k8s-docs` only routes `/ingest/webhook` and `/health`. The query endpoint is reachable only from the `akan` namespace, over internal Service DNS (`k8s-docs.k8s-docs.svc.cluster.local:3000`), enforced by `infrastructure/cilium/ciliumnetpol-akan-k8s-docs.yaml` — see Network Policies rule 7 above for the regression this caused the first time. An API key is checked in-app too, but it's defense-in-depth; the network policy is what actually keeps it unreachable from the internet. `akan`'s Next.js server (`apps/akan/app/api/k8s-docs/query/route.ts`) is the only caller, holding the key server-side.
+
+`ml.yanatech.co.uk/k8s-docs` only routes `/ingest/webhook` and `/health`. The query endpoint is reachable only from the `akan` namespace, over internal Service DNS (`k8s-docs.k8s-docs.svc.cluster.local:3000`), enforced by `infrastructure/cilium/ciliumnetpol-akan-k8s-docs.yaml` — see Network Policies rule 7 above for the failure mode this guards against. An API key is checked in-app too, but it's defense-in-depth; the network policy is what actually keeps it unreachable from the internet. `akan`'s Next.js server (`apps/akan/app/api/k8s-docs/query/route.ts`) is the only caller, holding the key server-side.
 
 ### CNPG
+
 Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases section above). `bootstrap.initdb.secret` names a secret CNPG does **not** auto-generate — it must be pre-created via its own `ExternalSecret` (`k8s-docs-db-credentials`, type `kubernetes.io/basic-auth`), same pattern as `apps/immich/external-secret.yaml`'s `immich-db-credentials`. Missing this hangs the bootstrap job indefinitely on `secret not found`, not an obvious error to trace back to a missing manifest.
 
 ### Images
+
 `harbor.yanatech.co.uk/ml/<app>:<tag>` — `k8s-docs`. Pushed via a project-scoped Harbor robot account (`robot$ml+ci`), same per-project-credential pattern as `shared-services`.
 
 ### CI runner
+
 `runners-ml` — same pattern as `runners-shared-services`.
 
 ## Useful Commands
@@ -566,25 +638,25 @@ kubectl create token headlamp -n headlamp --duration=8760h
 
 ## Services URLs
 
-| Service | URL |
-|---|---|
-| ArgoCD | https://argocd.yanatech.co.uk |
-| Authentik | https://authentik.yanatech.co.uk |
-| Grafana | https://grafana.yanatech.co.uk |
-| Immich | https://photos.yanatech.co.uk |
-| Infisical | https://infisical.yanatech.co.uk |
-| Harbor | https://harbor.yanatech.co.uk |
-| Nextcloud | https://cloud.yanatech.co.uk |
-| Kong | https://api-gateway.yanatech.co.uk |
-| MinIO Console | https://minio-console.yanatech.co.uk |
-| MongoDB UI | https://mongo.yanatech.co.uk |
-| Redis UI | https://redis.yanatech.co.uk |
-| Headlamp | https://headlamp.yanatech.co.uk |
-| Uptime Kuma | https://status.yanatech.co.uk |
-| Kafka UI | https://kafka-ui.yanatech.co.uk |
-| Argo Rollouts | https://rollouts.yanatech.co.uk |
-| pgAdmin | https://pgadmin.yanatech.co.uk |
-| Apicurio | https://apicurio.yanatech.co.uk |
-| yana-stocks | https://stocks.yanatech.co.uk |
-| Akan personal site | https://akan.nkweini.org |
-| K8s Docs Chat (k8s-docs, public UI) | https://akan.nkweini.org/k8s-docs |
+| Service                             | URL                                  |
+| ----------------------------------- | ------------------------------------ |
+| ArgoCD                              | https://argocd.yanatech.co.uk        |
+| Authentik                           | https://authentik.yanatech.co.uk     |
+| Grafana                             | https://grafana.yanatech.co.uk       |
+| Immich                              | https://photos.yanatech.co.uk        |
+| Infisical                           | https://infisical.yanatech.co.uk     |
+| Harbor                              | https://harbor.yanatech.co.uk        |
+| Nextcloud                           | https://cloud.yanatech.co.uk         |
+| Kong                                | https://api-gateway.yanatech.co.uk   |
+| MinIO Console                       | https://minio-console.yanatech.co.uk |
+| MongoDB UI                          | https://mongo.yanatech.co.uk         |
+| Redis UI                            | https://redis.yanatech.co.uk         |
+| Headlamp                            | https://headlamp.yanatech.co.uk      |
+| Uptime Kuma                         | https://status.yanatech.co.uk        |
+| Kafka UI                            | https://kafka-ui.yanatech.co.uk      |
+| Argo Rollouts                       | https://rollouts.yanatech.co.uk      |
+| pgAdmin                             | https://pgadmin.yanatech.co.uk       |
+| Apicurio                            | https://apicurio.yanatech.co.uk      |
+| yana-stocks                         | https://stocks.yanatech.co.uk        |
+| Akan personal site                  | https://akan.nkweini.org             |
+| K8s Docs Chat (k8s-docs, public UI) | https://akan.nkweini.org/k8s-docs    |
