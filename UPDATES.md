@@ -6,6 +6,16 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-07-02
 
+### Total platform outage during pve1 reboot — Ceph OSDs bound to mesh link IPs, not loopbacks
+
+**Symptom:** During the planned pve1 reboot, *everything* went offline (yana-stocks included) until pve1 returned — despite k8s pods being properly drained to worker-2/3 and Ceph having 2/3 hosts up. Prometheus has a total metrics gap 17:05–17:15Z; pve2's OSD logs show `heartbeat_check: no reply ... since back 17:59:40+0100` (front channel fine) and 1000+ blocked ops, "most affected pool ['rbd']".
+
+**Root cause:** The Ceph cluster network (`cluster_network = 10.10.0.0/16`) runs over the FRR/OSPF full mesh of /30 point-to-point links. That CIDR does **not** include the OSPF loopbacks (`10.255.255.1-3`), so every OSD bound its back-channel address to a physical link IP — and by enumeration order, all six picked their **pve1-facing** link (pve2's OSDs → `10.10.10.2`, pve3's OSDs → `10.10.20.2`). When pve1 rebooted, both of those NICs lost carrier, OSPF withdrew the /30s, and pve2↔pve3 OSD replication died even though their direct link (adjacency up 9 days) was healthy the whole time. With size-3/min_size-2 pools unable to ack 2 replicas, RBD I/O froze cluster-wide → every VM (all k8s nodes) hung on disk → total outage. Asymmetric latent bug: rebooting pve3 would have been harmless; pve1 or pve2 froze storage.
+
+**Fix:** `cluster_network = 10.255.255.0/24` in `/etc/pve/ceph.conf` (loopbacks are reachable via OSPF over any surviving link — the standard Proxmox full-mesh pattern), then restarted OSDs host-by-host under `noout` with `active+clean` gates. Verified `ceph osd metadata` shows `back_addr` on `10.255.255.x` for all six OSDs and live replication connections on loopbacks with zero on the old link IPs. Backup of the old conf: `pve1:/root/ceph.conf.bak-2026-07-02`.
+
+**Verification for next maintenance:** a pve1/pve2 reboot should now leave `ceph pg stat` at `active+clean` and VMs responsive throughout. Front/public network (192.168.22.0/24, mons) was never affected.
+
 ### Cilium 1.17.3 → 1.18.11: HA apiserver access via k8s.apiServerURLs
 
 **Problem:** `k8sServiceHost` was pinned to `192.168.33.21` (k8s-cp-1) — required with `kubeProxyReplacement` since the agent can't bootstrap via the in-cluster `10.96.0.1` VIP it itself implements. Consequence: any Cilium agent that (re)started while cp-1 was down crash-looped (`Start hook failed ... dial tcp 192.168.33.21:6443: connect: no route to host`) — observed on worker-3 during the 2026-07-02 pve1 reboot (3 crash-loop restarts until cp-1's apiserver returned). A single control-plane outage could take CNI management down cluster-wide with it.
