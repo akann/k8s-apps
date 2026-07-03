@@ -18,7 +18,7 @@ data:
       ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 5,
+      "version": 6,
       "refresh": "1m",
       "time": {
         "from": "now-24h",
@@ -672,7 +672,7 @@ data:
         {
           "id": 13,
           "type": "table",
-          "title": "Visitor IPs",
+          "title": "Top Visitor IPs",
           "gridPos": {
             "x": 8,
             "y": 22,
@@ -779,7 +779,8 @@ data:
             "footer": {
               "show": false
             }
-          }
+          },
+          "description": "Top 100 IPs by request count in the selected time range. Total unique IPs is in the stat row above. Click an IP for rDNS/ISP/geo via ipinfo.io."
         },
         {
           "id": 11,
