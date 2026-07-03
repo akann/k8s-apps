@@ -14,7 +14,15 @@ Third DNS zone added, mirroring the nkweini.org precedent end-to-end: new solver
 
 Two images per CI run: `ghcr.io/akann/dove-house-tt` (Next standalone runner) and `ghcr.io/akann/dove-house-tt-migrate` (full node_modules, runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone output can't run drizzle migrations; Turbopack bundles drizzle-orm/pg into server chunks so they aren't resolvable as packages at runtime). Repo + packages are **private** (switched from public during rollout): needs `repo-dove-house-tt` in argocd ns + `ghcr-secret` dockerconfigjson in the app ns (akan pattern); still no self-hosted runner (ghcr.io is publicly reachable).
 
-**⚠️ Incident found during rollout:** the pre-created proxied A record `dovehousett.org → 62.3.101.140` was serving the **pfSense web GUI login page to the internet** — no NAT forward existed for that WAN IP, so 443 fell through to the firewall GUI listener. Required pfSense fix: port-forward 62.3.101.140:80/443 → 192.168.33.200 (ingress-nginx) and block WAN GUI access on that VIP.
+**⚠️ Incident found during rollout:** the pre-created proxied A record `dovehousett.org → 62.3.101.140` was serving the **pfSense web GUI login page to the internet** — no NAT forward existed for that WAN IP, so 443 fell through to the firewall GUI listener. Resolved by repointing the A record to 62.3.101.138 (yanatech's WAN IP, which already forwards to ingress-nginx).
+
+**Four rollout snags, all "new namespace" checklist items (in hit order):**
+1. Forgot to register the Application in the root `kustomization.yaml` (the file even says to) — nothing deployed until added.
+2. NetworkPolicies (wave 3) sync-errored with `namespaces "dove-house-tt" not found` until the wave-9 app created the namespace — self-healed, expected ordering noise.
+3. Missing `allow-kube-apiserver-egress` for the new namespace (`netpol-apiserver-egress.yaml`) — CNPG initdb hung on "waiting for the API server to be reachable" (apiserver is 6443 behind the 443 ClusterIP; the app's allow-egress only opens 443).
+4. Missing per-namespace egress entry in `netpol-cnpg.yaml`'s `allow-cnpg-operator` (cnpg-system → new namespace, ports 8000/5432/9187) — cluster stuck at 1/2 instances with "Instance Status Extraction Error: HTTP communication issue".
+
+**Kong webhook regression (separate, cluster-wide):** cert-manager couldn't write `wildcard-dovehousett-tls` ("context deadline exceeded" on the secret PATCH) — the two `secrets.*.validation` webhooks in `kong-controller-kong-validations` were back at `timeoutSeconds: 10` (a chart re-render reverted the documented fix; the argocd ignoreDifferences pins the field but doesn't restore the value). Re-patched to 5, cert issued immediately. If a future cert hangs at "Issuing", check this first.
 
 ### Ingress access-log dashboard in Grafana (Loki) + two enabling fixes
 
