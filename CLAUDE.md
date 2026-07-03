@@ -83,6 +83,7 @@ k8s-apps/
   - `192.168.33.201` — infisical bundled nginx (scaled to 0, do not use)
   - `192.168.33.202` — Kong API Gateway
 - **Ingress:** ingress-nginx at `192.168.33.200`
+  - `externalTrafficPolicy: Local` + `use-forwarded-headers` with `forwarded-for-header: CF-Connecting-IP` and `proxy-real-ip-cidr` = Cloudflare ranges → access logs show the real visitor IP for Cloudflare-proxied hosts (LAN visitors bypass Cloudflare via split-horizon DNS and log their LAN IP directly). Don't revert to `Cluster` — kube SNAT rewrites sources to node IPs and breaks the Cloudflare trust check.
 - **TLS:** cert-manager, Let's Encrypt wildcards via Cloudflare DNS-01, reflected to all namespaces via Reflector:
   - `wildcard-yanatech-tls` (`*.yanatech.co.uk`) — Cloudflare token from Infisical `/cert-manager/api-token`
   - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)

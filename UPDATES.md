@@ -544,3 +544,20 @@ This creates a `Service` on port 8082 and a `ServiceMonitor` so Prometheus scrap
    - `ArgoCDAppOutOfSync` (warning, 15m) — fires when `sync_status="OutOfSync"`
 
 3. **Alertmanager routing** — critical alerts → Gotify (already configured). The PrometheusRule labels `severity: critical` for Degraded/Missing, so they route to the `critical-alerts` receiver → Gotify bridge.
+
+---
+
+### Real visitor IPs in ingress-nginx access logs (2026-07-03)
+
+**Problem:** Access logs showed node IPs (e.g. `192.168.33.31`) for every external request — useless for seeing who visits `akan.nkweini.org` or any other public host. Two layers hid the client: `externalTrafficPolicy: Cluster` SNATs the connection to a node IP, and the sites are behind Cloudflare's proxy anyway, so the L3 source is a Cloudflare edge, with the real visitor only in the `CF-Connecting-IP` header.
+
+**Fix** (`infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml`):
+
+1. `controller.service.externalTrafficPolicy: Local` — preserves the L3 source (the Cloudflare edge IP). MetalLB L2 only announces the VIP from nodes with a ready controller pod, so 2 replicas keep failover.
+2. `use-forwarded-headers: "true"` + `forwarded-for-header: CF-Connecting-IP` + `proxy-real-ip-cidr: <Cloudflare IPv4 ranges>` — nginx swaps `$remote_addr` to the visitor IP from the Cloudflare header, but only when the connection actually comes from a Cloudflare range (spoof-safe).
+
+**Notes:**
+- Step 2 depends on step 1 — with `Cluster`, the SNAT'd node IP never matches the Cloudflare CIDR list and the header is ignored.
+- LAN visitors resolve the hosts to the VIP directly (split-horizon) and log their real LAN IP with no header involved.
+- Cloudflare ranges change rarely; source is https://www.cloudflare.com/ips-v4 — refresh the `proxy-real-ip-cidr` list if logs ever start showing 172.64.x/104.x sources again.
+- nginx does not reverse-resolve DNS names in access logs; look up interesting IPs after the fact (`dig -x <ip>`) or in Grafana/Loki.
