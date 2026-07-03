@@ -226,15 +226,20 @@ helm:
     key: value
 ```
 
-### infrastructure/monitoring/ bootstrap caveat
+### infrastructure/monitoring/ sync caveat
 
-Files in `infrastructure/monitoring/` are applied once during the initial bootstrap (when the monitoring ArgoCD app first synced from the directory before converting itself to a Helm chart source). New files added to that directory are **not auto-synced** by any running ArgoCD app — apply them manually:
+The `argocd-app-*.yaml` Application manifests in `infrastructure/monitoring/` (like all `argocd-app-*.yaml` files repo-wide) **are** continuously synced — the root `kustomization.yaml` lists them and the `bootstrap` Application applies it with `selfHeal: true`. Two consequences:
+
+- Editing an Application's spec (e.g. Helm values in `argocd-app-monitoring.yaml`) takes effect on **push to GitHub** — no manual apply needed.
+- A manual `kubectl apply` of an Application spec that isn't pushed yet is **silently reverted** by the bootstrap app's selfHeal within minutes (confirmed 2026-07-03). Don't bother; push instead.
+
+Non-Application extras in the directory (ExternalSecrets, ClusterSecretStores, RBAC — `eso-*.yaml`, `external-secret*.yaml`) are **not** in the root kustomization and are not synced by anything — apply those manually after committing:
 
 ```bash
 kubectl apply -f infrastructure/monitoring/<file>.yaml
 ```
 
-The child apps `argocd-app-monitoring-rules.yaml` and `argocd-app-grafana-dashboards.yaml` are exceptions — they create their own persistent child ArgoCD apps that do continuously sync. For new persistent extras (ExternalSecrets, ClusterSecretStores, RBAC), either apply manually or create a dedicated `monitoring-extras` ArgoCD Application.
+The child apps `argocd-app-monitoring-rules.yaml` and `argocd-app-grafana-dashboards.yaml` create their own persistent child ArgoCD apps that sync `rules/` and `dashboards/` continuously.
 
 ### Known permanent OutOfSync (cosmetic, all Healthy — do not fix)
 
