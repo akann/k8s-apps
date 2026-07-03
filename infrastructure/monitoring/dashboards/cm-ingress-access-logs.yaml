@@ -18,7 +18,7 @@ data:
       ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 4,
+      "version": 5,
       "refresh": "1m",
       "time": {
         "from": "now-24h",
@@ -746,6 +746,24 @@ data:
                     "value": {
                       "mode": "continuous-BlPu"
                     }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "IP address"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Look up on ipinfo.io (rDNS, ISP, geo)",
+                        "url": "https://ipinfo.io/${__value.text}",
+                        "targetBlank": true
+                      }
+                    ]
                   }
                 ]
               }
