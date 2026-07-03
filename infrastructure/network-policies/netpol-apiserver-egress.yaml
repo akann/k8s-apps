@@ -323,3 +323,25 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+---
+# dove-house-tt: the CNPG instance manager (dove-house-tt-pg pods) watches the
+# Cluster CR via the apiserver — same as k8s-docs above. initdb hangs on
+# "waiting for the API server to be reachable" without this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: dove-house-tt
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
