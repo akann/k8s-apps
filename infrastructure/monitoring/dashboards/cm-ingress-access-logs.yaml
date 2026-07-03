@@ -18,7 +18,7 @@ data:
       ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 2,
+      "version": 3,
       "refresh": "1m",
       "time": {
         "from": "now-24h",
@@ -430,57 +430,13 @@ data:
           }
         },
         {
-          "id": 8,
-          "type": "bargauge",
-          "title": "Top 10 Visitor IPs",
+          "id": 9,
+          "type": "table",
+          "title": "Top Paths",
           "gridPos": {
             "x": 0,
             "y": 13,
-            "w": 8,
-            "h": 9
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "topk(10, sum by (remote_addr) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
-              "legendFormat": "{{remote_addr}}",
-              "queryType": "instant",
-              "instant": true,
-              "range": false
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "continuous-BlPu"
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "displayMode": "gradient",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ]
-            },
-            "showUnfilled": true
-          }
-        },
-        {
-          "id": 9,
-          "type": "bargauge",
-          "title": "Top 10 Paths",
-          "gridPos": {
-            "x": 8,
-            "y": 13,
-            "w": 8,
+            "w": 12,
             "h": 9
           },
           "datasource": {
@@ -491,40 +447,75 @@ data:
             {
               "refId": "A",
               "expr": "topk(10, sum by (uri) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
-              "legendFormat": "{{uri}}",
               "queryType": "instant",
               "instant": true,
               "range": false
             }
           ],
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {}
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "uri": "Path",
+                  "Value": "Requests"
+                }
+              }
+            }
+          ],
           "fieldConfig": {
             "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "continuous-GrYlRd"
+              "custom": {
+                "align": "left",
+                "filterable": true
               }
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
+                ]
+              }
+            ]
           },
           "options": {
-            "orientation": "horizontal",
-            "displayMode": "gradient",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ]
-            },
-            "showUnfilled": true
+            "sortBy": [
+              {
+                "displayName": "Requests",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": false
+            }
           }
         },
         {
           "id": 10,
-          "type": "bargauge",
-          "title": "Top 10 User Agents",
+          "type": "table",
+          "title": "Top User Agents",
           "gridPos": {
-            "x": 16,
+            "x": 12,
             "y": 13,
-            "w": 8,
+            "w": 12,
             "h": 9
           },
           "datasource": {
@@ -535,63 +526,70 @@ data:
             {
               "refId": "A",
               "expr": "topk(10, sum by (user_agent) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
-              "legendFormat": "{{user_agent}}",
               "queryType": "instant",
               "instant": true,
               "range": false
             }
           ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "continuous-BlYlRd"
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "orientation": "horizontal",
-            "displayMode": "gradient",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ]
-            },
-            "showUnfilled": true
-          }
-        },
-        {
-          "id": 11,
-          "type": "logs",
-          "title": "Access Log Tail",
-          "gridPos": {
-            "x": 0,
-            "y": 31,
-            "w": 24,
-            "h": 11
-          },
-          "datasource": {
-            "type": "loki",
-            "uid": "loki"
-          },
-          "targets": [
+          "transformations": [
             {
-              "refId": "A",
-              "expr": "{namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | line_format \"{{.remote_addr}} [{{if .country}}{{.country}}{{else}}--{{end}}] \u2192 {{.status}} {{.method}} {{.host}}{{.uri}} ({{.request_time}}s) {{.user_agent}}\""
+              "id": "labelsToFields",
+              "options": {}
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "user_agent": "User agent",
+                  "Value": "Requests"
+                }
+              }
             }
           ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "left",
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
+                ]
+              }
+            ]
+          },
           "options": {
-            "showTime": true,
-            "sortOrder": "Descending",
-            "wrapLogMessage": true,
-            "enableLogDetails": true,
-            "dedupStrategy": "none"
+            "sortBy": [
+              {
+                "displayName": "Requests",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": false
+            }
           }
         },
         {
           "id": 12,
-          "type": "bargauge",
+          "type": "table",
           "title": "Requests by Country",
           "gridPos": {
             "x": 0,
@@ -607,31 +605,65 @@ data:
             {
               "refId": "A",
               "expr": "topk(15, sum by (country) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
-              "legendFormat": "{{country}}",
               "queryType": "instant",
               "instant": true,
               "range": false
             }
           ],
+          "transformations": [
+            {
+              "id": "labelsToFields",
+              "options": {}
+            },
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "country": "Country",
+                  "Value": "Requests"
+                }
+              }
+            }
+          ],
           "fieldConfig": {
             "defaults": {
-              "unit": "short",
-              "color": {
-                "mode": "continuous-GrYlRd"
-              },
-              "noValue": "no data"
+              "custom": {
+                "align": "left",
+                "filterable": true
+              }
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Requests"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
+                ]
+              }
+            ]
           },
           "options": {
-            "orientation": "horizontal",
-            "displayMode": "gradient",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ]
-            },
-            "showUnfilled": true
+            "sortBy": [
+              {
+                "displayName": "Requests",
+                "desc": true
+              }
+            ],
+            "footer": {
+              "show": false
+            }
           }
         },
         {
@@ -725,6 +757,34 @@ data:
             "footer": {
               "show": false
             }
+          }
+        },
+        {
+          "id": 11,
+          "type": "logs",
+          "title": "Access Log Tail",
+          "gridPos": {
+            "x": 0,
+            "y": 31,
+            "w": 24,
+            "h": 11
+          },
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | line_format \"{{.remote_addr}} [{{if .country}}{{.country}}{{else}}--{{end}}] \u2192 {{.status}} {{.method}} {{.host}}{{.uri}} ({{.request_time}}s) {{.user_agent}}\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "dedupStrategy": "none"
           }
         }
       ]
