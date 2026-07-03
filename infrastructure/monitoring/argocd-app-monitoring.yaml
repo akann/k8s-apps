@@ -82,6 +82,11 @@ spec:
               access: proxy
             - name: Loki
               type: loki
+              # Explicit uid — Tempo's lokiSearch/tracesToLogsV2 below and the
+              # ingress-access-logs dashboard reference it. Without this Grafana
+              # generated a hashed uid (P8E80F9AEF21F6940) and those references
+              # were dangling.
+              uid: loki
               url: http://loki.monitoring.svc.cluster.local:3100
               access: proxy
               isDefault: false

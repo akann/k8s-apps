@@ -8,7 +8,7 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ### Ingress access-log dashboard in Grafana (Loki) + two enabling fixes
 
-**Goal:** see HTTP access logs per host (initially `akan.nkweini.org`) in Grafana. New "Ingress Access Logs" dashboard (`uid: ingress-access-logs`, `infrastructure/monitoring/dashboards/cm-ingress-access-logs.yaml`) — `$host` template variable covering all public hosts (defaults to akan), panels for request rate by status class, latency percentiles, top visitor IPs/paths/user agents, and a live log tail. Data source is the existing Loki (`P8E80F9AEF21F6940`); no new infrastructure.
+**Goal:** see HTTP access logs per host (initially `akan.nkweini.org`) in Grafana. New "Ingress Access Logs" dashboard (`uid: ingress-access-logs`, `infrastructure/monitoring/dashboards/cm-ingress-access-logs.yaml`) — `$host` template variable covering all public hosts (defaults to akan), panels for request rate by status class, latency percentiles, top visitor IPs/paths/user agents, and a live log tail. Data source is the existing Loki (`uid: loki`); no new infrastructure.
 
 Two pre-existing gaps had to be fixed to make the logs parseable:
 
@@ -17,7 +17,7 @@ Two pre-existing gaps had to be fixed to make the logs parseable:
 
 **Caveat:** log lines stored *before* these changes keep the CRI prefix + old format, so the dashboard shows nothing for time ranges before the rollout (the `| __error__=""` filter drops unparseable lines by design).
 
-**Noticed, not fixed:** the Tempo datasource's `lokiSearch/tracesToLogsV2.datasourceUid: loki` in `argocd-app-monitoring.yaml` references a UID that doesn't exist — the actual Loki UID is `P8E80F9AEF21F6940` (no explicit `uid` was set at provisioning, so Grafana generated one). Trace→logs links in Tempo have therefore never worked.
+**Follow-up fix — Loki datasource UID pinned:** the Tempo datasource's `lokiSearch/tracesToLogsV2.datasourceUid: loki` in `argocd-app-monitoring.yaml` referenced a UID that didn't exist — no explicit `uid` was set at provisioning, so Grafana generated a hashed one (`P8E80F9AEF21F6940`), and trace→logs links in Tempo had never worked. Fixed by pinning `uid: loki` on the Loki datasource (matching the existing `prometheus`/`alertmanager` convention) rather than chasing the hashed UID; the new dashboard uses `uid: loki` too. Verified nothing else (git or Grafana-DB dashboards) referenced the hashed UID before the change. Note `infrastructure/monitoring/` files aren't auto-synced (bootstrap caveat in CLAUDE.md) — the Application change was `kubectl apply`'d manually after committing.
 
 ---
 

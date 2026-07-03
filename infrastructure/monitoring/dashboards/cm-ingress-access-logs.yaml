@@ -39,7 +39,7 @@ data:
           "type": "stat",
           "title": "Total Requests",
           "gridPos": { "x": 0, "y": 0, "w": 5, "h": 4 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -57,7 +57,7 @@ data:
           "type": "stat",
           "title": "Unique Visitor IPs",
           "gridPos": { "x": 5, "y": 0, "w": 5, "h": 4 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -75,7 +75,7 @@ data:
           "type": "stat",
           "title": "4xx",
           "gridPos": { "x": 10, "y": 0, "w": 4, "h": 4 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -93,7 +93,7 @@ data:
           "type": "stat",
           "title": "5xx",
           "gridPos": { "x": 14, "y": 0, "w": 4, "h": 4 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -111,7 +111,7 @@ data:
           "type": "stat",
           "title": "p95 Latency",
           "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -129,7 +129,7 @@ data:
           "type": "timeseries",
           "title": "Requests by Status Class",
           "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -171,7 +171,7 @@ data:
           "type": "timeseries",
           "title": "Latency Percentiles",
           "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -197,7 +197,7 @@ data:
           "type": "bargauge",
           "title": "Top 10 Visitor IPs",
           "gridPos": { "x": 0, "y": 13, "w": 8, "h": 9 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -216,7 +216,7 @@ data:
           "type": "bargauge",
           "title": "Top 10 Paths",
           "gridPos": { "x": 8, "y": 13, "w": 8, "h": 9 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -235,7 +235,7 @@ data:
           "type": "bargauge",
           "title": "Top 10 User Agents",
           "gridPos": { "x": 16, "y": 13, "w": 8, "h": 9 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
@@ -254,7 +254,7 @@ data:
           "type": "logs",
           "title": "Access Log Tail",
           "gridPos": { "x": 0, "y": 22, "w": 24, "h": 11 },
-          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "targets": [
             {
               "refId": "A",
