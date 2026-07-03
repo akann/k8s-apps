@@ -622,7 +622,7 @@ Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases secti
 
 ### Repo
 
-`github.com/akann/dove-house-tt` — standalone Turborepo (Next.js 16 + better-auth + Drizzle), **public** — so no `repo-*` ArgoCD credential and no self-hosted runner needed (images go to ghcr.io, built on `ubuntu-latest`, akan-style). App manifests live in **its own repo** (`k8s/dove-house-tt/`).
+`github.com/akann/dove-house-tt` — standalone Turborepo (Next.js 16 + better-auth + Drizzle), **private** (akan-style): needs the `repo-dove-house-tt` git credential Secret in the `argocd` namespace and a `ghcr-secret` dockerconfigjson in the app namespace. No self-hosted runner needed (images go to ghcr.io, built on `ubuntu-latest`). App manifests live in **its own repo** (`k8s/dove-house-tt/`).
 
 ### Namespace / domain
 
@@ -630,7 +630,7 @@ Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases secti
 
 ### Images
 
-`ghcr.io/akann/dove-house-tt` (Next standalone runner) + `ghcr.io/akann/dove-house-tt-migrate` (full node_modules; runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone image can't run drizzle migrations). Both ghcr packages must stay **public**: the manifests have no imagePullSecrets.
+`ghcr.io/akann/dove-house-tt` (Next standalone runner) + `ghcr.io/akann/dove-house-tt-migrate` (full node_modules; runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone image can't run drizzle migrations). Both packages are **private** — pulled via the `ghcr-secret` in the namespace (akan pattern).
 
 ### CNPG
 
