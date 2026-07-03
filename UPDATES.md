@@ -6,6 +6,16 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-07-03
 
+### dove-house-tt deployed — third DNS zone (dovehousett.org), members app + dedicated CNPG
+
+New app: Dove House Table Tennis Club members app (`github.com/akann/dove-house-tt`, public repo — Next.js 16 + better-auth + Drizzle/Postgres). Deployment follows the akan pattern (manifests in the app repo's `k8s/dove-house-tt/`, ghcr.io images, CI sed-patches the image tag) plus the ml/k8s-docs database pattern (dedicated CNPG cluster `dove-house-tt-pg`, pre-created basic-auth credentials secret, barman → MinIO `s3://cnpg-backups/dove-house-tt-pg`, daily ScheduledBackup).
+
+Third DNS zone added, mirroring the nkweini.org precedent end-to-end: new solver in `letsencrypt-prod` (`dnsZones: [dovehousett.org]` → `cloudflare-api-token-dovehousett`), new ExternalSecret from Infisical `/cert-manager/api-token-dovehousett`, new `wildcard-dovehousett` Certificate in ingress-nginx with Reflector annotations → `wildcard-dovehousett-tls` reflected everywhere. App ingress serves apex + www (`from-to-www-redirect`).
+
+Two images per CI run: `ghcr.io/akann/dove-house-tt` (Next standalone runner) and `ghcr.io/akann/dove-house-tt-migrate` (full node_modules, runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone output can't run drizzle migrations; Turbopack bundles drizzle-orm/pg into server chunks so they aren't resolvable as packages at runtime). Both packages must be **public** on ghcr (no pull secret in the manifests). Repo is public → no `repo-*` ArgoCD credential and no self-hosted runner needed.
+
+**⚠️ Incident found during rollout:** the pre-created proxied A record `dovehousett.org → 62.3.101.140` was serving the **pfSense web GUI login page to the internet** — no NAT forward existed for that WAN IP, so 443 fell through to the firewall GUI listener. Required pfSense fix: port-forward 62.3.101.140:80/443 → 192.168.33.200 (ingress-nginx) and block WAN GUI access on that VIP.
+
 ### Ingress access-log dashboard in Grafana (Loki) + two enabling fixes
 
 **Goal:** see HTTP access logs per host (initially `akan.nkweini.org`) in Grafana. New "Ingress Access Logs" dashboard (`uid: ingress-access-logs`, `infrastructure/monitoring/dashboards/cm-ingress-access-logs.yaml`) — `$host` template variable covering all public hosts (defaults to akan), panels for request rate by status class, latency percentiles, top visitor IPs/paths/user agents, and a live log tail. Data source is the existing Loki (`uid: loki`); no new infrastructure.

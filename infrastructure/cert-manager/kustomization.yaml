@@ -5,3 +5,5 @@ resources:
   - certificate.yaml
   - certificate-nkweini.yaml
   - external-secret-nkweini.yaml
+  - certificate-dovehousett.yaml
+  - external-secret-dovehousett.yaml

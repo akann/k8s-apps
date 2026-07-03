@@ -25,3 +25,11 @@ spec:
         selector:
           dnsZones:
             - nkweini.org
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-dovehousett
+              key: api-token
+        selector:
+          dnsZones:
+            - dovehousett.org

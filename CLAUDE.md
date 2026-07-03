@@ -38,7 +38,8 @@ k8s-apps/
 │   ├── kubernetes-dashboard/
 │   ├── yana-stocks/               # yana-stocks microservices
 │   ├── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
-│   └── ml/                        # ml repo apps (k8s-docs RAG chatbot, source: akann/ml k8s/, directory.recurse: true)
+│   ├── ml/                        # ml repo apps (k8s-docs RAG chatbot, source: akann/ml k8s/, directory.recurse: true)
+│   └── dove-house-tt/             # Dove House TT members app (dovehousett.org, wave 9, source: akann/dove-house-tt k8s/dove-house-tt/)
 └── infrastructure/
     ├── argocd/
     ├── authentik/
@@ -88,6 +89,7 @@ k8s-apps/
 - **TLS:** cert-manager, Let's Encrypt wildcards via Cloudflare DNS-01, reflected to all namespaces via Reflector:
   - `wildcard-yanatech-tls` (`*.yanatech.co.uk`) — Cloudflare token from Infisical `/cert-manager/api-token`
   - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)
+  - `wildcard-dovehousett-tls` (`*.dovehousett.org` + apex) — Cloudflare token from Infisical `/cert-manager/api-token-dovehousett` (ExternalSecret `cloudflare-api-token-dovehousett` scoped to dovehousett.org zone)
 
 ### Storage
 
@@ -615,6 +617,24 @@ Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases secti
 ### CI runner
 
 `runners-ml` — same pattern as `runners-shared-services`.
+
+## dove-house-tt (Dove House Table Tennis Club members app)
+
+### Repo
+
+`github.com/akann/dove-house-tt` — standalone Turborepo (Next.js 16 + better-auth + Drizzle), **public** — so no `repo-*` ArgoCD credential and no self-hosted runner needed (images go to ghcr.io, built on `ubuntu-latest`, akan-style). App manifests live in **its own repo** (`k8s/dove-house-tt/`).
+
+### Namespace / domain
+
+`dove-house-tt` — served at `https://dovehousett.org` (+ www redirect). Third DNS zone on the cluster: own Cloudflare token (`/cert-manager/api-token-dovehousett`), own solver in `letsencrypt-prod`, own reflected wildcard cert `wildcard-dovehousett-tls`.
+
+### Images
+
+`ghcr.io/akann/dove-house-tt` (Next standalone runner) + `ghcr.io/akann/dove-house-tt-migrate` (full node_modules; runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone image can't run drizzle migrations). Both ghcr packages must stay **public**: the manifests have no imagePullSecrets.
+
+### CNPG
+
+Dedicated `dove-house-tt-pg` cluster (2 instances, plain `ghcr.io/cloudnative-pg/postgresql:16`), same pre-created basic-auth credentials pattern as k8s-docs (`dove-house-tt-db-credentials` via ExternalSecret — CNPG won't auto-generate it). `DATABASE_URL` is composed manually in Infisical (`/dove-house-tt/DATABASE_URL`) against `dove-house-tt-pg-rw.dove-house-tt.svc.cluster.local:5432`.
 
 ## Useful Commands
 
