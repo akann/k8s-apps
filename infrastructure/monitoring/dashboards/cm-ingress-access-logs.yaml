@@ -18,7 +18,7 @@ data:
       ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "version": 3,
+      "version": 4,
       "refresh": "1m",
       "time": {
         "from": "now-24h",
@@ -469,7 +469,8 @@ data:
                 },
                 "renameByName": {
                   "uri": "Path",
-                  "Value": "Requests"
+                  "Value": "Requests",
+                  "Value #A": "Requests"
                 }
               }
             }
@@ -548,7 +549,8 @@ data:
                 },
                 "renameByName": {
                   "user_agent": "User agent",
-                  "Value": "Requests"
+                  "Value": "Requests",
+                  "Value #A": "Requests"
                 }
               }
             }
@@ -627,7 +629,8 @@ data:
                 },
                 "renameByName": {
                   "country": "Country",
-                  "Value": "Requests"
+                  "Value": "Requests",
+                  "Value #A": "Requests"
                 }
               }
             }
@@ -707,7 +710,8 @@ data:
                 "renameByName": {
                   "remote_addr": "IP address",
                   "country": "Country",
-                  "Value": "Requests"
+                  "Value": "Requests",
+                  "Value #A": "Requests"
                 },
                 "indexByName": {
                   "remote_addr": 0,
