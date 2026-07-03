@@ -115,7 +115,7 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__range])",
+              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__range]) by ()",
               "queryType": "instant",
               "instant": true,
               "range": false
@@ -175,17 +175,17 @@ data:
           "targets": [
             {
               "refId": "A",
-              "expr": "quantile_over_time(0.50, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "expr": "quantile_over_time(0.50, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto]) by ()",
               "legendFormat": "p50"
             },
             {
               "refId": "B",
-              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto]) by ()",
               "legendFormat": "p95"
             },
             {
               "refId": "C",
-              "expr": "quantile_over_time(0.99, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "expr": "quantile_over_time(0.99, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto]) by ()",
               "legendFormat": "p99"
             }
           ],
