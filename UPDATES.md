@@ -4,6 +4,23 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-03
+
+### Ingress access-log dashboard in Grafana (Loki) + two enabling fixes
+
+**Goal:** see HTTP access logs per host (initially `akan.nkweini.org`) in Grafana. New "Ingress Access Logs" dashboard (`uid: ingress-access-logs`, `infrastructure/monitoring/dashboards/cm-ingress-access-logs.yaml`) — `$host` template variable covering all public hosts (defaults to akan), panels for request rate by status class, latency percentiles, top visitor IPs/paths/user agents, and a live log tail. Data source is the existing Loki (`P8E80F9AEF21F6940`); no new infrastructure.
+
+Two pre-existing gaps had to be fixed to make the logs parseable:
+
+1. **ingress-nginx access logs were the default combined format, which has no `$host`** — traffic was only attributable via the upstream name (`[akan-akan-3000]`), and every dashboard panel would have needed brittle regex parsing. Switched to a JSON `log-format-upstream` (with `log-format-escape-json: "true"` so quotes in user agents can't produce invalid JSON) including `host`, `remote_addr`, `status`, `uri`, `request_time`, `user_agent`, etc. Applies to all hosts behind ingress-nginx; nothing else parses these logs, so the format change is safe.
+2. **Promtail was shipping raw CRI-prefixed lines** (`<ts> stdout F <log>`) — our custom `config.snippets.scrapeConfigs` override silently discards the chart's default `pipeline_stages`, and the `snippets.pipelineStages: [cri: {}]` value we had set is *only referenced by the default scrapeConfigs template*, so it did nothing. Inlined `pipeline_stages: [- cri: {}]` into the scrape config (and removed the dead `pipelineStages` key). This fixes `| json` / `| logfmt` parsing for **all** namespaces' logs in Loki, not just ingress — and log timestamps now come from the CRI timestamp instead of ingestion time.
+
+**Caveat:** log lines stored *before* these changes keep the CRI prefix + old format, so the dashboard shows nothing for time ranges before the rollout (the `| __error__=""` filter drops unparseable lines by design).
+
+**Noticed, not fixed:** the Tempo datasource's `lokiSearch/tracesToLogsV2.datasourceUid: loki` in `argocd-app-monitoring.yaml` references a UID that doesn't exist — the actual Loki UID is `P8E80F9AEF21F6940` (no explicit `uid` was set at provisioning, so Grafana generated one). Trace→logs links in Tempo have therefore never worked.
+
+---
+
 ## 2026-07-02
 
 ### pve1 RAM confirmed bad — automated memtest (verdict for the June mon/OSD crash spree)

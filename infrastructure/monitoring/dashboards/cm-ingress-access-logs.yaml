@@ -1,0 +1,273 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-ingress-access-logs
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  ingress-access-logs.json: |
+    {
+      "title": "Ingress Access Logs",
+      "uid": "ingress-access-logs",
+      "description": "Per-host HTTP access logs from ingress-nginx via Loki (JSON log format). Visitor IPs are real client IPs (CF-Connecting-IP trust).",
+      "tags": ["ingress-nginx", "loki", "access-logs"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "1m",
+      "time": { "from": "now-24h", "to": "now" },
+      "annotations": { "list": [] },
+      "templating": {
+        "list": [
+          {
+            "name": "host",
+            "label": "Host",
+            "type": "custom",
+            "query": "akan.nkweini.org, yanatech.co.uk, stocks.yanatech.co.uk, photos.yanatech.co.uk, cloud.yanatech.co.uk, grafana.yanatech.co.uk, argocd.yanatech.co.uk, harbor.yanatech.co.uk, authentik.yanatech.co.uk, vault.yanatech.co.uk, status.yanatech.co.uk, kafka-ui.yanatech.co.uk, api-gateway.yanatech.co.uk",
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": false,
+            "current": { "text": "akan.nkweini.org", "value": "akan.nkweini.org" },
+            "options": []
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Total Requests",
+          "gridPos": { "x": 0, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range]))",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Unique Visitor IPs",
+          "gridPos": { "x": 5, "y": 0, "w": 5, "h": 4 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count(sum by (remote_addr) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "4xx",
+          "gridPos": { "x": 10, "y": 0, "w": 4, "h": 4 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 400 | status < 500 [$__range]))",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "yellow" }, "noValue": "0" }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "5xx",
+          "gridPos": { "x": 14, "y": 0, "w": 4, "h": 4 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 500 [$__range]))",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" }, "noValue": "0" }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none" }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "p95 Latency",
+          "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__range])",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "fixed", "fixedColor": "orange" } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none" }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Requests by Status Class",
+          "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 200 | status < 300 [$__auto]))",
+              "legendFormat": "2xx"
+            },
+            {
+              "refId": "B",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 300 | status < 400 [$__auto]))",
+              "legendFormat": "3xx"
+            },
+            {
+              "refId": "C",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 400 | status < 500 [$__auto]))",
+              "legendFormat": "4xx"
+            },
+            {
+              "refId": "D",
+              "expr": "sum(count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | status >= 500 [$__auto]))",
+              "legendFormat": "5xx"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" }, "lineWidth": 0 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+              { "matcher": { "id": "byName", "options": "3xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }] },
+              { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
+              { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+            ]
+          },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Latency Percentiles",
+          "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "quantile_over_time(0.50, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "expr": "quantile_over_time(0.95, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "legendFormat": "p95"
+            },
+            {
+              "refId": "C",
+              "expr": "quantile_over_time(0.99, {namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | unwrap request_time [$__auto])",
+              "legendFormat": "p99"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10 } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+        },
+        {
+          "id": 8,
+          "type": "bargauge",
+          "title": "Top 10 Visitor IPs",
+          "gridPos": { "x": 0, "y": 13, "w": 8, "h": 9 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "topk(10, sum by (remote_addr) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
+              "legendFormat": "{{remote_addr}}",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "continuous-BlPu" } }, "overrides": [] },
+          "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] }, "showUnfilled": true }
+        },
+        {
+          "id": 9,
+          "type": "bargauge",
+          "title": "Top 10 Paths",
+          "gridPos": { "x": 8, "y": 13, "w": 8, "h": 9 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "topk(10, sum by (uri) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
+              "legendFormat": "{{uri}}",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+          "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] }, "showUnfilled": true }
+        },
+        {
+          "id": 10,
+          "type": "bargauge",
+          "title": "Top 10 User Agents",
+          "gridPos": { "x": 16, "y": 13, "w": 8, "h": 9 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "topk(10, sum by (user_agent) (count_over_time({namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" [$__range])))",
+              "legendFormat": "{{user_agent}}",
+              "queryType": "instant",
+              "instant": true,
+              "range": false
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "continuous-BlYlRd" } }, "overrides": [] },
+          "options": { "orientation": "horizontal", "displayMode": "gradient", "reduceOptions": { "calcs": ["lastNotNull"] }, "showUnfilled": true }
+        },
+        {
+          "id": 11,
+          "type": "logs",
+          "title": "Access Log Tail",
+          "gridPos": { "x": 0, "y": 22, "w": 24, "h": 11 },
+          "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{namespace=\"ingress-nginx\", container=\"controller\"} | json | __error__=\"\" | host=~\"$host\" | line_format \"{{.remote_addr}} → {{.status}} {{.method}} {{.host}}{{.uri}} ({{.request_time}}s) {{.user_agent}}\""
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "dedupStrategy": "none"
+          }
+        }
+      ]
+    }

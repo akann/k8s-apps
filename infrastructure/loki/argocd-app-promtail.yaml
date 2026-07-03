@@ -21,10 +21,15 @@ spec:
           clients:
             - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
           snippets:
-            pipelineStages:
-              - cri: {}
+            # NOTE: overriding scrapeConfigs discards the chart's default
+            # pipeline_stages (snippets.pipelineStages is only referenced by the
+            # default scrapeConfigs template) — the cri stage must be inlined
+            # here or log lines keep their CRI prefix ("<ts> stdout F ...") in
+            # Loki, breaking `| json` / `| logfmt` parsing in queries.
             scrapeConfigs: |
               - job_name: kubernetes-pods
+                pipeline_stages:
+                  - cri: {}
                 kubernetes_sd_configs:
                   - role: pod
                 relabel_configs:

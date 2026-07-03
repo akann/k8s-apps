@@ -28,6 +28,11 @@ spec:
             # Ranges: https://www.cloudflare.com/ips-v4
             use-forwarded-headers: "true"
             forwarded-for-header: "CF-Connecting-IP"
+            # JSON access logs so Loki/Grafana can parse them with `| json`
+            # (default format has no $host, only the upstream name). escape=json
+            # keeps quotes in user agents etc. from producing invalid JSON.
+            log-format-escape-json: "true"
+            log-format-upstream: '{"time":"$time_iso8601","remote_addr":"$remote_addr","host":"$host","method":"$request_method","uri":"$uri","args":"$args","status":$status,"body_bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","request_length":$request_length,"request_time":$request_time,"proxy_upstream_name":"$proxy_upstream_name","upstream_addr":"$upstream_addr","upstream_status":"$upstream_status","upstream_response_time":"$upstream_response_time","request_id":"$req_id"}'
             proxy-real-ip-cidr: "173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22"
   destination:
     server: https://kubernetes.default.svc

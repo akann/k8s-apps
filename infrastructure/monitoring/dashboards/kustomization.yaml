@@ -7,3 +7,4 @@ resources:
   - cm-proxmox-via-prometheus.yaml
   - cm-nvme-temperatures.yaml
   - cm-yana-stocks-auth.yaml
+  - cm-ingress-access-logs.yaml
