@@ -90,3 +90,4 @@ resources:
   - apps/shared-services/argocd-app-shared-services.yaml
   - apps/ml/argocd-app-ml.yaml
   - apps/dove-house-tt/argocd-app-dove-house-tt.yaml
+  - apps/dove-house-tt-stg/argocd-app-dove-house-tt-stg.yaml

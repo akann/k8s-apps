@@ -345,3 +345,24 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+---
+# dove-house-tt-stg: same reason as dove-house-tt above, for the staging
+# CNPG instance manager (dove-house-tt-stg-pg pods).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: dove-house-tt-stg
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

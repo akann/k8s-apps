@@ -636,6 +636,10 @@ Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases secti
 
 Dedicated `dove-house-tt-pg` cluster (2 instances, plain `ghcr.io/cloudnative-pg/postgresql:16`), same pre-created basic-auth credentials pattern as k8s-docs (`dove-house-tt-db-credentials` via ExternalSecret — CNPG won't auto-generate it). `DATABASE_URL` is composed manually in Infisical (`/dove-house-tt/DATABASE_URL`) against `dove-house-tt-pg-rw.dove-house-tt.svc.cluster.local:5432`.
 
+### Staging environment
+
+A second, self-contained deployment at `https://stg.dovehousett.org`, sourced from the same repo's `staging` branch (`k8s/dove-house-tt-stg/`, own ArgoCD Application `apps/dove-house-tt-stg/`, own namespace `dove-house-tt-stg`). Reuses the existing `repo-dove-house-tt` git credential (not branch-scoped) but needs its own `ghcr-secret` in the new namespace (Secrets don't cross namespaces) and its own Infisical secrets under `/dove-house-tt-stg/`. CNPG is a minimal single-instance `dove-house-tt-stg-pg` cluster with no ScheduledBackup — disposable/re-seedable test data, deliberately not resilient to a node drain. TLS reuses the existing `wildcard-dovehousett-tls` wildcard cert (already covers `*.dovehousett.org`), so no new Certificate was needed — only the network-policy blocks (`netpol-apps.yaml`, `netpol-cnpg.yaml`, `netpol-apiserver-egress.yaml`) and the DNS record for the subdomain (created directly in Cloudflare, outside git) were.
+
 ## Useful Commands
 
 ```bash
