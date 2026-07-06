@@ -32,6 +32,17 @@ spec:
           size: 10Gi
         metrics:
           enabled: true
+          # Bitnami no longer publishes versioned tags for this image publicly
+          # (only a floating `latest`), which let mongodb-0 and mongodb-1 drift
+          # to two different exporter builds despite both requesting the same
+          # tag. Pinned to the digest already verified running (v0.51.0) so
+          # both replicas converge on one known build instead of silently
+          # drifting further apart. Doesn't fix the known upstream duplicate
+          # `mongodb_ss_opLatencies_*` metric bug on Mongo 8.3.x
+          # (percona/mongodb_exporter#1285, still open/unfixed as of writing)
+          # — that just gets carried forward consistently.
+          image:
+            digest: "sha256:b0a124ea4ec98c730bd2872e65799f59c8fc49bec99ad5545bf485a8e0aea8b8"
           serviceMonitor:
             enabled: true
             namespace: monitoring
