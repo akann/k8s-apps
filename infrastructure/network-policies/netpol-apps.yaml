@@ -192,6 +192,18 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: dove-house-tt-stg
+      ports:
+        - port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: yana-stocks
+      ports:
+        - port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: authentik
       ports:
         - port: 9000
@@ -438,6 +450,12 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pgadmin
       ports:
         - port: 5432
 ---
@@ -934,6 +952,12 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: pgadmin
       ports:
         - port: 5432
 ---

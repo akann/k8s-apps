@@ -30,6 +30,22 @@ spec:
               MaintenanceDB: "dove_house_tt"
               Username: "dove_house"
               SSLMode: "prefer"
+            "2":
+              Name: "dove-house-tt-stg"
+              Group: "Servers"
+              Host: "dove-house-tt-stg-pg-rw.dove-house-tt-stg.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "dove_house_tt"
+              Username: "dove_house"
+              SSLMode: "prefer"
+            "3":
+              Name: "yana-stocks"
+              Group: "Servers"
+              Host: "auth-service-pg-rw.yana-stocks.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "app"
+              Username: "app"
+              SSLMode: "prefer"
         extraConfigmapMounts:
           - name: config-local
             mountPath: /pgadmin4/config_local.py
