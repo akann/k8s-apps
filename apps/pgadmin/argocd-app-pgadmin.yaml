@@ -46,6 +46,54 @@ spec:
               MaintenanceDB: "app"
               Username: "app"
               SSLMode: "prefer"
+            "4":
+              Name: "app"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "app"
+              Username: "app"
+              SSLMode: "prefer"
+            "5":
+              Name: "authentik"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "authentik"
+              Username: "authentik"
+              SSLMode: "prefer"
+            "6":
+              Name: "nextcloud"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "nextcloud"
+              Username: "nextcloud"
+              SSLMode: "prefer"
+            "7":
+              Name: "vaultwarden"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "vaultwarden"
+              Username: "vaultwarden"
+              SSLMode: "prefer"
+            "8":
+              Name: "infisical"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "infisical"
+              Username: "infisical"
+              SSLMode: "prefer"
+            "9":
+              Name: "apicurio"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "apicurio"
+              Username: "apicurio"
+              SSLMode: "prefer"
         extraConfigmapMounts:
           - name: config-local
             mountPath: /pgadmin4/config_local.py
