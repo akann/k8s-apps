@@ -19,6 +19,17 @@ spec:
         env:
           email: admin@yanatech.co.uk
           password: pgadmin
+        serverDefinitions:
+          enabled: true
+          servers:
+            "1":
+              Name: "pg-main"
+              Group: "Servers"
+              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Port: 5432
+              MaintenanceDB: "postgres"
+              Username: "postgres"
+              SSLMode: "prefer"
         extraConfigmapMounts:
           - name: config-local
             mountPath: /pgadmin4/config_local.py
