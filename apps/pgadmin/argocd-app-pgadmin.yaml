@@ -23,12 +23,12 @@ spec:
           enabled: true
           servers:
             "1":
-              Name: "pg-main"
+              Name: "dove-house-tt"
               Group: "Servers"
-              Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
+              Host: "dove-house-tt-pg-rw.dove-house-tt.svc.cluster.local"
               Port: 5432
-              MaintenanceDB: "postgres"
-              Username: "postgres"
+              MaintenanceDB: "dove_house_tt"
+              Username: "dove_house"
               SSLMode: "prefer"
         extraConfigmapMounts:
           - name: config-local
