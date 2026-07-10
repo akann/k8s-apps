@@ -889,6 +889,8 @@ spec:
           protocol: TCP
     - ports:
         - port: 443  # future Google OAuth + ghcr metadata
+    - ports:
+        - port: 587  # SMTP to smtp.gmail.com (lib/email/) — signup verification + password reset
     - to:
         - namespaceSelector:
             matchLabels:
@@ -1014,3 +1016,5 @@ spec:
           protocol: TCP
     - ports:
         - port: 443  # future Google OAuth + ghcr metadata
+    - ports:
+        - port: 587  # SMTP to smtp.gmail.com (lib/email/) — signup verification + password reset
