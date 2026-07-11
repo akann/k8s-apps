@@ -632,6 +632,8 @@ spec:
         - port: 9092
     - ports:
         - port: 2525  # SMTP2GO (email-service delivery, STARTTLS)
+    - ports:
+        - port: 443  # Sentry ingest (email-api)
 ---
 # k8s-docs (ml repo — RAG chatbot over homelab docs)
 apiVersion: networking.k8s.io/v1
