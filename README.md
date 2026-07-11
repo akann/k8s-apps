@@ -849,6 +849,10 @@ graph LR
 
 All alerts route to Gotify only. Email notifications were removed 2026-06-29.
 
+### 11.3.1 Sentry Alerting
+
+Application-level errors (as opposed to infra/cluster alerts above) are tracked in Sentry.io (org `yanatech-tech-limited`) across all 11 app services (yanatech, akan, dove-house-tt, shared-services' email-api/email-service, ml's k8s-docs, yana-stocks' frontend/profile-service/portfolio-service/portfolio-api/price-processor). Each project has a per-project issue alert rule (fires on every new issue, `environment=production` only) whose action posts to `sentry-gotify-bridge` — a small Go relay (source: `apps/gotify/sentry-bridge/`, image built by `.github/workflows/build-sentry-gotify-bridge.yaml` on push to that path) that verifies the Sentry webhook HMAC signature and forwards a formatted message to Gotify's `/message` API. Reachable at `https://gotify.yanatech.co.uk/webhook/sentry` (separate `Ingress` in `apps/gotify/manifests/sentry-bridge.yaml`, same host as the main Gotify UI, different path — same pattern as the existing `gotify-api` Ingress). Uses its own Gotify application token (`gotify-secret` key `sentry-token`) so Sentry pushes are visually distinguishable from Alertmanager pushes in the Gotify client.
+
 ArgoCD app health alerts (`ArgoCDAppDegraded`, `ArgoCDAppMissing`, `ArgoCDAppOutOfSync`) are defined in `infrastructure/monitoring/rules/prometheusrule-argocd.yaml`. The ArgoCD controller metrics are scraped via a ServiceMonitor enabled in `infrastructure/argocd/values.yaml`.
 
 ### 11.4 Network Observability
