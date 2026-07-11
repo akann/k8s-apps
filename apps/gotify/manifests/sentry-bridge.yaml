@@ -13,6 +13,8 @@ spec:
       labels:
         app: sentry-gotify-bridge
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       containers:
         - name: bridge
           image: harbor.yanatech.co.uk/infra/sentry-gotify-bridge:latest
