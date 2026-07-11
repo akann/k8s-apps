@@ -43,6 +43,11 @@ spec:
                 secretKeyRef:
                   name: price-processor-secret
                   key: TWELVE_DATA_API_KEY
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: price-processor-secret
+                  key: SENTRY_DSN
             - name: KAFKA_BROKERS
               value: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: OTEL_SERVICE_NAME

@@ -65,6 +65,11 @@ spec:
                 secretKeyRef:
                   name: portfolio-api-secret
                   key: TWELVE_DATA_API_KEY
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-api-secret
+                  key: SENTRY_DSN
             - name: OTEL_SERVICE_NAME
               value: "portfolio-api"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

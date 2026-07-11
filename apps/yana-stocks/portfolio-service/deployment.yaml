@@ -28,6 +28,11 @@ spec:
                 secretKeyRef:
                   name: portfolio-service-secret
                   key: MONGODB_URI
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: portfolio-service-secret
+                  key: SENTRY_DSN
             - name: PORT
               value: "3000"
             - name: KAFKA_BROKERS
