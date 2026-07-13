@@ -13,6 +13,7 @@ spec:
       labels:
         app: uptime-kuma
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: uptime-kuma
           image: louislam/uptime-kuma:1

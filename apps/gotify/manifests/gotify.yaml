@@ -28,6 +28,7 @@ spec:
       labels:
         app: gotify
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: gotify
           image: gotify/server:2.6.3
@@ -156,6 +157,7 @@ spec:
       labels:
         app: alertmanager-gotify-bridge
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: bridge
           image: druggeri/alertmanager_gotify_bridge:latest

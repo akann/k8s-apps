@@ -15,6 +15,7 @@ spec:
       labels:
         app: apicurio-registry
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: apicurio-registry
           image: quay.io/apicurio/apicurio-registry-sql:2.5.8.Final

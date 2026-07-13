@@ -18,6 +18,7 @@ spec:
       labels:
         app: redisinsight
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: redisinsight
           image: redis/redisinsight:latest

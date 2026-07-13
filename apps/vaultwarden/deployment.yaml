@@ -17,6 +17,7 @@ spec:
       labels:
         app: vaultwarden
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: vaultwarden
           image: vaultwarden/server:1.36.0

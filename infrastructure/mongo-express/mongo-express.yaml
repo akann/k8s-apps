@@ -18,6 +18,7 @@ spec:
       labels:
         app: mongo-express
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mongo-express
           image: mongo-express:1.0.2

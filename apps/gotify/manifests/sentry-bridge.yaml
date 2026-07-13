@@ -13,6 +13,7 @@ spec:
       labels:
         app: sentry-gotify-bridge
     spec:
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:
