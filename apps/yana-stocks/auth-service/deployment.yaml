@@ -21,6 +21,15 @@ spec:
       containers:
         - name: auth-service
           image: harbor.yanatech.co.uk/yana-stocks/auth-service:a9ad4ee0a138244dc7ae37873bccd5b67237a319
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 3000
           envFrom:
@@ -69,6 +78,12 @@ spec:
             limits:
               cpu: 300m
               memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -21,6 +21,15 @@ spec:
       containers:
         - name: price-ingestor
           image: harbor.yanatech.co.uk/yana-stocks/price-ingestor:a9ad4ee0a138244dc7ae37873bccd5b67237a319
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: MASSIVE_API_KEY
               valueFrom:
@@ -42,3 +51,9 @@ spec:
             limits:
               cpu: 300m
               memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

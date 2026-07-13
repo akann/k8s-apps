@@ -21,6 +21,15 @@ spec:
       containers:
         - name: sentiment-analyzer
           image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:a9ad4ee0a138244dc7ae37873bccd5b67237a319
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: FMP_API_KEY
               valueFrom:
@@ -53,3 +62,9 @@ spec:
             limits:
               cpu: "1"
               memory: 2Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

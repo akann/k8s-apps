@@ -21,6 +21,15 @@ spec:
       containers:
         - name: price-processor
           image: harbor.yanatech.co.uk/yana-stocks/price-processor:2e6d4309469faa0017c33b53af5758e3d86a5285
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 3000
           env:
@@ -78,3 +87,9 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

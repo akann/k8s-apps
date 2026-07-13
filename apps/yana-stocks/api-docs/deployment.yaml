@@ -19,6 +19,13 @@ spec:
       containers:
         - name: api-docs
           image: harbor.yanatech.co.uk/yana-stocks/api-docs:2e6d4309469faa0017c33b53af5758e3d86a5285
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 80
           readinessProbe:
