@@ -20,6 +20,22 @@ spec:
                 bootstrapServers: kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
           auth:
             type: disabled
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 100
+          seccompProfile:
+            type: RuntimeDefault
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        volumes:
+          - name: tmp
+            emptyDir: {}
+        volumeMounts:
+          - name: tmp
+            mountPath: /tmp
         ingress:
           enabled: true
           ingressClassName: nginx
