@@ -660,6 +660,59 @@ spec:
     - ports:
         - port: 443  # includes api-gateway.yanatech.co.uk (Kong, contact form email)
 ---
+# akan personal site (akan.nkweini.org) — see infrastructure/cilium/
+# ciliumnetpol-akan-k8s-docs.yaml for its egress to the k8s-docs query
+# endpoint; that policy's toEntities:all catch-all is narrowed once this
+# default-deny + allow-egress pair exists (DNS/443 no longer need it).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: akan
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-akan
+  namespace: akan
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: uptime-kuma
+      ports:
+        - port: 3000
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443  # Turnstile verification, Sentry, api-gateway.yanatech.co.uk (email-api)
+---
 # immich (placeholder — removed, pending redeploy)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
