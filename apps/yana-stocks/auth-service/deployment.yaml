@@ -16,6 +16,13 @@ spec:
         app: auth-service
     spec:
       automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: auth-service
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:
@@ -96,3 +103,14 @@ spec:
   ports:
     - port: 3000
       targetPort: 3000
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-service
+  namespace: yana-stocks
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: auth-service

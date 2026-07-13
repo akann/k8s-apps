@@ -14,6 +14,13 @@ spec:
         app: frontend
     spec:
       automountServiceAccountToken: false
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: frontend
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:
@@ -72,3 +79,14 @@ spec:
           emptyDir: {}
         - name: next-cache
           emptyDir: {}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+  namespace: yana-stocks
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: frontend
