@@ -3,16 +3,15 @@
 # Standard NetworkPolicy cross-namespace ClusterIP routing fails in Cilium
 # native routing mode — same pattern as ciliumnetpol-grafana-pg.yaml.
 #
-# IMPORTANT: this is the only policy of any kind that selects `app: akan`
-# pods. The moment a CiliumNetworkPolicy/NetworkPolicy selects a pod for a
-# given policyType, that pod flips to default-deny for that direction except
-# what's explicitly allowed — so without the `toEntities: all` egress rule
-# below, this policy would silently break every other akan egress path (DNS,
-# the contact form's call to api-gateway.yanatech.co.uk, etc.), not just add
-# the k8s-docs rule. The toEntities:all rule restores akan's original
-# fully-open egress posture; the toEndpoints rule stays for documentation and
-# because it's the only form that reliably resolves cross-namespace ClusterIP
-# traffic in this cluster's Cilium native routing mode.
+# DNS and general HTTPS (443) egress for akan now come from the standard
+# default-deny-all + allow-akan NetworkPolicy pair in infrastructure/
+# network-policies/netpol-infrastructure.yaml (Cilium unions allow rules
+# across every applicable NetworkPolicy/CiliumNetworkPolicy selecting a pod),
+# so this policy no longer needs a toEntities:all catch-all — it only adds
+# the one thing those can't express: cross-namespace ClusterIP routing to
+# k8s-docs. Do not add this policy back to a namespace with no other
+# NetworkPolicy without restoring a catch-all — see the network-policies
+# CLAUDE.md's "first policy flips default" rule.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -31,5 +30,3 @@ spec:
         - ports:
             - port: "3000"
               protocol: TCP
-    - toEntities:
-        - all
