@@ -13,6 +13,7 @@ spec:
       labels:
         app: turbo-cache
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: turbo-cache
           image: ducktors/turborepo-remote-cache:latest

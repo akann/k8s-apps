@@ -15,6 +15,7 @@ spec:
       labels:
         app: portfolio-api
     spec:
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:

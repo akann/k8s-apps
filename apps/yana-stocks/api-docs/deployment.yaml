@@ -13,6 +13,7 @@ spec:
       labels:
         app: api-docs
     spec:
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:

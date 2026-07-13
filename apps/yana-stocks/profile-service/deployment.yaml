@@ -15,6 +15,7 @@ spec:
       labels:
         app: profile-service
     spec:
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: harbor-pull-secret
       containers:
