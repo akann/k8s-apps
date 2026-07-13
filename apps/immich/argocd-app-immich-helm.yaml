@@ -13,8 +13,6 @@ spec:
     targetRevision: 0.10.3
     helm:
       valuesObject:
-        defaultPodOptions:
-          automountServiceAccountToken: false
         controllers:
           main:
             containers:

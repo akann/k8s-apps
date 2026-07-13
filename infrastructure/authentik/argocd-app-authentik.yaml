@@ -43,7 +43,6 @@ spec:
                   name: authentik-secret
                   key: AUTHENTIK_EMAIL__PASSWORD
         server:
-          automountServiceAccountToken: false
           ingress:
             enabled: true
             ingressClassName: nginx
