@@ -43,6 +43,14 @@ spec:
                   name: authentik-secret
                   key: AUTHENTIK_EMAIL__PASSWORD
         server:
+          serviceAccountName: default
+          automountServiceAccountToken: false
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
           ingress:
             enabled: true
             ingressClassName: nginx
