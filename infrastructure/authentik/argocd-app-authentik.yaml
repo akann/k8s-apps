@@ -43,8 +43,11 @@ spec:
                   name: authentik-secret
                   key: AUTHENTIK_EMAIL__PASSWORD
         server:
-          serviceAccountName: default
-          automountServiceAccountToken: false
+          # automountServiceAccountToken:false is unreachable in this chart —
+          # its Deployment template wraps it in `{{- with ... }}`, and Helm's
+          # `with` treats boolean false as falsy/empty, so the block can never
+          # render regardless of serviceAccountName. Not fixable via values;
+          # left as the chart default (token still mounted).
           containerSecurityContext:
             allowPrivilegeEscalation: false
             capabilities:
