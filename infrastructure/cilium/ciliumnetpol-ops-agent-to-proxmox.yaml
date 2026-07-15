@@ -1,0 +1,24 @@
+# CiliumNetworkPolicy required for ops-agent's proxmox subagent to reach the
+# Proxmox API (pve1-3, PMX_VLAN=22). These are raw external IPs, not a
+# Kubernetes Service/Endpoint, so this uses toCIDR — same mechanism (and same
+# 3 IPs) as ciliumnetpol-ceph-osd.yaml, just a different port. Standard
+# NetworkPolicy egress to external IPs does not work in Cilium native routing
+# mode.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-proxmox
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toCIDR:
+        - 192.168.22.11/32
+        - 192.168.22.12/32
+        - 192.168.22.13/32
+      toPorts:
+        - ports:
+            - port: "8006"
+              protocol: TCP
