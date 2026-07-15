@@ -366,3 +366,31 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+---
+# ops-agent: the app itself (not an operator/controller) calls the Kubernetes
+# API directly via the kubernetes Python client (cluster-inspector's
+# list_pods/get_deployment/list_events/list_nodes, remediate's
+# restart_pod/cordon_node). Missing this was the actual root cause of a
+# ~9-minute hang on any question touching cluster state — netpol-apps.yaml's
+# own allow-egress only covers port 443 generically, which per the note atop
+# this file does not resolve Cilium's kube-apiserver entity in native routing
+# mode; confirmed by reproducing the exact hang (urllib3 ConnectTimeoutError
+# to 10.96.0.1:443 after 542s) from inside the pod before adding this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: ops-agent
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
