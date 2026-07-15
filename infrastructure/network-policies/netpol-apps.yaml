@@ -671,7 +671,9 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   # /query is deliberately not on the public Ingress at all — this rule is
-  # what actually makes it reachable, restricted to the akan namespace only.
+  # what actually makes it reachable, restricted to the akan and ops-agent
+  # namespaces only (ops-agent's docs-researcher subagent proxies to this
+  # endpoint — see ciliumnetpol-ops-agent-to-k8s-docs.yaml for its egress side).
   name: allow-akan-query
   namespace: k8s-docs
 spec:
@@ -685,6 +687,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: akan
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ops-agent
       ports:
         - port: 3000
 ---
@@ -1021,3 +1026,115 @@ spec:
         - port: 443  # future Google OAuth + ghcr metadata
     - ports:
         - port: 587  # SMTP to smtp.gmail.com (lib/email/) — signup verification + password reset
+---
+# ops-agent (ml repo — agentic SRE copilot over the homelab cluster)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ops-agent
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-ingress
+  namespace: ops-agent
+spec:
+  podSelector:
+    matchLabels:
+      app: ops-agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-scrape
+  namespace: ops-agent
+spec:
+  podSelector:
+    matchLabels:
+      app: ops-agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cnpg-operator
+  namespace: ops-agent
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: ops-agent-pg
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: ops-agent
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress
+  namespace: ops-agent
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443  # Anthropic API, and later GitHub/Harbor read-only API calls (release subagent)

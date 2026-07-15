@@ -1,0 +1,32 @@
+# CiliumNetworkPolicy required for ops-agent's docs-researcher subagent to
+# reach k8s-docs's Service (the RAG chatbot query endpoint, not exposed on
+# the public Ingress). Standard NetworkPolicy cross-namespace ClusterIP
+# egress fails in Cilium native routing mode — same pattern as
+# ciliumnetpol-akan-k8s-docs.yaml, just from a different caller namespace.
+#
+# DNS and general HTTPS (443) egress for ops-agent come from the standard
+# default-deny-all + allow-egress pair in infrastructure/network-policies/
+# netpol-apps.yaml (Cilium unions allow rules across every applicable
+# NetworkPolicy/CiliumNetworkPolicy selecting a pod), so this policy only
+# adds the one thing those can't express: cross-namespace ClusterIP routing
+# to k8s-docs. See the network-policies CLAUDE.md's "first policy flips
+# default" rule before adding a CiliumNetworkPolicy to any namespace with no
+# other NetworkPolicy yet.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-k8s-docs
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: k8s-docs
+            app: k8s-docs
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
