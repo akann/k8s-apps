@@ -11,3 +11,4 @@ resources:
   - ciliumnetpol-turbo-cache.yaml
   - ciliumnetpol-akan-k8s-docs.yaml
   - ciliumnetpol-ops-agent-to-k8s-docs.yaml
+  - ciliumnetpol-ops-agent-to-redis.yaml

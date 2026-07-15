@@ -1,0 +1,31 @@
+# CiliumNetworkPolicy required for ops-agent's prompt cache to reach the
+# shared cluster-wide Redis (redis-master.redis.svc.cluster.local:6379).
+# Standard NetworkPolicy cross-namespace ClusterIP egress fails in Cilium
+# native routing mode — same pattern as ciliumnetpol-ops-agent-to-k8s-docs.yaml,
+# just a different destination. The redis namespace's own allow-redis
+# NetworkPolicy (netpol-infrastructure.yaml) already permits ingress from any
+# namespace on port 6379, so only this egress side is needed.
+#
+# Labels verified against the live cluster (ssh kc1 kubectl get pods -n redis
+# --show-labels): redis-master-0 carries app.kubernetes.io/name=redis and
+# app.kubernetes.io/component=master (bitnami redis chart, standalone
+# architecture — a single master pod, no replicas).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-redis
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: redis
+            app.kubernetes.io/name: redis
+            app.kubernetes.io/component: master
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
