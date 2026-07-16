@@ -143,7 +143,7 @@ spec:
 
 - **CNPG clusters (pg-main, auth-service-pg, immich-postgres):** barman WAL streaming + daily ScheduledBackup → MinIO `s3://cnpg-backups/` — provides PITR to any second
 - **harbor-database** (plain StatefulSet, not CNPG): daily pg_dump CronJob (`harbor-db-backup` in `harbor` ns) → MinIO `s3://cnpg-backups/harbor-db/`, rolling 7-day filenames (`harbor-Monday.sql.gz` … `harbor-Sunday.sql.gz`)
-- **PVC data (all workloads):** Velero node-agent (Kopia fs-backup) on all nodes, daily schedule → Backblaze B2 `s3://yanatech-velero/`; `defaultVolumesToFsBackup: true` covers all PVCs
+- **PVC data (all workloads):** Velero node-agent (Kopia fs-backup) on all nodes, weekly schedule (`velero-weekly-backup`, cron `0 2 * * 0`) → Backblaze B2 `s3://yanatech-velero/`; `defaultVolumesToFsBackup: true` covers all PVCs. Confirmed 2026-07-16: the last 3 consecutive runs came back `PartiallyFailed` with a growing warning count (18 errors → 14 errors/8 warnings → 7 errors/132 warnings) despite the BackupStorageLocation itself being `Available` — root cause not yet identified, needs `velero backup describe --details`/backup logs to see per-item failures.
 - **MinIO credentials for backup jobs:** Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`, provisioned via ExternalSecret in each namespace
 
 ### kured (node reboot daemon)
