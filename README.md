@@ -1,6 +1,6 @@
 # Architecture — yanatech.co.uk Homelab
 
-> **Last verified:** June 2026  
+> **Last verified:** July 2026  
 > **Cluster version:** Kubernetes v1.32.13 (kubeadm) — Ubuntu 24.04.4 LTS — containerd 2.2.4  
 > **yana-stocks app:** [stocks.yanatech.co.uk](https://stocks.yanatech.co.uk) · [github.com/akann/yana-stocks](https://github.com/akann/yana-stocks)
 

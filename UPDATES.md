@@ -20,6 +20,12 @@ Diagnosed via `kubectl get backups.velero.io -o custom-columns=...` for the erro
 
 **Deliberate scope decision:** CNPG Postgres clusters (`pg-main`, `auth-service-pg`, `k8s-docs-pg`, `dove-house-tt-pg`, `dove-house-tt-stg-pg`, `ops-agent-pg`) were **not** given the opt-in annotation — they were being fs-backed-up under the old opt-out mode, but a live Kopia copy of a running PGDATA directory with no `pg_backup_start`/`stop` bracketing has no consistency guarantee, unlike CNPG's own barman WAL-streaming backup which already provides clean PITR for all of them. Dropping this was a correctness fix, not just a coverage preservation — see CLAUDE.md's Backup Strategy section for the full writeup.
 
+### ingest-docs CI broken by the Velero fix commit's own doc changes — argv length limit
+
+The commit above touched `CLAUDE.md` (46KB) and `README.md` (55KB) in the same push, and the `Ingest Docs` workflow that feeds the k8s-docs RAG chatbot failed: `jq: Argument list too long` (exit 126). Its payload-assembly script passed full file contents through `jq --arg`/`--argjson` and the final POST through `curl -d "$PAYLOAD"` — all of these route their value through the process's argv, which has a per-argument ceiling around 128KB regardless of the shell's overall `ARG_MAX`. The combined `files` JSON for this push was 164KB, comfortably over that line.
+
+Fixed by rerouting every file's content through disk instead of shell variables: `jq --rawfile content "$f"` reads a file's raw bytes directly (only the filename crosses argv), `--slurpfile` assembles the final payload the same way, and `curl --data-binary @file` posts it without ever building a giant `-d` string. Verified locally against this repo's actual `CLAUDE.md`/`README.md`/`UPDATES.md` before pushing — reproduces the exact 164KB payload that broke the old script, now succeeds. This commit's own changes to `CLAUDE.md`/`README.md`/`UPDATES.md` double as the backfill: they re-trigger ingestion through the fixed pipeline so the Velero writeup above (missed by the failed run) actually lands in the chatbot's index.
+
 ---
 
 ## 2026-07-03
