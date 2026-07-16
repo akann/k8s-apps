@@ -1,0 +1,24 @@
+# CiliumNetworkPolicy required for ops-agent's observability subagent to
+# reach Alertmanager's ClusterIP in the monitoring namespace — same
+# reasoning as ciliumnetpol-ops-agent-to-prometheus.yaml, different
+# destination pod/port. netpol-monitoring.yaml's allow-alertmanager-ingress
+# also needed an ops-agent namespace entry added on port 9093 for this to
+# actually connect.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-alertmanager
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: alertmanager
+      toPorts:
+        - ports:
+            - port: "9093"
+              protocol: TCP

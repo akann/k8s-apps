@@ -1,0 +1,30 @@
+# CiliumNetworkPolicy required for ops-agent's observability subagent to
+# reach Prometheus's ClusterIP in the monitoring namespace. Standard
+# NetworkPolicy cross-namespace ClusterIP egress fails in Cilium native
+# routing mode — same pattern as ciliumnetpol-ops-agent-to-k8s-docs.yaml and
+# ciliumnetpol-grafana-prometheus.yaml, just a different caller namespace.
+#
+# The destination side also needs an update: unlike Redis (netpol-
+# infrastructure.yaml already allows ingress from any namespace),
+# netpol-monitoring.yaml's allow-prometheus-ingress currently allowlists
+# specific namespaces/pods only — ops-agent had to be added there too (see
+# that file's history) for this egress policy to actually result in a
+# working connection.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-prometheus
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP

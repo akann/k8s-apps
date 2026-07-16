@@ -350,6 +350,8 @@ kubectl rollout restart deployment harbor-core -n harbor
 - `infrastructure/cilium/ciliumnetpol-eso-webhook.yaml` — ESO webhook (currently unused — webhook disabled)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-redis.yaml` — ops-agent → shared cluster Redis (prompt cache)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-proxmox.yaml` — ops-agent → Proxmox API (toCIDR, same 3 IPs as the Ceph OSD policy, port 8006)
+- `infrastructure/cilium/ciliumnetpol-ops-agent-to-prometheus.yaml` — ops-agent's observability subagent → Prometheus (port 9090)
+- `infrastructure/cilium/ciliumnetpol-ops-agent-to-alertmanager.yaml` — ops-agent's observability subagent → Alertmanager (port 9093)
 
 ### Adding a new namespace
 
