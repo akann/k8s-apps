@@ -348,6 +348,8 @@ kubectl rollout restart deployment harbor-core -n harbor
 - `infrastructure/cilium/ciliumnetpol-grafana-pg.yaml` — Grafana → PostgreSQL auth-service-pg in yana-stocks (cross-namespace ClusterIP)
 - `infrastructure/cilium/ciliumnetpol-pve-scrape.yaml` — Prometheus → Proxmox node exporters
 - `infrastructure/cilium/ciliumnetpol-eso-webhook.yaml` — ESO webhook (currently unused — webhook disabled)
+- `infrastructure/cilium/ciliumnetpol-ops-agent-to-redis.yaml` — ops-agent → shared cluster Redis (prompt cache)
+- `infrastructure/cilium/ciliumnetpol-ops-agent-to-proxmox.yaml` — ops-agent → Proxmox API (toCIDR, same 3 IPs as the Ceph OSD policy, port 8006)
 
 ### Adding a new namespace
 
