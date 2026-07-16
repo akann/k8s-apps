@@ -483,6 +483,8 @@ stocks.portfolio.events
 
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
+**Fixed 2026-07-16:** `apps/kafka/yana-stocks-topics.yaml`'s `KafkaTopic` resources previously used hyphenated `metadata.name`s (`stocks-prices-raw`, etc.) that didn't match the dotted names above at all — `packages/kafka-client/src/topics.ts` is what every producer/consumer actually connects with, and Kafka auto-created the real dotted-name topics on first use with 1 partition and no explicit retention config, while the hyphenated `KafkaTopic` resources quietly managed a completely separate, never-produced-to set of topics. `metadata.name` now matches the dotted topic names exactly, so Strimzi manages the real topics. **Still open:** every topic above is stuck at 1 partition (the live count when this was fixed), which caps KEDA's autoscaling at 1 effective consumer per group regardless of `maxReplicaCount` — bumping to 3 partitions is a valid follow-up but requires coordinating with price-ingestor's (keyed by symbol) and auth-service's (keyed by userID) ordering assumptions first, so it wasn't bundled into this fix.
+
 ### KEDA ScaledObject pattern (price-ingestor, price-processor, sentiment-analyzer, profile-service, portfolio-service, portfolio-api)
 
 ```yaml
@@ -569,6 +571,8 @@ notifications.email.failed   # 30d retention — DLQ, producer: email-service
 ```
 
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` (same cluster-wide Strimzi broker as yana-stocks)
+
+Same 2026-07-16 fix as yana-stocks' topics above applied here too — see that section for the full incident. `notifications.email.send` is stuck at 1 partition (already live when fixed); `notifications.email.failed` didn't exist live yet at fix time, so it was created correctly with 3 partitions from the start, no follow-up needed.
 
 ### Routing
 
