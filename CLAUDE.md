@@ -352,6 +352,7 @@ kubectl rollout restart deployment harbor-core -n harbor
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-proxmox.yaml` — ops-agent → Proxmox API (toCIDR, same 3 IPs as the Ceph OSD policy, port 8006)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-prometheus.yaml` — ops-agent's observability subagent → Prometheus (port 9090)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-alertmanager.yaml` — ops-agent's observability subagent → Alertmanager (port 9093)
+- `infrastructure/cilium/ciliumnetpol-ops-agent-to-minio.yaml` — ops-agent's minio subagent → MinIO S3 API health endpoints (port 9000)
 
 ### Adding a new namespace
 

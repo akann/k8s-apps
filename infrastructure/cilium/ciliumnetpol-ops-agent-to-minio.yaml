@@ -1,0 +1,31 @@
+# CiliumNetworkPolicy required for ops-agent's minio subagent to reach
+# MinIO's S3 API port for its unauthenticated /minio/health/live and
+# /minio/health/ready endpoints. Standard NetworkPolicy cross-namespace
+# ClusterIP egress fails in Cilium native routing mode — same pattern as
+# ciliumnetpol-ops-agent-to-prometheus.yaml, just a different destination.
+#
+# MinIO's own ingress NetworkPolicy (allow-minio in netpol-infrastructure.
+# yaml) already permits ingress from ANY namespace on port 9000 — unlike
+# Prometheus/Alertmanager, no destination-side edit was needed here, only
+# this egress side.
+#
+# Labels verified against the live cluster (ssh kc1 kubectl get pods -n
+# minio --show-labels): the single minio pod carries app=minio.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ops-agent-to-minio
+  namespace: ops-agent
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ops-agent
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: minio
+            app: minio
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
