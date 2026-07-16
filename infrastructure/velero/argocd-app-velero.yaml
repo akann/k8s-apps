@@ -47,7 +47,7 @@ spec:
             schedule: "0 2 * * 0"
             template:
               ttl: 720h
-              defaultVolumesToFsBackup: true
+              defaultVolumesToFsBackup: false
               excludedNamespaces:
                 - kube-system
                 - kube-public

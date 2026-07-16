@@ -4,6 +4,24 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-16
+
+### Velero weekly backups fixed — root cause was opt-out fs-backup sweeping up Velero's own maintenance jobs
+
+**Symptom:** the last 3 consecutive `velero-weekly-backup` runs came back `PartiallyFailed` (18 errors → 14 errors/8 warnings → 7 errors/132 warnings), even though the Backblaze B2 `BackupStorageLocation` itself was healthy the whole time.
+
+**Root cause:** the Schedule used `defaultVolumesToFsBackup: true` (opt-out) — Velero tried to Kopia-backup *every* volume on *every* pod cluster-wide, no exceptions possible. That swept up things nobody intended to back up:
+- **126 of 132 warnings** ("Skip pod volume scratch/plugins") were Velero's *own* internal `<namespace>-default-kopia-maintain-job-*` repository-maintenance Job pods — created by Velero itself roughly every 66 minutes per namespace, not something this repo can annotate to exclude.
+- **5-7 errors per run** were a genuine race: those same ephemeral pods (plus `argocd-repo-server`/`argocd-applicationset-controller` scratch volumes) got torn down before Velero's node-agent could expose their volume for snapshotting — `context deadline exceeded` / `etcd timed out` / volume path not found.
+
+Diagnosed via `kubectl get backups.velero.io -o custom-columns=...` for the error/warning trend, `kubectl get podvolumebackups.velero.io -l velero.io/backup-name=<name>` for per-item failures, and `kubectl exec deploy/velero -- /velero backup logs <name>` (the velero image ships the CLI binary too) for the full warning breakdown once pod logs had rotated past the run.
+
+**Fix:** flipped to opt-in fs-backup (`defaultVolumesToFsBackup: false` in `infrastructure/velero/argocd-app-velero.yaml`) and added an explicit `backup.velero.io/backup-volumes: <volname>` pod annotation to every workload that actually holds real PVC data (gotify, uptime-kuma, vaultwarden, harbor's 5 internal components, infisical's bundled redis, kafka, minio, mongodb, prometheus, alertmanager, loki, tempo, nextcloud, pgadmin, standalone redis). Verified each chart's actual annotation key via `helm show values`/template inspection on the live cluster rather than guessing — several charts nest it differently than expected (e.g. Harbor's `database.podAnnotations`/`redis.podAnnotations` are direct children, *not* nested under `.internal`; kube-prometheus-stack uses `podMetadata: {annotations: {...}}`, not `podAnnotations`).
+
+**Deliberate scope decision:** CNPG Postgres clusters (`pg-main`, `auth-service-pg`, `k8s-docs-pg`, `dove-house-tt-pg`, `dove-house-tt-stg-pg`, `ops-agent-pg`) were **not** given the opt-in annotation — they were being fs-backed-up under the old opt-out mode, but a live Kopia copy of a running PGDATA directory with no `pg_backup_start`/`stop` bracketing has no consistency guarantee, unlike CNPG's own barman WAL-streaming backup which already provides clean PITR for all of them. Dropping this was a correctness fix, not just a coverage preservation — see CLAUDE.md's Backup Strategy section for the full writeup.
+
+---
+
 ## 2026-07-03
 
 ### dove-house-tt deployed — third DNS zone (dovehousett.org), members app + dedicated CNPG

@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: uptime-kuma
+      annotations:
+        backup.velero.io/backup-volumes: data
     spec:
       automountServiceAccountToken: false
       containers:

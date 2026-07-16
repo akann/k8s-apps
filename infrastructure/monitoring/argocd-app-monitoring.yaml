@@ -168,6 +168,9 @@ spec:
                   resources:
                     requests:
                       storage: 50Gi
+            podMetadata:
+              annotations:
+                backup.velero.io/backup-volumes: prometheus-kube-prometheus-stack-prometheus-db
         alertmanager:
           config:
             global:
@@ -219,6 +222,9 @@ spec:
                   resources:
                     requests:
                       storage: 10Gi
+            podMetadata:
+              annotations:
+                backup.velero.io/backup-volumes: alertmanager-kube-prometheus-stack-alertmanager-db
   ignoreDifferences:
     - group: monitoring.coreos.com
       kind: Prometheus

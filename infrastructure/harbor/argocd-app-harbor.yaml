@@ -59,12 +59,26 @@ spec:
 
         database:
           type: internal
+          podAnnotations:
+            backup.velero.io/backup-volumes: database-data
 
         redis:
           type: internal
+          podAnnotations:
+            backup.velero.io/backup-volumes: data
 
         trivy:
           enabled: true
+          podAnnotations:
+            backup.velero.io/backup-volumes: data
+
+        registry:
+          podAnnotations:
+            backup.velero.io/backup-volumes: registry-data
+
+        jobservice:
+          podAnnotations:
+            backup.velero.io/backup-volumes: job-logs
 
         notary:
           enabled: false

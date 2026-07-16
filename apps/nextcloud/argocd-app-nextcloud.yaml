@@ -76,6 +76,9 @@ spec:
           accessMode: ReadWriteOnce
           size: 100Gi
 
+        podAnnotations:
+          backup.velero.io/backup-volumes: nextcloud-main
+
         cronjob:
           enabled: true
 

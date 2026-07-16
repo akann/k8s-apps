@@ -16,6 +16,8 @@ spec:
     metadata:
       labels:
         app: vaultwarden
+      annotations:
+        backup.velero.io/backup-volumes: data
     spec:
       automountServiceAccountToken: false
       containers:

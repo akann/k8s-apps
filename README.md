@@ -946,7 +946,7 @@ Requires `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` 
 | Schedule name | `velero-weekly-backup`       |
 | Namespace     | `velero`                     |
 
-Velero backs up Kubernetes resources and PVC snapshots. Configure a `BackupStorageLocation` pointing to MinIO (`minio.minio.svc.cluster.local:9000`) for object storage of backups.
+Velero backs up Kubernetes resources and PVC data (Kopia fs-backup) to Backblaze B2. Fs-backup is **opt-in** (`defaultVolumesToFsBackup: false`) — only pods carrying an explicit `backup.velero.io/backup-volumes: <volname>` annotation get their PVC backed up. CNPG Postgres clusters are deliberately excluded (barman WAL-streaming already covers them safely; see CLAUDE.md's Backup Strategy section).
 
 ### 13.2 CNPG Backup
 
@@ -957,7 +957,8 @@ CloudNativePG clusters support WAL archiving to S3-compatible storage. Configure
 | Priority | Data                              | RTO                            |
 | -------- | --------------------------------- | ------------------------------ |
 | Critical | Vaultwarden (password vault)      | Restore from Velero backup     |
-| High     | Infisical secrets, CNPG data      | Restore from WAL / Velero      |
+| High     | Infisical secrets                 | Restore from Velero backup     |
+| High     | CNPG data (all clusters)          | Restore from WAL (barman) — not covered by Velero, see 13.1 |
 | High     | Immich photo library (200 Gi PVC) | Restore PVC from Ceph snapshot |
 | Medium   | Nextcloud files, MongoDB          | Restore from Velero            |
 | Low      | Redis, monitoring TSDB            | Ephemeral acceptable, re-seed  |

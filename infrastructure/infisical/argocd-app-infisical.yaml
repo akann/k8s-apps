@@ -48,6 +48,8 @@ spec:
             persistence:
               storageClass: ceph-rbd
               size: 5Gi
+            podAnnotations:
+              backup.velero.io/backup-volumes: redis-data
   ignoreDifferences:
     - group: networking.k8s.io
       kind: Ingress

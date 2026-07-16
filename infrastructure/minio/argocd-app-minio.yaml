@@ -20,6 +20,8 @@ spec:
           enabled: true
           storageClass: ceph-rbd
           size: 50Gi
+        podAnnotations:
+          backup.velero.io/backup-volumes: export
         ingress:
           enabled: true
           ingressClassName: nginx

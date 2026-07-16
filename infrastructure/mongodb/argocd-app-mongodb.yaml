@@ -30,6 +30,8 @@ spec:
           enabled: true
           storageClass: ceph-rbd
           size: 10Gi
+        podAnnotations:
+          backup.velero.io/backup-volumes: datadir
         metrics:
           enabled: true
           # Bitnami no longer publishes versioned tags for this image publicly

@@ -35,6 +35,8 @@ spec:
             enabled: true
             storageClass: ceph-rbd
             size: 20Gi
+          podAnnotations:
+            backup.velero.io/backup-volumes: storage
         backend:
           replicas: 0
         read:

@@ -27,6 +27,8 @@ spec:
     metadata:
       labels:
         app: gotify
+      annotations:
+        backup.velero.io/backup-volumes: data
     spec:
       automountServiceAccountToken: false
       containers:

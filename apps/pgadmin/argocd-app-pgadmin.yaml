@@ -116,6 +116,8 @@ spec:
           enabled: true
           storageClass: ceph-rbd
           size: 1Gi
+        podAnnotations:
+          backup.velero.io/backup-volumes: pgadmin-data
   destination:
     server: https://kubernetes.default.svc
     namespace: pgadmin
