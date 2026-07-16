@@ -14,18 +14,20 @@
 # portfolio-service): all real traffic is on the dotted names, all on
 # partition 0, zero consumers of the old hyphenated names.
 #
-# `partitions: 1` below matches the CURRENT live partition count, not the
-# `3` these topics were originally intended to have — every producer keys
-# its messages (price-ingestor by symbol, auth-service by userID), so
-# bumping partition count is a live rebalance of the key→partition mapping,
-# not a free operation. Strimzi's topic operator adopts an existing topic
-# in place without deleting it as long as spec.partitions doesn't ask for a
-# decrease, so this fix only takes over configuration (retention/cleanup)
-# — it deliberately does NOT attempt the partition increase needed to
-# actually fix KEDA's autoscaling ceiling (every one of these topics can
-# only ever have 1 effective consumer per group right now). That's a
-# separate, deliberate follow-up requiring coordination with each
-# consumer's ordering assumptions, not bundled into this fix.
+# `partitions: 1` below (except users.registered, see its own comment)
+# matches the CURRENT live partition count, not the `3` these topics were
+# originally intended to have — every producer keys its messages
+# (price-ingestor/price-processor/sentiment-analyzer/ml-predictor by
+# symbol, auth-service by userID, portfolio-service by portfolioId), so
+# bumping partition count changes the live key→partition mapping. Strimzi's
+# topic operator supports increasing (never decreasing) an existing
+# topic's partition count in place. The safe precondition, confirmed fresh
+# immediately before each bump: every consumer group's lag is 0 — with
+# nothing backlogged, there's no in-flight message racing the new hash
+# assignment on a different partition, which is the actual risk this
+# guards against. users.registered was bumped first as the pilot (lowest
+# risk: single event per user, no ongoing per-key derived state); the rest
+# follow once that validated cleanly.
 ---
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
@@ -91,7 +93,12 @@ metadata:
   labels:
     strimzi.io/cluster: kafka-cluster
 spec:
-  partitions: 1
+  # Bumped 1 -> 3 (2026-07-16) as the pilot for the partition-increase
+  # follow-up noted above — confirmed consumer group lag=0 immediately
+  # before this change, and this topic is keyed by userID with no ongoing
+  # per-user derived state (a single registration event per user), making
+  # it the lowest-risk candidate to validate the pattern on first.
+  partitions: 3
   replicas: 3
   config:
     retention.ms: 604800000     # 7 days
