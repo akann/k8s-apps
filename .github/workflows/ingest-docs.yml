@@ -38,22 +38,30 @@ jobs:
             exit 0
           fi
 
-          FILES_JSON="[]"
-          for f in $CHANGED; do
-            CONTENT=$(jq -Rs . < "$f")
-            FILES_JSON=$(echo "$FILES_JSON" | jq --arg path "$f" --argjson content "$CONTENT" '. + [{path: $path, content: $content}]')
-          done
+          # File contents (and the assembled payload) are large enough to
+          # blow past the ~128KB per-argument exec limit if passed through
+          # shell variables into `jq --arg`/`--argjson` or `curl -d`. Every
+          # step below reads/writes files instead, so no file content ever
+          # travels through argv.
+          WORKDIR=$(mktemp -d)
+          FILES_JSONL="$WORKDIR/files.jsonl"
+          : > "$FILES_JSONL"
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            jq -n --arg path "$f" --rawfile content "$f" '{path: $path, content: $content}' >> "$FILES_JSONL"
+          done <<< "$CHANGED"
+          jq -s '.' "$FILES_JSONL" > "$WORKDIR/files.json"
 
-          DELETED_JSON=$(printf '%s\n' $DELETED | jq -R . | jq -s 'map(select(length > 0))')
+          printf '%s\n' $DELETED | jq -R 'select(length > 0)' | jq -s '.' > "$WORKDIR/deleted.json"
 
-          PAYLOAD=$(jq -n \
+          jq -n \
             --arg repo "k8s-apps" \
             --arg sha "${{ github.sha }}" \
-            --argjson files "$FILES_JSON" \
-            --argjson deleted "$DELETED_JSON" \
-            '{sourceRepo: $repo, commitSha: $sha, files: $files, deletedPaths: $deleted}')
+            --slurpfile files "$WORKDIR/files.json" \
+            --slurpfile deleted "$WORKDIR/deleted.json" \
+            '{sourceRepo: $repo, commitSha: $sha, files: $files[0], deletedPaths: $deleted[0]}' > "$WORKDIR/payload.json"
 
           curl -sf -X POST https://ml.yanatech.co.uk/k8s-docs/ingest/webhook \
             -H "Authorization: Bearer $INGEST_WEBHOOK_SECRET" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            --data-binary @"$WORKDIR/payload.json"
