@@ -17,7 +17,7 @@ spec:
         - ALTER ROLE app SET search_path = auth
   backup:
     barmanObjectStore:
-      destinationPath: s3://yanatech-cnpg-backups/auth-service-pg
+      destinationPath: s3://yanatech-cnpg/auth-service-pg
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       s3Credentials:
         accessKeyId:

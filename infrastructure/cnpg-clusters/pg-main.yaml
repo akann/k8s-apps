@@ -16,7 +16,7 @@ spec:
     storageClass: ceph-rbd
   backup:
     barmanObjectStore:
-      destinationPath: s3://yanatech-cnpg-backups/pg-main
+      destinationPath: s3://yanatech-cnpg/pg-main
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       s3Credentials:
         accessKeyId:
