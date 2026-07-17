@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 300" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" role="img" aria-label="CI to GitOps loop: push code, CI builds and pushes image, patches image tag into git, ArgoCD syncs and rolls the Deployment">
+  <rect x="0" y="0" width="820" height="300" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+  <text x="410" y="34" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2328">CI → GitOps loop  (how a code change reaches prod)</text>
+
+  <defs>
+    <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- row 1 -->
+  <g>
+    <!-- step 1 -->
+    <rect x="30" y="64" width="230" height="66" rx="8" fill="#ddf4ff" stroke="#1f6feb"/>
+    <circle cx="52" cy="86" r="11" fill="#1f6feb"/><text x="52" y="90" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">1</text>
+    <text x="72" y="90" font-size="12.5" font-weight="600" fill="#0a3069">push code</text>
+    <text x="44" y="114" font-size="11.5" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">github.com/akann/akan (main)</text>
+
+    <!-- step 2 -->
+    <rect x="295" y="64" width="230" height="66" rx="8" fill="#fff8e5" stroke="#bf8700"/>
+    <circle cx="317" cy="86" r="11" fill="#bf8700"/><text x="317" y="90" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">2</text>
+    <text x="337" y="90" font-size="12.5" font-weight="600" fill="#7a5300">CI builds the image</text>
+    <text x="309" y="114" font-size="11.5" fill="#656d76">GitHub Actions (self-hosted runner)</text>
+
+    <!-- step 3 -->
+    <rect x="560" y="64" width="230" height="66" rx="8" fill="#fff8e5" stroke="#bf8700"/>
+    <circle cx="582" cy="86" r="11" fill="#bf8700"/><text x="582" y="90" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">3</text>
+    <text x="602" y="90" font-size="12.5" font-weight="600" fill="#7a5300">push image</text>
+    <text x="574" y="114" font-size="11.5" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">ghcr.io / harbor : &lt;newtag&gt;</text>
+  </g>
+
+  <line x1="260" y1="97" x2="295" y2="97" stroke="#57606a" stroke-width="2" marker-end="url(#arrow3)"/>
+  <line x1="525" y1="97" x2="560" y2="97" stroke="#57606a" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- down connector -->
+  <line x1="675" y1="130" x2="675" y2="168" stroke="#57606a" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <!-- row 2 (reversed order visually right->left) -->
+  <g>
+    <!-- step 4 -->
+    <rect x="560" y="170" width="230" height="66" rx="8" fill="#fff8e5" stroke="#bf8700"/>
+    <circle cx="582" cy="192" r="11" fill="#bf8700"/><text x="582" y="196" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">4</text>
+    <text x="602" y="196" font-size="12.5" font-weight="600" fill="#7a5300">patch image tag → git</text>
+    <text x="574" y="220" font-size="11.5" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">k8s/akan/deployment.yaml</text>
+
+    <!-- step 5 -->
+    <rect x="295" y="170" width="230" height="66" rx="8" fill="#fff8e5" stroke="#bf8700"/>
+    <circle cx="317" cy="192" r="11" fill="#bf8700"/><text x="317" y="196" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">5</text>
+    <text x="337" y="196" font-size="12.5" font-weight="600" fill="#7a5300">commit patch back</text>
+    <text x="309" y="220" font-size="11.5" fill="#656d76">to main, with <tspan font-family="ui-monospace,SFMono-Regular,Menlo,monospace">[skip ci]</tspan></text>
+
+    <!-- step 6 -->
+    <rect x="30" y="170" width="230" height="66" rx="8" fill="#fbefff" stroke="#8250df"/>
+    <circle cx="52" cy="192" r="11" fill="#8250df"/><text x="52" y="196" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">6</text>
+    <text x="72" y="196" font-size="12.5" font-weight="600" fill="#3e1f79">ArgoCD syncs</text>
+    <text x="44" y="220" font-size="11.5" fill="#1f2328">sees manifest change → rolls Deployment</text>
+  </g>
+
+  <line x1="560" y1="203" x2="525" y2="203" stroke="#57606a" stroke-width="2" marker-end="url(#arrow3)"/>
+  <line x1="295" y1="203" x2="260" y2="203" stroke="#57606a" stroke-width="2" marker-end="url(#arrow3)"/>
+
+  <text x="410" y="270" text-anchor="middle" font-size="12" fill="#656d76">ArgoCD never builds images — CI builds and writes the tag into git; ArgoCD only reconciles manifests.</text>
+  <text x="410" y="290" text-anchor="middle" font-size="12" font-style="italic" fill="#656d76">Commit to the manifests and it auto-syncs. Never <tspan font-family="ui-monospace,SFMono-Regular,Menlo,monospace">kubectl apply</tspan> without a follow-up commit — selfHeal reverts it.</text>
+</svg>

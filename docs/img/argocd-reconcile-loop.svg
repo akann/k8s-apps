@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 320" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" role="img" aria-label="ArgoCD reconcile loop: Git desired state compared and applied to Kubernetes live state">
+  <rect x="0" y="0" width="780" height="320" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- Git repo (desired state) -->
+  <rect x="40" y="60" width="280" height="150" rx="8" fill="#ddf4ff" stroke="#1f6feb"/>
+  <text x="180" y="88" text-anchor="middle" font-size="15" font-weight="700" fill="#0a3069">Git repo — desired state</text>
+  <text x="66" y="122" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">deployment.yaml</text>
+  <text x="66" y="146" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">service.yaml</text>
+  <text x="66" y="170" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">ingress.yaml</text>
+  <text x="66" y="194" font-size="13" fill="#656d76" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">…</text>
+
+  <!-- Kubernetes cluster (live state) -->
+  <rect x="460" y="60" width="280" height="150" rx="8" fill="#dafbe1" stroke="#2da44e"/>
+  <text x="600" y="88" text-anchor="middle" font-size="15" font-weight="700" fill="#0a3622">Kubernetes cluster — live state</text>
+  <text x="486" y="122" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Deployment  (running pods)</text>
+  <text x="486" y="146" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Service</text>
+  <text x="486" y="170" font-size="13" fill="#1f2328" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Ingress</text>
+  <text x="486" y="194" font-size="13" fill="#656d76" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">…</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+
+  <!-- apply arrow (top, git -> cluster) -->
+  <line x1="320" y1="110" x2="460" y2="110" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="390" y="100" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2328">ArgoCD</text>
+  <text x="390" y="132" text-anchor="middle" font-size="11" fill="#656d76">pull + apply</text>
+
+  <!-- compare arrow (bottom, cluster -> git) -->
+  <line x1="460" y1="170" x2="320" y2="170" stroke="#57606a" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="390" y="192" text-anchor="middle" font-size="11" fill="#656d76">compares</text>
+
+  <!-- caption -->
+  <text x="390" y="248" text-anchor="middle" font-size="13" fill="#1f2328">observe live state → compare to Git → if different, mark</text>
+  <text x="390" y="268" text-anchor="middle" font-size="13" fill="#1f2328"><tspan font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#cf222e">OutOfSync</tspan> and sync (apply the Git manifests)</text>
+  <text x="390" y="296" text-anchor="middle" font-size="12" font-style="italic" fill="#656d76">Git is the source of truth — the cluster is made to match it.</text>
+</svg>

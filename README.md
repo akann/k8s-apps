@@ -387,7 +387,7 @@ For a fresh cluster, Vaultwarden (at `vault.yanatech.co.uk`) is the source of tr
 | Namespace creation | Via `CreateNamespace=true` syncOption   |
 | Apply method       | `ServerSideApply=true`                  |
 
-All applications use **app-of-apps pattern** or direct ArgoCD `Application` manifests. The sync wave annotation controls deployment ordering.
+All applications use **app-of-apps pattern** or direct ArgoCD `Application` manifests. The sync wave annotation controls deployment ordering. See [`docs/argocd-explained.md`](docs/argocd-explained.md) for a full walkthrough of how ArgoCD works generally and how this repo's bootstrap/app-of-apps wiring works specifically.
 
 ### 7.2 ArgoCD Sync Waves
 
