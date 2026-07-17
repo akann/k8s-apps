@@ -4,6 +4,23 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-18
+
+### `bootstrap.sh` drift fixed + CNPG Postgres backups moved off-cluster to B2
+
+**Context:** a full-cluster-rebuild readiness review found two gaps.
+
+**Gap 1 — `bootstrap.sh` had drifted from `kustomization.yaml`.** This repo's own checklist (`docs/argocd-explained.md`) says every new app needs a line in both files; that hadn't been followed for the last several additions. `bootstrap.sh` was missing `apps/akan`, `apps/shared-services`, `apps/ml`, `apps/dove-house-tt`, `apps/dove-house-tt-stg`, and infra apps `minio`, `cilium-policies`, `harbor-backup`, `grafana-dashboards`, `monitoring-rules`, `actions-runner-apps`, `runners-shared-services`, `runners-ml` — on a real fresh-cluster bootstrap none of these would have deployed. Its manual-secrets header also predated the 4 private-repo apps and never documented the `repo-akan`/`repo-shared-services`/`repo-ml`/`repo-dove-house-tt` git-credential Secrets or dove-house-tt's `ghcr-secret`, without which those apps fail with `Repository not found` / image pull errors on a fresh cluster. **Fix:** rewrote `bootstrap.sh`'s apply sequence to mirror `kustomization.yaml` exactly (verified via diff — every file in the kustomization is now applied) and documented the missing manual secrets in the header.
+
+**Gap 2 — CNPG Postgres backups had no off-cluster copy.** `pg-main`, `immich-postgres`, and `auth-service-pg` all streamed barman WAL/backups to in-cluster MinIO, which itself sits on Ceph RBD. The only actual off-cluster backup target (Velero → Backblaze B2) deliberately excludes CNPG PGDATA (2026-07-16 fix, see above — a live Kopia fs-backup of a running PGDATA dir has no consistency guarantee). Net effect: a Ceph loss alongside a k8s rebuild would have taken every Postgres backup down with it, with nothing recoverable — including Vaultwarden's own database, which this repo's bootstrap process treats as the "source of truth" for the cluster's manual bootstrap secrets. **Fix:** repointed all three visible CNPG clusters' `barmanObjectStore` from MinIO to the same Backblaze B2 account Velero uses, under a new bucket `s3://yanatech-cnpg-backups/`. Each namespace gets its own `cnpg-b2-credentials` ExternalSecret (`external-secret-b2.yaml`) pulling from Infisical `/cnpg-clusters/ACCESS_KEY_ID` + `/cnpg-clusters/ACCESS_SECRET_KEY` — the cnpg-clusters namespace's copy of this ExternalSecret already existed from an earlier bulk-scaffolding commit but was never wired into `pg-main`'s Cluster spec or verified against real Infisical values.
+
+**Still open:**
+- **The `yanatech-cnpg-backups` B2 bucket/application key and the two Infisical keys above need to be confirmed or created** — this session had no Infisical or Backblaze access to verify they exist. Until confirmed, check `kubectl get externalsecret cnpg-b2-credentials -n <ns>` for a `SecretSynced` condition and watch the next `ScheduledBackup` actually complete before trusting this.
+- `k8s-docs-pg` (ml repo) and `dove-house-tt-pg` (dove-house-tt repo) still point at MinIO — same fix needed in their own repos.
+- Retention on the new B2 destination is still `retentionPolicy: 7d`, unchanged from the MinIO setup — worth reconsidering now that it's the sole backup copy rather than a local convenience copy.
+
+---
+
 ## 2026-07-16
 
 ### Velero weekly backups fixed — root cause was opt-out fs-backup sweeping up Velero's own maintenance jobs
