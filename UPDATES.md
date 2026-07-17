@@ -624,3 +624,25 @@ This creates a `Service` on port 8082 and a `ServiceMonitor` so Prometheus scrap
 - LAN visitors resolve the hosts to the VIP directly (split-horizon) and log their real LAN IP with no header involved.
 - Cloudflare ranges change rarely; source is https://www.cloudflare.com/ips-v4 — refresh the `proxy-real-ip-cidr` list if logs ever start showing 172.64.x/104.x sources again.
 - nginx does not reverse-resolve DNS names in access logs; look up interesting IPs after the fact (`dig -x <ip>`) or in Grafana/Loki.
+
+---
+
+### Ceph clock skew (pve1-3 NTP) and uptime-kuma `Sync: Unknown` (both resolved, 2026-07-17)
+
+**Ceph clock skew:**
+
+**Symptom:** `ceph -s` reported `HEALTH_WARN clock skew detected on mon.pve2, mon.pve3`.
+
+**Root cause:** All three Proxmox nodes' chrony was still pointed at the Debian default `pool 2.debian.pool.ntp.org` (public internet). That path had been unreachable since the 2026-07-14 PMX_VLAN firewall hardening — the hardening pass already allowed NTP to pfSense's own interface address by design, but the hosts' `chrony.conf` was never repointed from the public pool, so it silently broke the same day and only surfaced 3 days later as accumulated root dispersion tripped Ceph's skew threshold. Confirmed with a raw NTP UDP packet round-trip (a `nc -zu` "open" result is a false positive for actual sync — it doesn't confirm a two-way reply).
+
+**Fix:** confirmed pfSense's PMX_VLAN gateway (`192.168.22.1`) actually answers NTP queries, then added `/etc/chrony/conf.d/pfsense-gateway.conf` (`server 192.168.22.1 iburst prefer`) on pve1/pve2/pve3 and `systemctl restart chrony`. All three synced within seconds; Ceph's `HEALTH_WARN` self-cleared ~30s later via its own periodic timecheck.
+
+**uptime-kuma `Sync: Unknown`:**
+
+**Symptom:** `uptime-kuma`'s ArgoCD Application showed `Sync: Unknown` (not `OutOfSync`) with a `ComparisonError` condition: `spec.strategy.rollingUpdate: Forbidden: may not be specified when strategy type is 'Recreate'`.
+
+**Root cause:** Same class of issue as the Harbor deadlock above — git's `apps/uptime-kuma/deployment.yaml` already specified `strategy.type: Recreate` (the correct fix for a single-replica app on an RWO Ceph RBD PVC), but the **live** Deployment still had a stale `rollingUpdate: {maxSurge: 25%, maxUnavailable: 25%}` block from before that git change, left over from whenever it was last actually applied under `RollingUpdate`. ArgoCD's server-side dry-run diff can't resolve that combination at all, so it reports `Unknown` rather than `OutOfSync` — it's not just behind, it can't be evaluated.
+
+**Fix:** `kubectl patch deployment uptime-kuma -n uptime-kuma --type=merge -p '{"spec":{"strategy":{"rollingUpdate":null,"type":"Recreate"}}}'` — didn't restart the running pod (same pod, same age, 0 restarts after the patch). A forced `argocd.argoproj.io/refresh: hard` confirmed `Synced`/`Healthy` with the `ComparisonError` condition gone.
+
+**Key lesson:** if any other single-replica RWO-PVC app ever shows `Sync: Unknown` with a strategy-related `ComparisonError`, check for exactly this git/live strategy-type drift first — see `CLAUDE.md`'s ArgoCD pitfalls list.
