@@ -38,6 +38,36 @@
 #     kubectl -n argocd patch secret argocd-secret \
 #       -p '{"stringData":{"dex.authentik.clientSecret":"<secret from Vaultwarden: argocd-dex>"}}'
 #
+#   argocd namespace — private-repo git credentials (repository-type Secrets,
+#   type: git, fine-grained PAT per repo, NOT ESO-managed):
+#     kubectl create secret generic repo-akan -n argocd \
+#       --from-literal=type=git --from-literal=url=https://github.com/akann/akan \
+#       --from-literal=username=<user> --from-literal=password=<PAT from Vaultwarden: repo-akan>
+#     kubectl label secret repo-akan -n argocd argocd.argoproj.io/secret-type=repository
+#     kubectl create secret generic repo-shared-services -n argocd \
+#       --from-literal=type=git --from-literal=url=https://github.com/akann/shared-services \
+#       --from-literal=username=<user> --from-literal=password=<PAT from Vaultwarden: repo-shared-services>
+#     kubectl label secret repo-shared-services -n argocd argocd.argoproj.io/secret-type=repository
+#     kubectl create secret generic repo-ml -n argocd \
+#       --from-literal=type=git --from-literal=url=https://github.com/akann/ml \
+#       --from-literal=username=<user> --from-literal=password=<PAT from Vaultwarden: repo-ml>
+#     kubectl label secret repo-ml -n argocd argocd.argoproj.io/secret-type=repository
+#     kubectl create secret generic repo-dove-house-tt -n argocd \
+#       --from-literal=type=git --from-literal=url=https://github.com/akann/dove-house-tt \
+#       --from-literal=username=<user> --from-literal=password=<PAT from Vaultwarden: repo-dove-house-tt>
+#     kubectl label secret repo-dove-house-tt -n argocd argocd.argoproj.io/secret-type=repository
+#   Without these, akan/shared-services/ml/dove-house-tt(-stg) Applications fail
+#   with "ComparisonError: ... authentication required: Repository not found."
+#
+#   dove-house-tt + dove-house-tt-stg namespaces — ghcr.io pull secret
+#   (images are private; Secrets don't cross namespaces, so create in both):
+#     kubectl create secret docker-registry ghcr-secret -n dove-house-tt \
+#       --docker-server=ghcr.io --docker-username=<user> \
+#       --docker-password=<PAT from Vaultwarden: ghcr-pull-token>
+#     kubectl create secret docker-registry ghcr-secret -n dove-house-tt-stg \
+#       --docker-server=ghcr.io --docker-username=<user> \
+#       --docker-password=<PAT from Vaultwarden: ghcr-pull-token>
+#
 # ============================================================
 # ESO-MANAGED SECRETS (auto-created via Infisical after ESO deploys):
 # ============================================================
@@ -100,6 +130,7 @@ kubectl apply -f infrastructure/ceph-csi/argocd-app-ceph-csi.yaml
 
 echo "Applying infrastructure apps (wave 1 — CNI, ingress, TLS)..."
 kubectl apply -f infrastructure/cilium/argocd-app-cilium.yaml
+kubectl apply -f infrastructure/cilium/argocd-app-cilium-policies.yaml
 kubectl apply -f infrastructure/cert-manager/argocd-app-cert-manager.yaml
 kubectl apply -f infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml
 
@@ -119,6 +150,8 @@ kubectl apply -f infrastructure/network-policies/argocd-app-network-policies.yam
 echo "Applying infrastructure apps (wave 4 — platform services)..."
 kubectl apply -f infrastructure/authentik/argocd-app-authentik.yaml
 kubectl apply -f infrastructure/monitoring/argocd-app-monitoring.yaml
+kubectl apply -f infrastructure/monitoring/argocd-app-grafana-dashboards.yaml
+kubectl apply -f infrastructure/monitoring/argocd-app-monitoring-rules.yaml
 kubectl apply -f infrastructure/tempo/argocd-app-tempo.yaml
 kubectl apply -f infrastructure/velero/argocd-app-velero.yaml
 
@@ -127,10 +160,16 @@ kubectl apply -f infrastructure/loki/argocd-app-loki.yaml
 kubectl apply -f infrastructure/loki/argocd-app-promtail.yaml
 kubectl apply -f infrastructure/headlamp/argocd-app-headlamp.yaml
 kubectl apply -f infrastructure/goldilocks/argocd-app-goldilocks.yaml
+kubectl apply -f infrastructure/redis/argocd-app-redis.yaml
+kubectl apply -f infrastructure/mongodb/argocd-app-mongodb.yaml
+kubectl apply -f infrastructure/minio/argocd-app-minio.yaml
+kubectl apply -f infrastructure/kong/argocd-app-kong.yaml
 
 echo "Applying infrastructure apps (wave 6 — secrets management)..."
 kubectl apply -f infrastructure/eso/argocd-app-eso.yaml
 kubectl apply -f infrastructure/infisical/argocd-app-infisical.yaml
+kubectl apply -f infrastructure/redis-insight/argocd-app-redis-insight.yaml
+kubectl apply -f infrastructure/mongo-express/argocd-app-mongo-express.yaml
 echo "  --> Wait for ESO + Infisical to be ready before continuing"
 echo "  --> Add eso-k8s machine identity to Infisical project members in UI"
 echo "  --> ESO ClusterSecretStore will then sync all app secrets automatically"
@@ -140,29 +179,24 @@ echo "Applying infrastructure apps (wave 7 — CNPG)..."
 kubectl apply -f infrastructure/cnpg/argocd-app-cnpg.yaml
 kubectl apply -f infrastructure/cnpg-clusters/argocd-app-cnpg-clusters.yaml
 
-echo "Applying infrastructure apps (wave 8 — data stores)..."
-kubectl apply -f infrastructure/redis/argocd-app-redis.yaml
-kubectl apply -f infrastructure/redis-insight/argocd-app-redis-insight.yaml
-kubectl apply -f infrastructure/mongodb/argocd-app-mongodb.yaml
-kubectl apply -f infrastructure/mongo-express/argocd-app-mongo-express.yaml
-
-echo "Applying infrastructure apps (wave 9 — API gateway)..."
-kubectl apply -f infrastructure/kong/argocd-app-kong.yaml
+echo "Applying infrastructure apps (wave 8 — harbor, harbor backup, actions runners)..."
+kubectl apply -f infrastructure/harbor/argocd-app-harbor.yaml
+kubectl apply -f infrastructure/harbor/argocd-app-harbor-backup.yaml
 kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission 2>/dev/null; true
 kubectl apply -f infrastructure/kong/ingress-kong-admin.yaml
-
-echo "Applying infrastructure apps (wave 10 — harbor, actions runners)..."
-kubectl apply -f infrastructure/harbor/argocd-app-harbor.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
+kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-apps.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
+kubectl apply -f infrastructure/actions-runner/argocd-app-runners-shared-services.yaml
+kubectl apply -f infrastructure/actions-runner/argocd-app-runners-ml.yaml
 
-echo "Applying apps (wave 11 — foundational apps)..."
+echo "Applying apps (wave 9 — foundational apps)..."
 kubectl apply -f apps/vaultwarden/argocd-app-vaultwarden.yaml
 kubectl apply -f apps/kafka/argocd-app-strimzi.yaml
 
-echo "Applying apps (wave 12 — all other apps)..."
+echo "Applying apps (wave 9+ — all other apps)..."
 kubectl apply -f apps/kafka/argocd-app-kafka.yaml
 kubectl apply -f apps/kafka-ui/argocd-app-kafka-ui.yaml
 kubectl apply -f apps/uptime-kuma/argocd-app-uptime-kuma.yaml
@@ -170,8 +204,13 @@ kubectl apply -f apps/pgadmin/argocd-app-pgadmin.yaml
 kubectl apply -f apps/nextcloud/argocd-app-nextcloud.yaml
 kubectl apply -f apps/gotify/argocd-app-gotify.yaml
 kubectl apply -f apps/apicurio/argocd-app-apicurio.yaml
-kubectl apply -f apps/kubernetes-dashboard/argocd-app-kubernetes-dashboard.yaml
+# kubernetes-dashboard excluded — chart repo moved, fix URL before re-enabling (see root kustomization.yaml)
 kubectl apply -f apps/yana-stocks/argocd-app-yana-stocks.yaml
+kubectl apply -f apps/akan/argocd-app-akan.yaml
+kubectl apply -f apps/shared-services/argocd-app-shared-services.yaml
+kubectl apply -f apps/ml/argocd-app-ml.yaml
+kubectl apply -f apps/dove-house-tt/argocd-app-dove-house-tt.yaml
+kubectl apply -f apps/dove-house-tt-stg/argocd-app-dove-house-tt-stg.yaml
 
 echo "Bootstrapping Immich (CNPG cluster + PVC must exist before Helm app)..."
 kubectl apply -f apps/immich/namespace.yaml
