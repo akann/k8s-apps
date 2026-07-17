@@ -4,6 +4,7 @@ resources:
   - namespace.yaml
   - external-secret.yaml
   - external-secret-minio.yaml
+  - external-secret-b2.yaml
   - postgres-cluster.yaml
   - scheduled-backup.yaml
   - library-pvc.yaml

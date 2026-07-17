@@ -17,14 +17,14 @@ spec:
         - ALTER ROLE app SET search_path = auth
   backup:
     barmanObjectStore:
-      destinationPath: s3://cnpg-backups/auth-service-pg
-      endpointURL: http://minio.minio.svc.cluster.local:9000
+      destinationPath: s3://yanatech-cnpg-backups/auth-service-pg
+      endpointURL: https://s3.eu-central-003.backblazeb2.com
       s3Credentials:
         accessKeyId:
-          name: cnpg-minio-credentials
+          name: cnpg-b2-credentials
           key: ACCESS_KEY_ID
         secretAccessKey:
-          name: cnpg-minio-credentials
+          name: cnpg-b2-credentials
           key: ACCESS_SECRET_KEY
       wal:
         compression: gzip

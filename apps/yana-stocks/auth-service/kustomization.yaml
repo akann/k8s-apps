@@ -4,6 +4,7 @@ resources:
   - cnpg-cluster.yaml
   - external-secret.yaml
   - external-secret-minio.yaml
+  - external-secret-b2.yaml
   - scheduled-backup.yaml
   - deployment.yaml
   - network-policy.yaml

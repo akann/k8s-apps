@@ -16,14 +16,14 @@ spec:
     storageClass: ceph-rbd
   backup:
     barmanObjectStore:
-      destinationPath: s3://cnpg-backups/pg-main
-      endpointURL: http://minio.minio.svc.cluster.local:9000
+      destinationPath: s3://yanatech-cnpg-backups/pg-main
+      endpointURL: https://s3.eu-central-003.backblazeb2.com
       s3Credentials:
         accessKeyId:
-          name: cnpg-minio-credentials
+          name: cnpg-b2-credentials
           key: ACCESS_KEY_ID
         secretAccessKey:
-          name: cnpg-minio-credentials
+          name: cnpg-b2-credentials
           key: ACCESS_SECRET_KEY
       wal:
         compression: gzip
