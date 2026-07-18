@@ -55,37 +55,15 @@ Also create the Infisical folders/secrets that ESO expects to already exist (see
 
 ### Regenerating `./venv` from a live cluster
 
-If you have a healthy cluster right now and want to (re)capture its current values into the Vaultwarden Note, run this from your workstation (not on `kc1` — it SSHes out and prints the result locally):
+If you have a healthy cluster right now and want to (re)capture its current values into the Vaultwarden Note, run `./regenerate-venv.sh` from your workstation (not on `kc1` — it SSHes out itself):
 
 ```bash
-mkdir -p ~/vault && ssh kc1 '
-echo "export CEPH_CSI_USER_KEY=$(kubectl get secret csi-rbd-secret -n ceph-csi-rbd -o jsonpath="{.data.userKey}" | base64 -d)"
-echo "export CLOUDFLARE_API_TOKEN=$(kubectl get secret cloudflare-api-token -n cert-manager -o jsonpath="{.data.api-token}" | base64 -d)"
-echo "export GRAFANA_AUTHENTIK_CLIENT_ID=$(kubectl get secret grafana-authentik-secret -n monitoring -o jsonpath="{.data.client_id}" | base64 -d)"
-echo "export GRAFANA_AUTHENTIK_CLIENT_SECRET=$(kubectl get secret grafana-authentik-secret -n monitoring -o jsonpath="{.data.client_secret}" | base64 -d)"
-echo "export AUTHENTIK_SECRET_KEY=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_SECRET_KEY}" | base64 -d)"
-echo "export AUTHENTIK_POSTGRESQL__HOST=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__HOST}" | base64 -d)"
-echo "export AUTHENTIK_POSTGRESQL__NAME=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__NAME}" | base64 -d)"
-echo "export AUTHENTIK_POSTGRESQL__USER=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__USER}" | base64 -d)"
-echo "export AUTHENTIK_POSTGRESQL__PASSWORD=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__PASSWORD}" | base64 -d)"
-echo "export AUTHENTIK_REDIS__HOST=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_REDIS__HOST}" | base64 -d)"
-echo "export AUTHENTIK_EMAIL__PASSWORD=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_EMAIL__PASSWORD}" | base64 -d)"
-echo "export ESO_CLIENT_SECRET=$(kubectl get secret infisical-eso-credentials -n external-secrets -o jsonpath="{.data.clientSecret}" | base64 -d)"
-echo "export ARGOCD_DEX_CLIENT_SECRET=$(kubectl get secret argocd-secret -n argocd -o jsonpath="{.data.dex\.authentik\.clientSecret}" | base64 -d)"
-echo "export GIT_PAT_USERNAME=$(kubectl get secret repo-akan -n argocd -o jsonpath="{.data.username}" | base64 -d)"
-echo "export REPO_AKAN_PAT=$(kubectl get secret repo-akan -n argocd -o jsonpath="{.data.password}" | base64 -d)"
-echo "export REPO_SHARED_SERVICES_PAT=$(kubectl get secret repo-shared-services -n argocd -o jsonpath="{.data.password}" | base64 -d)"
-echo "export REPO_ML_PAT=$(kubectl get secret repo-ml -n argocd -o jsonpath="{.data.password}" | base64 -d)"
-echo "export REPO_DOVE_HOUSE_TT_PAT=$(kubectl get secret repo-dove-house-tt -n argocd -o jsonpath="{.data.password}" | base64 -d)"
-echo "export GHCR_USERNAME=$(kubectl get secret ghcr-secret -n dove-house-tt -o jsonpath="{.data.\.dockerconfigjson}" | base64 -d | jq -r ".auths[\"ghcr.io\"].username")"
-echo "export GHCR_PAT=$(kubectl get secret ghcr-secret -n dove-house-tt -o jsonpath="{.data.\.dockerconfigjson}" | base64 -d | jq -r ".auths[\"ghcr.io\"].password")"
-' > ~/vault/vaultwarden-creds-DELETE-ME.txt
-
-echo "Review with: less ~/vault/vaultwarden-creds-DELETE-ME.txt"
-echo "Then copy its contents into the Vaultwarden Note, and rm ~/vault/vaultwarden-creds-DELETE-ME.txt"
+./regenerate-venv.sh
+# review the output it prints the path to, copy into the Vaultwarden Note, then:
+rm ~/vault/vaultwarden-creds-DELETE-ME.txt
 ```
 
-Needs `jq` on `kc1` for the ghcr-secret lines (already present as of 2026-07-18). This produces the exact `export VAR=value` shape `./venv` needs — nothing further to reformat.
+Needs `jq` on `kc1` for the ghcr-secret lines (already present as of 2026-07-18). Writes to `~/vault/`, never into this repo. Produces the exact `export VAR=value` shape `./venv` needs — nothing further to reformat.
 
 ## Phase 2 — Run `bootstrap.sh`
 

@@ -5,9 +5,9 @@
 #   - helm installed
 #   - a file named `venv` in this directory, containing the manual secret
 #     values below as `export VAR=value` lines. Copy this from the Vaultwarden
-#     Note where you store it -- see docs/disaster-recovery-runbook.md for the
-#     full list of required variables and how to regenerate this file from a
-#     live cluster if you ever need to.
+#     Note where you store it. If that Note doesn't exist yet or needs
+#     refreshing, run ./regenerate-venv.sh against a live cluster first --
+#     see docs/disaster-recovery-runbook.md for the full workflow.
 #
 # ============================================================
 # REQUIRED VARIABLES IN ./venv (all from Vaultwarden):
