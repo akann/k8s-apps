@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - external-secret-minio.yaml
   - db-backup-cronjob.yaml
+  - scan-policy-cronjob.yaml

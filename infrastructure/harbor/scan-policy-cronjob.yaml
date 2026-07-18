@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: harbor-enforce-scan-policy
+  namespace: harbor
+spec:
+  schedule: "30 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          containers:
+            - name: enforce-scan-policy
+              image: alpine:3.20
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache curl jq >/dev/null
+                  base="http://harbor-core.harbor.svc.cluster.local/api/v2.0/projects"
+                  ids=$(curl -sf -u "admin:$HARBOR_ADMIN_PASSWORD" "$base?page_size=100" | jq -r '.[].project_id')
+                  for id in $ids; do
+                    curl -sf -X PUT -u "admin:$HARBOR_ADMIN_PASSWORD" \
+                      -H "Content-Type: application/json" \
+                      -d '{"metadata":{"auto_scan":"true"}}' \
+                      "$base/$id"
+                    echo "project $id: auto_scan enforced"
+                  done
+              env:
+                - name: HARBOR_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: harbor-secret
+                      key: HARBOR_ADMIN_PASSWORD
