@@ -370,7 +370,7 @@ Secrets in Infisical follow the path pattern `/namespace/SECRET_NAME`.
 
 ### 6.4 Bootstrap Process
 
-For a fresh cluster, Vaultwarden (at `vault.yanatech.co.uk`) is the source of truth for manually provisioning the initial Infisical credentials and any secrets that ESO cannot yet pull.
+For a fresh cluster, Vaultwarden (at `vault.yanatech.co.uk`) is the source of truth for manually provisioning the initial Infisical credentials and any secrets that ESO cannot yet pull. See [`docs/disaster-recovery-runbook.md`](docs/disaster-recovery-runbook.md) for the full step-by-step procedure, including CNPG database recovery from Backblaze B2 if PVC data itself was lost.
 
 ---
 
