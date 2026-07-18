@@ -10,6 +10,8 @@ resources:
   # ArgoCD self-management
   - infrastructure/argocd/values.yaml
   - infrastructure/argocd/argocd-webhook-ingress.yaml
+  - infrastructure/argocd/external-secret-webhook-monitor.yaml
+  - infrastructure/argocd/webhook-delivery-check-cronjob.yaml
 
   # Wave 0 — storage/network foundation
   - infrastructure/metallb/argocd-app-metallb.yaml

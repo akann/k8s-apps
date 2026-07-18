@@ -268,3 +268,9 @@ spec:
               kubernetes.io/metadata.name: ops-agent
       ports:
         - port: 9093
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+      ports:
+        - port: 9093

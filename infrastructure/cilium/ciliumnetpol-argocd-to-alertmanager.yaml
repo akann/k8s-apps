@@ -1,0 +1,23 @@
+# CiliumNetworkPolicy required for the argocd-webhook-delivery-check CronJob
+# to reach Alertmanager's ClusterIP in the monitoring namespace — same
+# reasoning and pattern as ciliumnetpol-ops-agent-to-alertmanager.yaml.
+# netpol-monitoring.yaml's allow-alertmanager-ingress also needed an argocd
+# namespace entry added on port 9093 for this to actually connect.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-argocd-to-alertmanager
+  namespace: argocd
+spec:
+  endpointSelector:
+    matchLabels:
+      app: argocd-webhook-delivery-check
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+            app.kubernetes.io/name: alertmanager
+      toPorts:
+        - ports:
+            - port: "9093"
+              protocol: TCP

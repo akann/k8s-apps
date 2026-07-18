@@ -1,0 +1,85 @@
+# Polls GitHub's own delivery log for the argocd-webhook.yanatech.co.uk hook
+# on each of the 7 tracked repos, and pushes an alert directly to
+# Alertmanager's API (bypassing Prometheus scraping — nothing here exposes a
+# metric) when a recent delivery failed, or the webhook itself is missing.
+# Flows through the existing Alertmanager -> Gotify bridge (netpol/cilium
+# policy: ciliumnetpol-argocd-to-alertmanager.yaml).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: argocd-webhook-delivery-check
+  namespace: argocd
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: argocd-webhook-delivery-check
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          containers:
+            - name: check
+              image: alpine:3.20
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache curl jq coreutils >/dev/null
+
+                  webhook_url="https://argocd-webhook.yanatech.co.uk/api/webhook"
+                  cutoff_epoch=$(( $(date +%s) - 1200 ))  # 20min window, > 15min schedule
+                  repos="k8s-apps yana-stocks shared-services ml dove-house-tt akan yanatech"
+                  alerts="[]"
+
+                  for repo in $repos; do
+                    hook_id=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+                      "https://api.github.com/repos/akann/${repo}/hooks" \
+                      | jq -r --arg url "$webhook_url" '.[] | select(.config.url == $url) | .id')
+
+                    if [ -z "$hook_id" ]; then
+                      alerts=$(echo "$alerts" | jq --arg repo "$repo" '. + [{
+                        "labels": {"alertname": "ArgoCDWebhookMissing", "repo": $repo, "severity": "critical"},
+                        "annotations": {"summary": ("No ArgoCD webhook found on " + $repo), "description": "Expected a webhook pointing at argocd-webhook.yanatech.co.uk/api/webhook - none found. Recreate it (see k8s-apps CLAUDE.md)."}
+                      }]')
+                      continue
+                    fi
+
+                    failures=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+                      "https://api.github.com/repos/akann/${repo}/hooks/${hook_id}/deliveries?per_page=5" \
+                      | jq --argjson cutoff "$cutoff_epoch" '[.[] | select((.delivered_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > $cutoff and (.status_code < 200 or .status_code >= 300))]')
+
+                    count=$(echo "$failures" | jq 'length')
+                    if [ "$count" -gt 0 ]; then
+                      detail=$(echo "$failures" | jq -r '[.[] | "\(.event):\(.status_code)"] | join(", ")')
+                      alerts=$(echo "$alerts" | jq --arg repo "$repo" --arg detail "$detail" '. + [{
+                        "labels": {"alertname": "ArgoCDWebhookDeliveryFailed", "repo": $repo, "severity": "critical"},
+                        "annotations": {"summary": ("ArgoCD webhook delivery failing for " + $repo), "description": ("Recent failed deliveries: " + $detail)}
+                      }]')
+                    fi
+                  done
+
+                  alert_count=$(echo "$alerts" | jq 'length')
+                  if [ "$alert_count" -gt 0 ]; then
+                    ends_at=$(date -u -d "@$(( $(date +%s) + 1200 ))" +%Y-%m-%dT%H:%M:%SZ)
+                    payload=$(echo "$alerts" | jq --arg endsAt "$ends_at" '[.[] | .endsAt = $endsAt]')
+                    echo "$payload"
+                    curl -sf -X POST http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093/api/v2/alerts \
+                      -H "Content-Type: application/json" \
+                      -d "$payload"
+                    echo "posted ${alert_count} alert(s)"
+                  else
+                    echo "all webhooks healthy"
+                  fi
+              env:
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: github-webhook-monitor-token
+                      key: token
