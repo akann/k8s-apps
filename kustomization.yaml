@@ -9,6 +9,7 @@ kind: Kustomization
 resources:
   # ArgoCD self-management
   - infrastructure/argocd/values.yaml
+  - infrastructure/argocd/ci-refresh-rbac.yaml
 
   # Wave 0 — storage/network foundation
   - infrastructure/metallb/argocd-app-metallb.yaml
