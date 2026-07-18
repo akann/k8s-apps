@@ -328,6 +328,24 @@ kubectl get secret harbor-core -n harbor -o jsonpath='{.data.secret}' | base64 -
 kubectl rollout restart deployment harbor-core -n harbor
 ```
 
+### Harbor: vulnerability scanning (Trivy)
+
+Trivy is deployed by the Helm chart (`trivy.enabled: true` in `argocd-app-harbor.yaml`, `harbor-trivy-0` StatefulSet, 10Gi Ceph RBD PVC) and registered as Harbor's scanner. This part is GitOps-tracked.
+
+**Scan-on-push is NOT Helm-chart config** — it's a per-project `metadata.auto_scan` flag stored in Harbor's own Postgres DB, set via the API (`PUT /api/v2.0/projects/{id}` with `{"metadata":{"auto_scan":"true"}}`), not git. Enabled 2026-07-18 for all 6 existing projects (`library`, `infra`, `yana-ecommerce`, `yana-stocks`, `shared-services`, `ml`). **Any new project (e.g. a future per-repo project like `dove-house-tt`) needs this set explicitly** — it does not inherit from existing projects or a system-wide default. Same applies after a full Harbor DB restore, since this setting isn't in the backed-up dump's... actually it IS in the `harbor-database` pg_dump backup (project metadata lives in Postgres), so a restore preserves it — only a genuinely *new* project needs the manual step.
+
+To check current state or set it on a new project:
+
+```bash
+PASS=$(kubectl get secret harbor-secret -n harbor -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d)
+curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/projects?page_size=100" | jq '.[] | {name, auto_scan: .metadata.auto_scan}'
+curl -s -X PUT -u "admin:$PASS" -k -H "Content-Type: application/json" \
+  -d '{"metadata":{"auto_scan":"true"}}' \
+  "https://harbor.yanatech.co.uk/api/v2.0/projects/<project_id>"
+```
+
+Not yet configured: prevent-pull-on-vulnerability threshold, and a scheduled scan-all (for catching newly-disclosed CVEs in images that aren't re-pushed) — both are also per-project/system Harbor API settings, same pattern as above.
+
 ## Network Policies
 
 ### Critical rules
