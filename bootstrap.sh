@@ -22,17 +22,30 @@
 #       --from-literal=client_id=<id> \
 #       --from-literal=client_secret=<secret from Vaultwarden: grafana-authentik>
 #
-#   authentik namespace:
+#   authentik namespace (all 7 keys confirmed live 2026-07-18 -- values from
+#   Vaultwarden: authentik-secret):
 #     kubectl create secret generic authentik-secret -n authentik \
 #       --from-literal=AUTHENTIK_SECRET_KEY=<key> \
+#       --from-literal=AUTHENTIK_POSTGRESQL__HOST=<host> \
+#       --from-literal=AUTHENTIK_POSTGRESQL__NAME=<db name> \
+#       --from-literal=AUTHENTIK_POSTGRESQL__USER=<db user> \
 #       --from-literal=AUTHENTIK_POSTGRESQL__PASSWORD=<password> \
-#       ... (see Vaultwarden: authentik-secret)
+#       --from-literal=AUTHENTIK_REDIS__HOST=<redis host> \
+#       --from-literal=AUTHENTIK_EMAIL__PASSWORD=<email password>
 #
 #   external-secrets namespace (ESO machine identity for Infisical):
 #     kubectl create namespace external-secrets
-#     kubectl create secret generic infisical-machine-identity -n external-secrets \
+#     kubectl create secret generic infisical-eso-credentials -n external-secrets \
 #       --from-literal=clientId=1a5f2d02-e826-4132-9784-aa8e23094416 \
 #       --from-literal=clientSecret=<secret from Vaultwarden: eso-k8s-machine-identity>
+#   NOTE: the secret name MUST be infisical-eso-credentials, matching
+#   infrastructure/eso/cluster-secret-store.yaml's universalAuthCredentials
+#   refs -- verified 2026-07-18 against the live cluster after finding this
+#   script previously documented the wrong name (infisical-machine-identity,
+#   which nothing actually references). Getting this wrong means ESO can
+#   never authenticate to Infisical, so every other ExternalSecret in the
+#   cluster fails to sync -- this is the single most load-bearing secret in
+#   the whole bootstrap sequence.
 #
 #   argocd namespace (AFTER ArgoCD is installed — not ESO-managed):
 #     kubectl -n argocd patch secret argocd-secret \
