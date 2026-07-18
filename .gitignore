@@ -2,3 +2,7 @@ x
 x.sh
 
 .claude/
+
+# bootstrap.sh's sourced credentials file (from Vaultwarden) -- never commit
+venv
+vaultwarden-creds-DELETE-ME.txt

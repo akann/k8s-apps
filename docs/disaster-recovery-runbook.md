@@ -18,87 +18,95 @@ If you're not sure which scenario you're in: check `kubectl get pv` (or equivale
 3. Access to Vaultwarden (`vault.yanatech.co.uk`) for the manual secrets below. **If Vaultwarden itself is down** (its data lives in `pg-main`, recoverable per Phase 4, but that's circular — you need some of these secrets to get ESO/Infisical running before you can even reach the point of restoring `pg-main`): you need an out-of-band copy of at least the secrets marked mandatory below. If no such copy exists, that's a gap — fix it before you need this runbook for real.
 4. A local clone of `github.com/akann/k8s-apps` at the revision you want to deploy (normally `main`).
 
-## Phase 1 — Manual secrets (before running `bootstrap.sh`)
+## Phase 1 — `./venv` credentials file (before running `bootstrap.sh`)
 
-These are not ESO-managed and must exist before the relevant wave runs. All values come from Vaultwarden unless noted.
+**Changed 2026-07-18:** `bootstrap.sh` no longer just documents these as copy-paste commands — it creates all of them itself, sourcing the values from a file named `venv` in the same directory (plain `export VAR=value` lines, not a Python virtualenv — the name is just what this setup settled on). The script bails immediately with a clear error if `./venv` isn't present, rather than failing confusingly partway through.
 
-```bash
-# ceph-csi-rbd namespace
-kubectl create secret generic csi-rbd-secret -n ceph-csi-rbd \
-  --from-literal=userID=kubernetes \
-  --from-literal=userKey=<Vaultwarden: ceph-csi-rbd>
+**Where `./venv` comes from:** its contents live in a Vaultwarden Note. Copy that Note's contents into a file named `venv` in this repo's root before running `bootstrap.sh`. **Delete the file again once bootstrap finishes** — it's cluster-bootstrap credentials sitting in plaintext on disk, not something to leave lying around.
 
-# cert-manager namespace
-kubectl create secret generic cloudflare-api-token -n cert-manager \
-  --from-literal=api-token=<Vaultwarden: cloudflare-api-token>
+**If the Vaultwarden Note doesn't exist yet, or you're not sure it's current:** regenerate it from a live cluster (see the "Regenerating `./venv` from a live cluster" section below), then save its output into that Note before you need it for real.
 
-# monitoring namespace
-kubectl create secret generic grafana-authentik-secret -n monitoring \
-  --from-literal=client_id=<id> \
-  --from-literal=client_secret=<Vaultwarden: grafana-authentik>
+Required variables (full list is also in `bootstrap.sh`'s own header comment):
 
-# authentik namespace — all 7 keys required (confirmed live 2026-07-18)
-kubectl create secret generic authentik-secret -n authentik \
-  --from-literal=AUTHENTIK_SECRET_KEY=<key> \
-  --from-literal=AUTHENTIK_POSTGRESQL__HOST=<host> \
-  --from-literal=AUTHENTIK_POSTGRESQL__NAME=<db name> \
-  --from-literal=AUTHENTIK_POSTGRESQL__USER=<db user> \
-  --from-literal=AUTHENTIK_POSTGRESQL__PASSWORD=<password> \
-  --from-literal=AUTHENTIK_REDIS__HOST=<redis host> \
-  --from-literal=AUTHENTIK_EMAIL__PASSWORD=<email password>
-
-# external-secrets namespace — THE MOST LOAD-BEARING SECRET IN THIS LIST.
-# Name MUST be infisical-eso-credentials (matches
-# infrastructure/eso/cluster-secret-store.yaml). Get this wrong and ESO can
-# never authenticate to Infisical, which cascades to every other
-# ExternalSecret in the cluster failing to sync. (bootstrap.sh previously
-# documented the wrong name here — fixed 2026-07-18.)
-kubectl create namespace external-secrets
-kubectl create secret generic infisical-eso-credentials -n external-secrets \
-  --from-literal=clientId=1a5f2d02-e826-4132-9784-aa8e23094416 \
-  --from-literal=clientSecret=<Vaultwarden: eso-k8s-machine-identity>
-
-# Private-repo git credentials, in the argocd namespace (created AFTER ArgoCD
-# is installed in Phase 2 — argocd namespace doesn't exist yet before that).
-# Same repository-Secret shape for all four:
-for repo in akan shared-services ml dove-house-tt; do
-  kubectl create secret generic repo-$repo -n argocd \
-    --from-literal=type=git \
-    --from-literal=url=https://github.com/akann/$repo \
-    --from-literal=username=<user> \
-    --from-literal=password=<Vaultwarden: repo-$repo>
-  kubectl label secret repo-$repo -n argocd argocd.argoproj.io/secret-type=repository
-done
-
-# dove-house-tt + dove-house-tt-stg namespaces — ghcr.io pull secret
-# (images are private; create in BOTH namespaces, Secrets don't cross)
-for ns in dove-house-tt dove-house-tt-stg; do
-  kubectl create secret docker-registry ghcr-secret -n $ns \
-    --docker-server=ghcr.io \
-    --docker-username=<user> \
-    --docker-password=<Vaultwarden: ghcr-pull-token>
-done
+```
+CEPH_CSI_USER_KEY
+CLOUDFLARE_API_TOKEN
+GRAFANA_AUTHENTIK_CLIENT_ID
+GRAFANA_AUTHENTIK_CLIENT_SECRET
+AUTHENTIK_SECRET_KEY
+AUTHENTIK_POSTGRESQL__HOST
+AUTHENTIK_POSTGRESQL__NAME
+AUTHENTIK_POSTGRESQL__USER
+AUTHENTIK_POSTGRESQL__PASSWORD
+AUTHENTIK_REDIS__HOST
+AUTHENTIK_EMAIL__PASSWORD
+ESO_CLIENT_SECRET          # THE MOST LOAD-BEARING ONE -- see bootstrap.sh's comment
+ARGOCD_DEX_CLIENT_SECRET
+GIT_PAT_USERNAME
+REPO_AKAN_PAT
+REPO_SHARED_SERVICES_PAT
+REPO_ML_PAT
+REPO_DOVE_HOUSE_TT_PAT
+GHCR_USERNAME
+GHCR_PAT
 ```
 
-Also create the Infisical folders/secrets that ESO expects to already exist (see `bootstrap.sh`'s header comment for the current list — `redis`, `mongodb` folders, etc.).
+Also create the Infisical folders/secrets that ESO expects to already exist (see `bootstrap.sh`'s header comment for the current list — `redis`, `mongodb` folders, etc.) — these are freshly `openssl rand` generated, not stored in Vaultwarden, so they're not part of `./venv`.
+
+### Regenerating `./venv` from a live cluster
+
+If you have a healthy cluster right now and want to (re)capture its current values into the Vaultwarden Note, run this from your workstation (not on `kc1` — it SSHes out and prints the result locally):
+
+```bash
+mkdir -p ~/vault && ssh kc1 '
+echo "export CEPH_CSI_USER_KEY=$(kubectl get secret csi-rbd-secret -n ceph-csi-rbd -o jsonpath="{.data.userKey}" | base64 -d)"
+echo "export CLOUDFLARE_API_TOKEN=$(kubectl get secret cloudflare-api-token -n cert-manager -o jsonpath="{.data.api-token}" | base64 -d)"
+echo "export GRAFANA_AUTHENTIK_CLIENT_ID=$(kubectl get secret grafana-authentik-secret -n monitoring -o jsonpath="{.data.client_id}" | base64 -d)"
+echo "export GRAFANA_AUTHENTIK_CLIENT_SECRET=$(kubectl get secret grafana-authentik-secret -n monitoring -o jsonpath="{.data.client_secret}" | base64 -d)"
+echo "export AUTHENTIK_SECRET_KEY=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_SECRET_KEY}" | base64 -d)"
+echo "export AUTHENTIK_POSTGRESQL__HOST=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__HOST}" | base64 -d)"
+echo "export AUTHENTIK_POSTGRESQL__NAME=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__NAME}" | base64 -d)"
+echo "export AUTHENTIK_POSTGRESQL__USER=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__USER}" | base64 -d)"
+echo "export AUTHENTIK_POSTGRESQL__PASSWORD=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_POSTGRESQL__PASSWORD}" | base64 -d)"
+echo "export AUTHENTIK_REDIS__HOST=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_REDIS__HOST}" | base64 -d)"
+echo "export AUTHENTIK_EMAIL__PASSWORD=$(kubectl get secret authentik-secret -n authentik -o jsonpath="{.data.AUTHENTIK_EMAIL__PASSWORD}" | base64 -d)"
+echo "export ESO_CLIENT_SECRET=$(kubectl get secret infisical-eso-credentials -n external-secrets -o jsonpath="{.data.clientSecret}" | base64 -d)"
+echo "export ARGOCD_DEX_CLIENT_SECRET=$(kubectl get secret argocd-secret -n argocd -o jsonpath="{.data.dex\.authentik\.clientSecret}" | base64 -d)"
+echo "export GIT_PAT_USERNAME=$(kubectl get secret repo-akan -n argocd -o jsonpath="{.data.username}" | base64 -d)"
+echo "export REPO_AKAN_PAT=$(kubectl get secret repo-akan -n argocd -o jsonpath="{.data.password}" | base64 -d)"
+echo "export REPO_SHARED_SERVICES_PAT=$(kubectl get secret repo-shared-services -n argocd -o jsonpath="{.data.password}" | base64 -d)"
+echo "export REPO_ML_PAT=$(kubectl get secret repo-ml -n argocd -o jsonpath="{.data.password}" | base64 -d)"
+echo "export REPO_DOVE_HOUSE_TT_PAT=$(kubectl get secret repo-dove-house-tt -n argocd -o jsonpath="{.data.password}" | base64 -d)"
+echo "export GHCR_USERNAME=$(kubectl get secret ghcr-secret -n dove-house-tt -o jsonpath="{.data.\.dockerconfigjson}" | base64 -d | jq -r ".auths[\"ghcr.io\"].username")"
+echo "export GHCR_PAT=$(kubectl get secret ghcr-secret -n dove-house-tt -o jsonpath="{.data.\.dockerconfigjson}" | base64 -d | jq -r ".auths[\"ghcr.io\"].password")"
+' > ~/vault/vaultwarden-creds-DELETE-ME.txt
+
+echo "Review with: less ~/vault/vaultwarden-creds-DELETE-ME.txt"
+echo "Then copy its contents into the Vaultwarden Note, and rm ~/vault/vaultwarden-creds-DELETE-ME.txt"
+```
+
+Needs `jq` on `kc1` for the ghcr-secret lines (already present as of 2026-07-18). This produces the exact `export VAR=value` shape `./venv` needs — nothing further to reformat.
 
 ## Phase 2 — Run `bootstrap.sh`
 
 ```bash
 cd k8s-apps
+# copy the Vaultwarden Note's contents into ./venv first (see Phase 1) —
+# the script bails immediately with a clear error if it's missing
 ./bootstrap.sh
 ```
 
-This installs ArgoCD, then applies every `argocd-app-*.yaml` in wave order (mirrors `kustomization.yaml` exactly as of 2026-07-18 — verify that's still true if it's been a while: `diff <(grep -oP '(?<=- )(infrastructure|apps)/\S+\.yaml' kustomization.yaml) <(grep -oP '(?<=kubectl apply -f )(infrastructure|apps)/\S+\.yaml' bootstrap.sh | sort -u)` should be empty modulo ordering).
+The script now creates every Phase 1 secret itself, sourced from `./venv` — including the ArgoCD dex patch and all 4 git-credential secrets, which used to be separate manual steps. It installs ArgoCD, then applies every `argocd-app-*.yaml` in wave order (mirrors `kustomization.yaml` exactly as of 2026-07-18 — verify that's still true if it's been a while: `diff <(grep -oP '(?<=- )(infrastructure|apps)/\S+\.yaml' kustomization.yaml) <(grep -oP '(?<=kubectl apply -f )(infrastructure|apps)/\S+\.yaml' bootstrap.sh | sort -u)` should be empty modulo ordering).
 
-Stop and do these manually when the script tells you to:
+**Delete `./venv` once the script finishes** — no reason to leave cluster-bootstrap credentials sitting in plaintext on disk afterward.
+
+Stop and do these manually when the script tells you to (nothing here can be scripted from `./venv` — these need a live ESO/Infisical or a browser):
 
 1. **After ESO + Infisical (wave 6):** wait for both healthy, add the `eso-k8s` machine identity to the Infisical project members list in the Infisical UI (not just org-level), then confirm secrets are flowing: `kubectl get externalsecret -A` — nothing should stay `NotReady` for more than a minute or two once this step is done.
-2. **ArgoCD dex secret** (needs the `argocd` namespace to exist first): `kubectl -n argocd patch secret argocd-secret -p '{"stringData":{"dex.authentik.clientSecret":"<Vaultwarden: argocd-dex>"}}'`
-3. **Infisical ingress** — the bundled nginx is disabled by design; the script's own commands patch it to use the `nginx` ingress class and set the webhook's `failurePolicy` to `Ignore`. If ingress/ExternalSecret creation starts failing cluster-wide at any point, that webhook is almost certainly the cause — `kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission`.
-4. **Headlamp SSO is broken upstream** — issue a token manually: `kubectl create token headlamp -n headlamp --duration=8760h`
-5. **Immich**: set up the admin account at `https://photos.yanatech.co.uk`, then configure Authentik SSO under Administration → Settings → OAuth.
-6. **Authentik outposts**: Mongo Express and RedisInsight both need their forward-auth outpost configured in the Authentik UI (see `CLAUDE.md`'s SSO section for the general pattern).
+2. **Infisical ingress** — the bundled nginx is disabled by design; the script's own commands patch it to use the `nginx` ingress class and set the webhook's `failurePolicy` to `Ignore`. If ingress/ExternalSecret creation starts failing cluster-wide at any point, that webhook is almost certainly the cause — `kubectl delete validatingwebhookconfiguration infisical-ingress-nginx-admission`.
+3. **Headlamp SSO is broken upstream** — issue a token manually: `kubectl create token headlamp -n headlamp --duration=8760h`
+4. **Immich**: set up the admin account at `https://photos.yanatech.co.uk`, then configure Authentik SSO under Administration → Settings → OAuth.
+5. **Authentik outposts**: Mongo Express and RedisInsight both need their forward-auth outpost configured in the Authentik UI (see `CLAUDE.md`'s SSO section for the general pattern).
 
 ## Phase 3 — Verify the sync
 
@@ -219,4 +227,5 @@ Once confirmed healthy with real data: scale `instances` back up to the original
 - **CNPG recovery mechanism**: tested end-to-end for real (2026-07-18) — recovered `ops-agent-pg` from B2 into a throwaway namespace with zero shortcuts, verified exact row-count parity against the live source (4810/4640/11110/10 rows across all 4 tables), then fully cleaned up. This validates the recovery YAML shape and the `serverName` gotcha above are correct.
 - **`bootstrap.sh`'s manual secrets**: every one audited against live cluster state on 2026-07-18. One was wrong (`infisical-eso-credentials`, fixed) and one was incomplete (`authentik-secret`'s key list, fixed). The rest confirmed correct.
 - **`bootstrap.sh` vs. `kustomization.yaml` drift**: fixed and diff-verified 2026-07-18.
+- **NOT tested: the `./venv`-sourced secret-creation block itself.** `bootstrap.sh` was restructured 2026-07-18 to actually run the `kubectl create secret` commands (reading values from `./venv`) instead of just documenting them as copy-paste instructions — this is new, unexercised code. Syntax-checked (`bash -n`) and the `kustomization.yaml` diff still passes, but it has not been run against a real cluster. First real run of this script should be treated as the first test of this mechanism too, not just a routine bootstrap.
 - **NOT tested**: a real cold-start `kubeadm` + `bootstrap.sh` run against a genuinely empty cluster, start to finish, in one sitting. Everything above was verified against pieces of the live cluster or in an isolated throwaway namespace — not a full simulated disaster. Treat this runbook as strong evidence, not a guarantee, and re-verify the `bootstrap.sh`/`kustomization.yaml` diff check above before trusting it if significant time has passed since 2026-07-18.
