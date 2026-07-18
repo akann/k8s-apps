@@ -29,7 +29,7 @@ spec:
         compression: gzip
       data:
         compression: gzip
-    retentionPolicy: 7d
+    retentionPolicy: 30d
   monitoring:
     enablePodMonitor: false
   resources:

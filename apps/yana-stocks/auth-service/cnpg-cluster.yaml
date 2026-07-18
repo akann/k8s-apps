@@ -30,7 +30,7 @@ spec:
         compression: gzip
       data:
         compression: gzip
-    retentionPolicy: 7d
+    retentionPolicy: 30d
   storage:
     size: 10Gi
     storageClass: ceph-rbd
