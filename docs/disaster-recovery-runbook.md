@@ -15,8 +15,9 @@ If you're not sure which scenario you're in: check `kubectl get pv` (or equivale
 
 1. A working Kubernetes cluster (kubeadm, CNI not yet installed) — out of scope here, see `proxmox-cluster-setup.md`.
 2. `kubectl` and `helm` against that cluster.
-3. Access to Vaultwarden (`vault.yanatech.co.uk`) for the manual secrets below. **If Vaultwarden itself is down** (its data lives in `pg-main`, recoverable per Phase 4, but that's circular — you need some of these secrets to get ESO/Infisical running before you can even reach the point of restoring `pg-main`): you need an out-of-band copy of at least the secrets marked mandatory below. If no such copy exists, that's a gap — fix it before you need this runbook for real.
-4. A local clone of `github.com/akann/k8s-apps` at the revision you want to deploy (normally `main`).
+3. Access to Vaultwarden (`vault.yanatech.co.uk`) for the manual secrets below, **or** the break-glass copy (see next point) if Vaultwarden itself is gone.
+4. **Break-glass copy of the `./venv` Note, outside Vaultwarden.** Vaultwarden's own data lives in `pg-main`, recoverable per Phase 4 — but that's circular: you need these secrets to get ESO/Infisical running before you can even reach the point of restoring `pg-main`. If Vaultwarden is genuinely gone (not just down — destroyed along with Ceph), there must be a copy of the `./venv` contents somewhere that doesn't depend on the homelab at all. **Current answer: the same Note is also kept in LastPass** (a separate account, independent of this infrastructure) — update it there every time `regenerate-venv.sh` produces a real change, not just once. If that copy doesn't exist or is stale, that's a gap — fix it before you need this runbook for real.
+5. A local clone of `github.com/akann/k8s-apps` at the revision you want to deploy (normally `main`).
 
 ## Phase 1 — `./venv` credentials file (before running `bootstrap.sh`)
 
@@ -55,13 +56,16 @@ Also create the Infisical folders/secrets that ESO expects to already exist (see
 
 ### Regenerating `./venv` from a live cluster
 
-If you have a healthy cluster right now and want to (re)capture its current values into the Vaultwarden Note, run `./regenerate-venv.sh` from your workstation (not on `kc1` — it SSHes out itself):
+If you have a healthy cluster right now and want to (re)capture its current values, run `./regenerate-venv.sh` from your workstation (not on `kc1` — it SSHes out itself):
 
 ```bash
 ./regenerate-venv.sh
-# review the output it prints the path to, copy into the Vaultwarden Note, then:
+# review the output it prints the path to, copy into BOTH the Vaultwarden
+# Note AND the LastPass break-glass copy (see Prerequisites #4), then:
 rm ~/vault/vaultwarden-creds-DELETE-ME.txt
 ```
+
+Both copies, every time — a break-glass copy that's gone stale is worse than useless, since you won't know it's wrong until you're actually depending on it.
 
 Needs `jq` on `kc1` for the ghcr-secret lines (already present as of 2026-07-18). Writes to `~/vault/`, never into this repo. Produces the exact `export VAR=value` shape `./venv` needs — nothing further to reformat.
 
