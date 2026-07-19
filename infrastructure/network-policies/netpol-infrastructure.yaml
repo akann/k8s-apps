@@ -658,7 +658,8 @@ spec:
         - port: 53
           protocol: TCP
     - ports:
-        - port: 443  # includes api-gateway.yanatech.co.uk (Kong, contact form email)
+        - port: 443  # Turnstile verification, Sentry
+        - port: 587  # Gmail SMTP (smtp.gmail.com, contact form email — STARTTLS)
 ---
 # akan personal site (akan.nkweini.org) — see infrastructure/cilium/
 # ciliumnetpol-akan-k8s-docs.yaml for its egress to the k8s-docs query
