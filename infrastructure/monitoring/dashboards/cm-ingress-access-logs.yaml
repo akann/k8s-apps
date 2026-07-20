@@ -33,7 +33,7 @@ data:
             "name": "host",
             "label": "Host",
             "type": "custom",
-            "query": "akan.nkweini.org, yanatech.co.uk, stocks.yanatech.co.uk, photos.yanatech.co.uk, cloud.yanatech.co.uk, grafana.yanatech.co.uk, argocd.yanatech.co.uk, harbor.yanatech.co.uk, authentik.yanatech.co.uk, vault.yanatech.co.uk, status.yanatech.co.uk, kafka-ui.yanatech.co.uk, api-gateway.yanatech.co.uk",
+            "query": "akan.nkweini.org, yanatech.co.uk, stocks.yanatech.co.uk, photos.yanatech.co.uk, cloud.yanatech.co.uk, grafana.yanatech.co.uk, argocd.yanatech.co.uk, harbor.yanatech.co.uk, authentik.yanatech.co.uk, vault.yanatech.co.uk, status.yanatech.co.uk, kafka-ui.yanatech.co.uk, api-gateway.yanatech.co.uk, dovehousett.org",
             "includeAll": true,
             "allValue": ".*",
             "multi": false,
