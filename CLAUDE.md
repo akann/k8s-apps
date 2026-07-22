@@ -34,6 +34,7 @@ k8s-apps/
 │   ├── uptime-kuma/
 │   ├── vaultwarden/
 │   ├── gotify/
+│   ├── lighthouse-ci/              # Lighthouse CI server for yana-stocks (lighthouse.yanatech.co.uk) — basic auth, not Authentik; see note below SSO section
 │   ├── apicurio/
 │   ├── kubernetes-dashboard/
 │   ├── yana-stocks/               # yana-stocks microservices
@@ -175,6 +176,22 @@ nginx.ingress.kubernetes.io/auth-snippet: |
 
 - **CRITICAL:** `auth-url` must use the external hostname, NOT the internal service URL. The outpost matches by external host.
 - **ingress-nginx** requires `allowSnippetAnnotations: true` AND `annotations-risk-level: Critical` for `auth-snippet`
+
+**Deliberate exception — `lighthouse-ci`** (2026-07-22): uses HTTP Basic Auth
+built into `@lhci/server` instead of the Authentik forward-auth pattern above.
+Reason: the server needs to be usable by both `yana-stocks` CI's automated
+upload (no browser, can't complete an SSO redirect/login flow) and a human
+clicking the link posted on a GitHub commit status — one shared credential
+works for both, Authentik's outpost doesn't cleanly support a non-browser
+caller without extra per-path bypass config. Credentials live in Infisical
+(`/lighthouse-ci/BASIC_AUTH_USERNAME`+`PASSWORD`) *and*, unavoidably, as
+separate `yana-stocks` GitHub Actions secrets — no bridge between the two
+stores, rotate both by hand if the password ever changes. **Open follow-up,
+explicitly deferred**: split into two Ingresses on the same host — `/v1/*`
+(the API, what CI calls) ungated, `/app/*` (the UI) with the normal Authentik
+outpost annotations — gets per-user SSO on the human-facing dashboard while
+leaving CI's API access untouched. Needs an Authentik Provider/Application
+created first (steps 1-2 above are manual regardless).
 
 ## ArgoCD Conventions
 
@@ -735,6 +752,7 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | Argo Rollouts                       | https://rollouts.yanatech.co.uk      |
 | pgAdmin                             | https://pgadmin.yanatech.co.uk       |
 | Apicurio                            | https://apicurio.yanatech.co.uk      |
+| Lighthouse CI (basic auth)          | https://lighthouse.yanatech.co.uk    |
 | yana-stocks                         | https://stocks.yanatech.co.uk        |
 | Akan personal site                  | https://akan.nkweini.org             |
 | K8s Docs Chat (k8s-docs, public UI) | https://akan.nkweini.org/k8s-docs    |
