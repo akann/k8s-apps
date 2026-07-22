@@ -84,6 +84,7 @@ resources:
   - apps/pgadmin/argocd-app-pgadmin.yaml
   - apps/nextcloud/argocd-app-nextcloud.yaml
   - apps/gotify/argocd-app-gotify.yaml
+  - apps/lighthouse-ci/argocd-app-lighthouse-ci.yaml
   - apps/apicurio/argocd-app-apicurio.yaml
   # kubernetes-dashboard excluded — chart repo moved, fix URL before re-enabling
   - apps/immich/argocd-app-immich.yaml

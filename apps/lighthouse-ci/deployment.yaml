@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lighthouse-ci
+  namespace: lighthouse-ci
+  annotations:
+    secret.reloader.stakater.com/reload: "lighthouse-ci-basic-auth"
+    configmap.reloader.stakater.com/reload: "lighthouse-ci-config"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single-replica + RWO Ceph RBD PVC — RollingUpdate deadlocks (see k8s-apps/CLAUDE.md)
+  selector:
+    matchLabels:
+      app: lighthouse-ci
+  template:
+    metadata:
+      labels:
+        app: lighthouse-ci
+      annotations:
+        backup.velero.io/backup-volumes: data
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: lighthouse-ci
+          image: patrickhulce/lhci-server:latest
+          # basicAuth credentials are passed as explicit CLI args (not relying
+          # on @lhci/cli's env-var-to-nested-option auto-mapping, whose exact
+          # naming convention for the `server` command wasn't verifiable from
+          # source alone) — unambiguous, and the values never appear in the
+          # image/ConfigMap, only resolved at container start from the Secret.
+          command:
+            - sh
+            - -c
+            - >-
+              lhci server
+              --config=/config/lighthouserc.json
+              --basicAuth.username="$BASIC_AUTH_USERNAME"
+              --basicAuth.password="$BASIC_AUTH_PASSWORD"
+          env:
+            - name: BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: lighthouse-ci-basic-auth
+                  key: username
+            - name: BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lighthouse-ci-basic-auth
+                  key: password
+          ports:
+            - containerPort: 9001
+          livenessProbe:
+            httpGet:
+              path: /healthz # registered before the basic-auth middleware — no credentials needed
+              port: 9001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: lighthouse-ci-pvc
+        - name: config
+          configMap:
+            name: lighthouse-ci-config

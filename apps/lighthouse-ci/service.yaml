@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lighthouse-ci
+  namespace: lighthouse-ci
+spec:
+  selector:
+    app: lighthouse-ci
+  ports:
+    - port: 9001
+      targetPort: 9001

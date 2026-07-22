@@ -1,0 +1,28 @@
+# Internal-only hostname — no public DNS record, same pattern as
+# argocd.yanatech.co.uk / harbor.yanatech.co.uk / shared-api-docs.yanatech.co.uk
+# (split-horizon DNS resolves it inside the homelab network only).
+# No auth-* annotations here: gating is HTTP Basic Auth at the app level
+# (see deployment.yaml), not Authentik forward-auth, so the same URL and
+# credential work for both a human browser and yana-stocks CI's upload call.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lighthouse-ci
+  namespace: lighthouse-ci
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - lighthouse.yanatech.co.uk
+      secretName: wildcard-yanatech-tls
+  rules:
+    - host: lighthouse.yanatech.co.uk
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lighthouse-ci
+                port:
+                  number: 9001

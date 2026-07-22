@@ -1,0 +1,26 @@
+# Non-secret server config. Matches the storage/port settings the
+# patrickhulce/lhci-server image already ships by default (verified by
+# inspecting the image directly) — kept explicit here rather than relying on
+# the image default, so it survives an image update that might change it.
+# basicAuth credentials are deliberately NOT in this file (see
+# external-secret.yaml + deployment.yaml, which pass them as CLI args from a
+# Secret instead) — ConfigMaps are not encrypted at rest.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lighthouse-ci-config
+  namespace: lighthouse-ci
+data:
+  lighthouserc.json: |
+    {
+      "ci": {
+        "server": {
+          "port": 9001,
+          "storage": {
+            "storageMethod": "sql",
+            "sqlDialect": "sqlite",
+            "sqlDatabasePath": "/data/lhci.db"
+          }
+        }
+      }
+    }
