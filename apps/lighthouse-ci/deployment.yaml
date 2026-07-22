@@ -29,11 +29,15 @@ spec:
           # naming convention for the `server` command wasn't verifiable from
           # source alone) — unambiguous, and the values never appear in the
           # image/ConfigMap, only resolved at container start from the Secret.
+          # `lhci` is not on PATH for a plain `sh -c` invocation — it only
+          # gets prepended to PATH by `npm start`'s own script runner, which
+          # this command override bypasses. Verified inside the actual image:
+          # /usr/src/lhci/node_modules/.bin/lhci -> ../@lhci/cli/src/cli.js
           command:
             - sh
             - -c
             - >-
-              lhci server
+              /usr/src/lhci/node_modules/.bin/lhci server
               --config=/config/lighthouserc.json
               --basicAuth.username="$BASIC_AUTH_USERNAME"
               --basicAuth.password="$BASIC_AUTH_PASSWORD"
