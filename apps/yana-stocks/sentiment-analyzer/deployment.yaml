@@ -20,7 +20,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: sentiment-analyzer
-          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:a9ad4ee0a138244dc7ae37873bccd5b67237a319
+          image: harbor.yanatech.co.uk/yana-stocks/sentiment-analyzer:c893ad5a7d9a1a587fa34a2f01404b9eaafd29a1
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
