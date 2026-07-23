@@ -394,3 +394,25 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+---
+# akan: the CNPG instance manager (akan-pg pods) watches the Cluster CR via
+# the apiserver — same reason as k8s-docs/dove-house-tt above. initdb hangs
+# on "waiting for the API server to be reachable" without this.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-apiserver-egress
+  namespace: akan
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+        - port: 6443
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
