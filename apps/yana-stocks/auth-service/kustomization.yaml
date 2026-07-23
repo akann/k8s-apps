@@ -8,3 +8,4 @@ resources:
   - scheduled-backup.yaml
   - deployment.yaml
   - network-policy.yaml
+  - service-monitor.yaml

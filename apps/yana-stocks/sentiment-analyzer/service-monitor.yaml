@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sentiment-analyzer
+  namespace: yana-stocks
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: sentiment-analyzer
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

@@ -4,3 +4,5 @@ resources:
   - external-secret.yaml
   - deployment.yaml
   - keda-scaledobject.yaml
+  - service.yaml
+  - service-monitor.yaml

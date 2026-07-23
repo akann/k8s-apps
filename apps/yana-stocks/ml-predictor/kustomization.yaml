@@ -5,3 +5,4 @@ resources:
   - analysis-template.yaml
   - rollout.yaml
   - service.yaml
+  - service-monitor.yaml

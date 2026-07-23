@@ -5,3 +5,4 @@ resources:
   - deployment.yaml
   - network-policy.yaml
   - keda-scaledobject.yaml
+  - service-monitor.yaml
