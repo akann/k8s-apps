@@ -21,6 +21,7 @@ spec:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret
           env:
+            GF_USERS_ALLOW_SIGN_UP: "true"
             GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
             GF_AUTH_GENERIC_OAUTH_NAME: Authentik
             GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email profiles
