@@ -20,7 +20,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: portfolio-service
-          image: harbor.yanatech.co.uk/yana-stocks/portfolio-service:47ffd4719f5ad03c639395f081ef62ec8be39b15
+          image: harbor.yanatech.co.uk/yana-stocks/portfolio-service:861c6eca0e8a351a099bec0f03dacaf654cb3bcb
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

@@ -27,7 +27,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: auth-service
-          image: harbor.yanatech.co.uk/yana-stocks/auth-service:c893ad5a7d9a1a587fa34a2f01404b9eaafd29a1
+          image: harbor.yanatech.co.uk/yana-stocks/auth-service:861c6eca0e8a351a099bec0f03dacaf654cb3bcb
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
