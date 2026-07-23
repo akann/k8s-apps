@@ -18,10 +18,3 @@ spec:
         topic: stocks.prices.processed
         lagThreshold: "100"
         offsetResetPolicy: latest
-    - type: kafka
-      metadata:
-        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
-        consumerGroup: portfolio-service
-        topic: users.registered
-        lagThreshold: "100"
-        offsetResetPolicy: latest
