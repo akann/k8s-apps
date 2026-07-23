@@ -30,7 +30,7 @@ The pattern generally follows "infrastructure the rest depends on" → "infrastr
 
 ## Why every private repo needs its own CI runner
 
-`harbor.yanatech.co.uk`, the in-cluster container registry, isn't publicly resolvable — it only exists on the homelab's own network. GitHub-hosted runners (`ubuntu-latest`) therefore physically cannot push an image to it. Every repo that builds and pushes images gets its own self-hosted Actions Runner Controller scale set running inside the cluster, so the `docker build && docker push` step actually happens somewhere that can reach Harbor. Steps that don't need registry access (linting, type-checking, GitOps manifest validation) stay on GitHub-hosted runners, since there's no reason to burn homelab compute on those.
+`harbor.yanatech.co.uk`, the in-cluster container registry, isn't publicly resolvable — it only exists on the on-prem cloud's own network. GitHub-hosted runners (`ubuntu-latest`) therefore physically cannot push an image to it. Every repo that builds and pushes images gets its own self-hosted Actions Runner Controller scale set running inside the cluster, so the `docker build && docker push` step actually happens somewhere that can reach Harbor. Steps that don't need registry access (linting, type-checking, GitOps manifest validation) stay on GitHub-hosted runners, since there's no reason to burn on-prem cloud compute on those.
 
 Each repo also gets its own Harbor *project* with its own project-scoped robot account, rather than sharing one set of push credentials across repos — a compromised or leaked credential for one project's CI can't be used to push to another project's images.
 

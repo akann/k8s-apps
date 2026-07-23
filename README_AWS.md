@@ -3,13 +3,13 @@
 > **Reference:** AWS translation of [README.md](README.md)  
 > **yana-stocks app:** [stocks.yanatech.co.uk](https://stocks.yanatech.co.uk) · [github.com/akann/yana-stocks](https://github.com/akann/yana-stocks)
 
-This document maps the homelab architecture to AWS equivalents component by component. Tools that remain the same on AWS are noted explicitly; everything else is replaced by a managed AWS service.
+This document maps the on-prem cloud architecture to AWS equivalents component by component. Tools that remain the same on AWS are noted explicitly; everything else is replaced by a managed AWS service.
 
 ---
 
 ## Component Translation Map
 
-| Homelab | AWS Equivalent | Notes |
+| On-Prem Cloud | AWS Equivalent | Notes |
 |---------|---------------|-------|
 | Proxmox hypervisors | EC2 (managed by EKS) | Abstracted away — EKS provisions nodes |
 | Ceph RBD | Amazon EBS (gp3) | Block storage, same RWO semantics |
@@ -99,7 +99,7 @@ graph TB
 
 Replace the three-host Proxmox cluster and physical VLANs with a VPC spanning three Availability Zones.
 
-| Component | Homelab equivalent | Detail |
+| Component | On-Prem Cloud equivalent | Detail |
 |-----------|-------------------|--------|
 | VPC | 192.168.0.0/16 network | e.g. `10.0.0.0/16` |
 | Public subnets (× 3 AZs) | 192.168.33.200–202 VIPs | Load balancer front-ends |
@@ -210,7 +210,7 @@ spec:
 
 Unchanged. The same namespace layout applies on EKS. Replace or remove:
 
-| Homelab namespace | AWS disposition |
+| On-Prem Cloud namespace | AWS disposition |
 |-------------------|----------------|
 | `ceph-csi-rbd` | Remove — EBS CSI driver (`aws-ebs-csi-driver`) is an EKS add-on |
 | `kured` | Remove — managed node group handles OS updates |
@@ -230,9 +230,9 @@ Unchanged. The same namespace layout applies on EKS. Replace or remove:
 - Security Groups for Pods available — assign SGs directly to pods (replaces some CiliumNetworkPolicy use cases)
 - Installed as an EKS add-on
 
-**Cilium on EKS (alternative):** Cilium runs on EKS with AWS VPC CNI in chained mode or in ENI mode. Choose this if you want to carry the homelab NetworkPolicy/CiliumNetworkPolicy config forward unchanged. See [Cilium EKS guide](https://docs.cilium.io/en/stable/installation/k8s-install-helm/).
+**Cilium on EKS (alternative):** Cilium runs on EKS with AWS VPC CNI in chained mode or in ENI mode. Choose this if you want to carry the on-prem cloud NetworkPolicy/CiliumNetworkPolicy config forward unchanged. See [Cilium EKS guide](https://docs.cilium.io/en/stable/installation/k8s-install-helm/).
 
-**Cross-namespace ClusterIP routing caveat (homelab):** In the homelab, standard NetworkPolicy doesn't reliably handle cross-namespace ClusterIP traffic in Cilium native routing mode — requiring CiliumNetworkPolicy workarounds for Grafana → Prometheus and Grafana → PostgreSQL. With AWS VPC CNI this issue does not exist; standard NetworkPolicy works.
+**Cross-namespace ClusterIP routing caveat (on-prem cloud):** In the on-prem cloud, standard NetworkPolicy doesn't reliably handle cross-namespace ClusterIP traffic in Cilium native routing mode — requiring CiliumNetworkPolicy workarounds for Grafana → Prometheus and Grafana → PostgreSQL. With AWS VPC CNI this issue does not exist; standard NetworkPolicy works.
 
 ### 4.2 Load Balancing
 
@@ -247,7 +247,7 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<IRSA_ARN>
 ```
 
-| Homelab | AWS |
+| On-Prem Cloud | AWS |
 |---------|-----|
 | MetalLB VIP 192.168.33.200 (ingress-nginx) | NLB provisioned by `Service type: LoadBalancer` annotation |
 | MetalLB VIP 192.168.33.202 (Kong) | NLB provisioned by `Service type: LoadBalancer` annotation |
@@ -265,7 +265,7 @@ service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 
 ### 4.3 Ingress Controllers
 
-| Class | Homelab controller | AWS equivalent |
+| Class | On-Prem Cloud controller | AWS equivalent |
 |-------|--------------------|----------------|
 | `nginx` | ingress-nginx (VIP .200) | ingress-nginx on NLB (unchanged Helm chart) |
 | `kong` | Kong Ingress Controller (VIP .202) | Kong on NLB (unchanged) **or** Amazon API Gateway |
@@ -363,11 +363,11 @@ alb.ingress.kubernetes.io/auth-on-unauthenticated-request: authenticate
 
 **Option B — keep Authentik on EKS:**
 
-Deploy Authentik unchanged via Helm. Connect it to a Cognito User Pool as an upstream OIDC provider if desired, or run it standalone. Forward-auth flow via ingress-nginx annotations is identical to the homelab.
+Deploy Authentik unchanged via Helm. Connect it to a Cognito User Pool as an upstream OIDC provider if desired, or run it standalone. Forward-auth flow via ingress-nginx annotations is identical to the on-prem cloud.
 
 ### 4.8 Network Policies
 
-Standard Kubernetes `NetworkPolicy` works correctly with AWS VPC CNI — no CiliumNetworkPolicy required. The cross-namespace ClusterIP workaround from the homelab (Grafana → Prometheus, Grafana → PostgreSQL) is not needed on AWS VPC CNI.
+Standard Kubernetes `NetworkPolicy` works correctly with AWS VPC CNI — no CiliumNetworkPolicy required. The cross-namespace ClusterIP workaround from the on-prem cloud (Grafana → Prometheus, Grafana → PostgreSQL) is not needed on AWS VPC CNI.
 
 All existing `default-deny-all` NetworkPolicy objects carry over unchanged.
 
@@ -381,7 +381,7 @@ All existing `default-deny-all` NetworkPolicy objects carry over unchanged.
 
 **AWS equivalent:** Amazon EBS (gp3) via the EBS CSI driver add-on
 
-| Property | Homelab (Ceph RBD) | AWS (EBS gp3) |
+| Property | On-Prem Cloud (Ceph RBD) | AWS (EBS gp3) |
 |----------|--------------------|---------------|
 | Access mode | RWO | RWO |
 | StorageClass | `ceph-rbd` | `gp3` (EKS add-on default) |
@@ -422,7 +422,7 @@ reclaimPolicy: Retain
 
 **AWS equivalent:** Amazon S3
 
-All MinIO usage in the homelab maps directly to S3:
+All MinIO usage in the on-prem cloud maps directly to S3:
 
 | Usage | S3 replacement |
 |-------|---------------|
@@ -508,7 +508,7 @@ serviceAccount:
 ### 6.3 ExternalSecret Pattern
 
 ```yaml
-# Identical to homelab — only secretStoreRef changes
+# Identical to on-prem cloud — only secretStoreRef changes
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -612,7 +612,7 @@ graph LR
 
 ### 7.4 Known Permanent OutOfSync (cosmetic)
 
-Same as homelab — these are ArgoCD/Helm chart behaviours unrelated to the underlying infrastructure:
+Same as on-prem cloud — these are ArgoCD/Helm chart behaviours unrelated to the underlying infrastructure:
 
 | App | Reason |
 |-----|--------|
@@ -633,7 +633,7 @@ Same as homelab — these are ArgoCD/Helm chart behaviours unrelated to the unde
 
 **AWS equivalent:** Amazon Aurora PostgreSQL Serverless v2
 
-| Property | Homelab (CNPG) | AWS (Aurora) |
+| Property | On-Prem Cloud (CNPG) | AWS (Aurora) |
 |----------|---------------|--------------|
 | Instances | 3 (primary + 2 standbys) | Writer + 1 reader (Aurora auto-manages replicas) |
 | Failover | CNPG promotes standby | Aurora auto-promotes reader (<30 s) |
@@ -654,7 +654,7 @@ aws rds create-db-cluster \
 
 **Immich PostgreSQL:** Immich requires `pgvector` / VectorChord. Aurora PostgreSQL supports `pgvector` natively as of Aurora 15.5+ — no custom image needed. Create a separate Aurora cluster for Immich or use an RDS PostgreSQL instance.
 
-**k8s-docs PostgreSQL:** Same `pgvector` requirement as Immich (RAG chunk embeddings). Aurora's native `pgvector` support covers this too — use a separate Aurora cluster or RDS instance, kept dedicated and not shared with Immich's, matching the homelab's isolation.
+**k8s-docs PostgreSQL:** Same `pgvector` requirement as Immich (RAG chunk embeddings). Aurora's native `pgvector` support covers this too — use a separate Aurora cluster or RDS instance, kept dedicated and not shared with Immich's, matching the on-prem cloud's isolation.
 
 **yana-stocks auth-service-pg:** Single-instance CNPG → RDS PostgreSQL (`db.t4g.micro`) or Aurora Serverless v2 (cheaper at low load with ACU min 0.5).
 
@@ -666,7 +666,7 @@ aws rds create-db-cluster \
 
 **AWS equivalent:** Amazon DocumentDB (MongoDB 5.0-compatible)
 
-| Property | Homelab | AWS |
+| Property | On-Prem Cloud | AWS |
 |----------|---------|-----|
 | Connection | `mongodb-headless.mongodb.svc:27017` | DocumentDB cluster endpoint |
 | Replica set | Manual `rs0` | Managed, up to 15 replicas |
@@ -680,7 +680,7 @@ aws rds create-db-cluster \
 
 **AWS equivalent:** Amazon ElastiCache for Redis (cluster mode disabled)
 
-| Property | Homelab | AWS |
+| Property | On-Prem Cloud | AWS |
 |----------|---------|-----|
 | Connection | `redis-master.redis.svc:6379` | ElastiCache primary endpoint |
 | Persistence | AOF/RDB on EBS | Snapshot to S3 (automated) |
@@ -705,7 +705,7 @@ No code changes required — ElastiCache speaks the Redis protocol on port 6379.
 
 **AWS equivalent:** Amazon MSK (Managed Streaming for Kafka)
 
-| Property | Homelab (Strimzi) | AWS (MSK) |
+| Property | On-Prem Cloud (Strimzi) | AWS (MSK) |
 |----------|-------------------|-----------|
 | Brokers | 3 (KRaft, combined) | 3 brokers across 3 AZs |
 | Bootstrap | `kafka-cluster-kafka-bootstrap.kafka.svc:9092` | MSK bootstrap endpoint |
@@ -740,7 +740,7 @@ Topic names, partition counts, and retention settings are identical.
 
 ### 8.3 Cluster Maintenance
 
-| Tool | Homelab | AWS equivalent |
+| Tool | On-Prem Cloud | AWS equivalent |
 |------|---------|----------------|
 | **Kured** | Auto-reboot on `/var/run/reboot-required` | EKS managed node group `updateConfig` — nodes replaced automatically |
 | **Descheduler** | Evict pods to rebalance | **Karpenter** consolidation (`WhenUnderutilized`) |
@@ -785,7 +785,7 @@ All URLs unchanged — Route 53 replaces Cloudflare DNS, pointing to ALB/NLB ins
 
 Unchanged — all services run as Kubernetes Deployments on EKS. Only the external dependencies change:
 
-| Dependency | Homelab | AWS |
+| Dependency | On-Prem Cloud | AWS |
 |-----------|---------|-----|
 | PostgreSQL (auth) | CNPG `auth-service-pg` | RDS / Aurora PostgreSQL |
 | MongoDB | StatefulSet `rs0` | DocumentDB |
@@ -825,7 +825,7 @@ Kong and all KongPlugin/KongIngress CRs are unchanged. The only difference is th
 
 **Option A — fully managed (recommended for low ops overhead):**
 
-| Component | Homelab | AWS Managed |
+| Component | On-Prem Cloud | AWS Managed |
 |-----------|---------|-------------|
 | Prometheus | kube-prometheus-stack | Amazon Managed Prometheus (AMP) |
 | Grafana | Self-hosted, EBS PVC | Amazon Managed Grafana (AMG) |
@@ -833,7 +833,7 @@ Kong and all KongPlugin/KongIngress CRs are unchanged. The only difference is th
 | Traces | Tempo | AWS X-Ray |
 | Alerts | Alertmanager → Gotify | CloudWatch Alarms → SNS → email/Slack |
 
-**Option B — keep self-hosted stack on EKS (identical to homelab):**
+**Option B — keep self-hosted stack on EKS (identical to on-prem cloud):**
 
 All components (Prometheus, Grafana, Loki, Tempo, Alertmanager) run unchanged on EKS with EBS gp3 PVCs. Prometheus scrapes via the same ServiceMonitor resources. Use this if you want to preserve existing Grafana dashboards and alert rules without migration.
 
@@ -894,7 +894,7 @@ Or keep the existing Gotify + email routing unchanged on EKS.
 
 ### 12.1 Standard Deployment
 
-Identical to homelab — ArgoCD Application manifest pointing at `github.com/akann/k8s-apps`. No changes.
+Identical to on-prem cloud — ArgoCD Application manifest pointing at `github.com/akann/k8s-apps`. No changes.
 
 ### 12.2 IRSA Annotation Pattern
 
@@ -929,7 +929,7 @@ The IAM role trust policy:
 
 ### 12.3 Adding a New Namespace Checklist (AWS)
 
-1. Add `default-deny-all` NetworkPolicy (identical to homelab)
+1. Add `default-deny-all` NetworkPolicy (identical to on-prem cloud)
 2. Add specific ingress/egress NetworkPolicy rules
 3. If namespace has operators/controllers: add `allow-kube-apiserver-egress` policy
 4. If secrets needed: create ExternalSecret pointing to `aws-secrets-manager` ClusterSecretStore; create the secret in AWS Secrets Manager at `/yanatech/<namespace>/<NAME>`
@@ -968,11 +968,11 @@ spec:
     region: eu-west-2
 ```
 
-Schedule and namespace coverage identical to homelab.
+Schedule and namespace coverage identical to on-prem cloud.
 
 ### 13.2 Database Backup
 
-| Database | Homelab | AWS |
+| Database | On-Prem Cloud | AWS |
 |----------|---------|-----|
 | CNPG pg-main | WAL archiving to MinIO | Aurora: continuous backup to S3 (PITR up to 35 days), automated |
 | CNPG pg-main (alt) | WAL archiving | CNPG on EKS: WAL-G / Barman Cloud to S3 via IRSA |
@@ -1004,7 +1004,7 @@ EBS volumes are single-AZ. If a pod using an EBS PVC is rescheduled to a differe
 
 ### MSK IAM Authentication
 
-MSK with IAM auth requires the `aws-msk-iam-auth` library on the client classpath and a pod IAM role with `kafka-cluster:Connect` permission. The homelab PLAINTEXT bootstrap config must be updated in all services that connect to Kafka.
+MSK with IAM auth requires the `aws-msk-iam-auth` library on the client classpath and a pod IAM role with `kafka-cluster:Connect` permission. The on-prem cloud PLAINTEXT bootstrap config must be updated in all services that connect to Kafka.
 
 ### ECR Image Pull
 

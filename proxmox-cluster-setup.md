@@ -29,7 +29,7 @@ This document is a complete record of how this cluster is built. It is intended 
 
 ## 1. Hardware
 
-All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact Intel 12th-gen mini-PCs with dual SFP+ 10GbE and dual 2.5GbE, purpose-built for homelab clustering.
+All three nodes are identical **MINISFORUM MS-01 Mini Workstations** — compact Intel 12th-gen mini-PCs with dual SFP+ 10GbE and dual 2.5GbE, purpose-built for on-prem cloud clustering.
 
 ### Device — MINISFORUM MS-01
 

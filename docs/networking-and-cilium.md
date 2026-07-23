@@ -20,7 +20,7 @@ The cluster uses Cilium with **no encapsulation** (no VXLAN/Geneve overlay) — 
 1. **Standard `NetworkPolicy` doesn't fully work.** Cross-namespace ClusterIP-to-ClusterIP traffic and egress to IPs outside the pod CIDR (like the Ceph monitors on the management VLAN) require `CiliumNetworkPolicy` instead — plain `NetworkPolicy` objects are silently ineffective for these paths.
 2. **Egress to raw IPs needs `toCIDR`.** Ceph CSI's egress to OSD ports (6802-6809) on `192.168.22.0/24` is defined via a `CiliumNetworkPolicy` with an explicit `toCIDR` block (`infrastructure/cilium/ciliumnetpol-ceph-osd.yaml`), because the destination isn't a Kubernetes-native endpoint Cilium can select by label.
 
-Confirmed cases needing `CiliumNetworkPolicy` over standard `NetworkPolicy`: Grafana → Prometheus, Grafana → PostgreSQL (cross-namespace), the RAG chatbot's internal query path (`akan` namespace → `k8s-docs` namespace), and several homelab-copilot subagents reaching Proxmox, Redis, Prometheus, Alertmanager, and MinIO across namespace boundaries.
+Confirmed cases needing `CiliumNetworkPolicy` over standard `NetworkPolicy`: Grafana → Prometheus, Grafana → PostgreSQL (cross-namespace), the RAG chatbot's internal query path (`akan` namespace → `k8s-docs` namespace), and several on-prem-cloud-copilot subagents reaching Proxmox, Redis, Prometheus, Alertmanager, and MinIO across namespace boundaries.
 
 ## The "first policy flips the default" trap
 

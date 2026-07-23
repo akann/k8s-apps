@@ -2,7 +2,7 @@
 
 ## Overview
 
-GitOps repository for Akan's homelab Kubernetes cluster. All infrastructure and applications are defined here and deployed via ArgoCD. Everything must be committed to git — nothing deployed manually without a follow-up commit.
+GitOps repository for Akan's on-prem cloud Kubernetes cluster. All infrastructure and applications are defined here and deployed via ArgoCD. Everything must be committed to git — nothing deployed manually without a follow-up commit.
 
 **Principle:** GitOps-first. Correctness over speed. If it's not in git, it doesn't exist.
 
@@ -642,9 +642,9 @@ Same shape as yana-stocks' pattern above — `minReplicaCount: 0`, triggers on `
 
 ### CI runner
 
-`runners-shared-services` — a dedicated per-repo ARC runner scale set (`infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`), same pattern as `runners-yana-stocks`/`runners-k8s-apps`. GitHub-hosted `ubuntu-latest` **cannot** build/push here — `harbor.yanatech.co.uk` doesn't resolve outside the homelab network. Only the `docker` job needs the self-hosted runner; `quality`/`gitops` stay on `ubuntu-latest`.
+`runners-shared-services` — a dedicated per-repo ARC runner scale set (`infrastructure/actions-runner/argocd-app-runners-shared-services.yaml`), same pattern as `runners-yana-stocks`/`runners-k8s-apps`. GitHub-hosted `ubuntu-latest` **cannot** build/push here — `harbor.yanatech.co.uk` doesn't resolve outside the on-prem cloud network. Only the `docker` job needs the self-hosted runner; `quality`/`gitops` stay on `ubuntu-latest`.
 
-## ml (RAG chatbot over homelab docs)
+## ml (RAG chatbot over on-prem cloud docs)
 
 ### Repo
 

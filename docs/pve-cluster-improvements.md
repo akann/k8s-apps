@@ -4,7 +4,7 @@
 > **Based on:** pve1 audit — 2026-06-19  
 > **Scope:** All three Proxmox hypervisors  
 
-Findings are grouped by area. Each item has a rationale and a concrete action — skip anything that doesn't fit your homelab goals.
+Findings are grouped by area. Each item has a rationale and a concrete action — skip anything that doesn't fit your on-prem cloud goals.
 
 ---
 
@@ -82,7 +82,7 @@ systemctl reload corosync   # on each node
 pvecm status                # verify ring1 is now primary
 ```
 
-**Alternative — switch to `link_mode: active`:** Both rings carry traffic simultaneously; corosync load-balances and achieves true redundancy. More bandwidth, but adds complexity (multipath corosync). For a 3-node homelab, `passive` with correct priority is simpler and sufficient.
+**Alternative — switch to `link_mode: active`:** Both rings carry traffic simultaneously; corosync load-balances and achieves true redundancy. More bandwidth, but adds complexity (multipath corosync). For a 3-node on-prem cloud, `passive` with correct priority is simpler and sufficient.
 
 ---
 
@@ -168,7 +168,7 @@ ceph config set mon mon_warn_on_slow_ping_time 250
 
 The Proxmox firewall is **not enabled** at either cluster or node level. The PVE web UI (port 8006) and SSH (port 22) are accessible to any host on 192.168.22.0/24 with no filtering.
 
-For a homelab on a trusted private network this is a reasonable tradeoff, but consider enabling at minimum a node-level firewall to protect the management plane:
+For an on-prem cloud on a trusted private network this is a reasonable tradeoff, but consider enabling at minimum a node-level firewall to protect the management plane:
 
 ### Recommended — enable PVE firewall with management rules
 

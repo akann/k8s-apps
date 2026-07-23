@@ -1,6 +1,6 @@
 # Storage & Backup Architecture
 
-The homelab runs three distinct storage layers — block storage for pods, managed Postgres for app data, and object storage as the common backup target — plus two independent backup systems covering different failure modes.
+The on-prem cloud runs three distinct storage layers — block storage for pods, managed Postgres for app data, and object storage as the common backup target — plus two independent backup systems covering different failure modes.
 
 ## Ceph RBD: the default StorageClass
 

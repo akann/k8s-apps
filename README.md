@@ -1,4 +1,4 @@
-# Architecture — yanatech.co.uk Homelab
+# Architecture — yanatech.co.uk On-Prem Cloud
 
 > **Last verified:** July 2026  
 > **Cluster version:** Kubernetes v1.32.13 (kubeadm) — Ubuntu 24.04.4 LTS — containerd 2.2.4  
@@ -26,7 +26,7 @@
 
 ## 1. Overview
 
-A self-hosted, production-grade homelab running on a 6-node Kubernetes cluster across 3 Proxmox hypervisors. The cluster is managed entirely via GitOps (ArgoCD) — nothing is deployed manually without a subsequent commit to `github.com/akann/k8s-apps`.
+A self-hosted, production-grade on-prem cloud running on a 6-node Kubernetes cluster across 3 Proxmox hypervisors. The cluster is managed entirely via GitOps (ArgoCD) — nothing is deployed manually without a subsequent commit to `github.com/akann/k8s-apps`.
 
 **Design principles:**
 
@@ -508,7 +508,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 
 ### 8.3 Container Registry — Harbor
 
-- **URL:** `harbor.yanatech.co.uk` (not publicly resolvable — only reachable from inside the homelab network, including self-hosted GitHub Actions runners)
+- **URL:** `harbor.yanatech.co.uk` (not publicly resolvable — only reachable from inside the on-prem cloud network, including self-hosted GitHub Actions runners)
 - **Projects:** `yana-stocks`, `shared-services` — each project has its own project-scoped robot account (e.g. `robot$shared-services+ci`); robot accounts don't carry access across projects, so a new project needs its own project + robot account (`POST /api/v2.0/projects`, then `POST /api/v2.0/robots` with `level: project`)
 - **Image format:** `harbor.yanatech.co.uk/<project>/<service>:<tag>`
 - **Storage:** 100 Gi registry PVC + 10 Gi database PVC (ceph-rbd)

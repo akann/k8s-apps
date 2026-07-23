@@ -1,6 +1,6 @@
 # How ArgoCD Works — and How It Works in This Setup
 
-A reference for the GitOps engine behind the homelab cluster. Part 1 explains ArgoCD generally; Part 2 is specific to this `k8s-apps` repo.
+A reference for the GitOps engine behind the on-prem cloud cluster. Part 1 explains ArgoCD generally; Part 2 is specific to this `k8s-apps` repo.
 
 ---
 
@@ -179,4 +179,4 @@ This repo deliberately uses the **explicit app-of-apps list** in the root `kusto
 
 ### TL;DR
 
-ArgoCD pulls desired state from git and continuously forces the cluster to match it. In this homelab, a single **`bootstrap` app-of-apps** (sync-wave -1) applies the root `kustomization.yaml`, which is an ordered, wave-partitioned list of every child `Application` — infrastructure first (waves 0–8), workloads last (wave 9). Each child app deploys manifests either from this repo or from the app's own external repo. CI builds images and patches image tags into git; ArgoCD does the rest. `selfHeal` means **git is the only way to change anything** — manual edits are reverted.
+ArgoCD pulls desired state from git and continuously forces the cluster to match it. In this on-prem cloud, a single **`bootstrap` app-of-apps** (sync-wave -1) applies the root `kustomization.yaml`, which is an ordered, wave-partitioned list of every child `Application` — infrastructure first (waves 0–8), workloads last (wave 9). Each child app deploys manifests either from this repo or from the app's own external repo. CI builds images and patches image tags into git; ArgoCD does the rest. `selfHeal` means **git is the only way to change anything** — manual edits are reverted.

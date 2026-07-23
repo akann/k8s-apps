@@ -681,7 +681,7 @@ spec:
     - ports:
         - port: 443  # Sentry ingest (email-api)
 ---
-# k8s-docs (ml repo — RAG chatbot over homelab docs)
+# k8s-docs (ml repo — RAG chatbot over on-prem cloud docs)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -1072,7 +1072,7 @@ spec:
     - ports:
         - port: 587  # SMTP to smtp.gmail.com (lib/email/) — signup verification + password reset
 ---
-# ops-agent (ml repo — agentic SRE copilot over the homelab cluster)
+# ops-agent (ml repo — agentic SRE copilot over the on-prem cloud cluster)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
