@@ -4,6 +4,26 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-23
+
+### akan's first CNPG cluster (`akan-pg`) — 4-part NetworkPolicy gap for a CNPG cluster hosted in an app's own namespace (not `cnpg-clusters`)
+
+**Context:** `akan` shipped blog comments + star ratings, its first feature needing a database — a new dedicated `akan-pg` CNPG cluster living in the `akan` namespace itself (unlike `pg-main`/`k8s-docs-pg`/`dove-house-tt-pg`, which each get and are the sole occupant of their own namespace, but are still architecturally "a CNPG cluster as the only tenant of a namespace" — `akan-pg` is the first case of a CNPG cluster sharing a namespace with an existing, already-deployed application). `akan`'s NetworkPolicy had only ever needed DNS + HTTPS (Turnstile, Sentry, email-api) egress — nothing had opened a path for a database.
+
+**Symptom:** deploying the CNPG cluster + the app's new migrate initContainer produced two simultaneous, independently-diagnosed failures: the migrate initContainer crash-looped with `connect EPERM` against the `akan-pg-rw` ClusterIP, and CNPG's own `cnpg-cloudnative-pg` operator logged `Instance Status Extraction Error: HTTP communication issue` / `dial tcp <pod-ip>:8000: i/o timeout` trying to reach the instance pod directly, and the CNPG instance manager's own `initdb` job separately timed out reaching the kube-apiserver (`dial tcp 10.96.0.1:443: i/o timeout`).
+
+**Root cause — 4 separate missing rules, found and fixed in 2 passes:**
+1. `allow-akan` (`netpol-infrastructure.yaml`) had no egress rule for port 5432 at all.
+2. `netpol-apiserver-egress.yaml` had no `allow-kube-apiserver-egress` entry for the `akan` namespace — CNPG's instance manager watches its own `Cluster` CR via the apiserver, same as the pre-existing `k8s-docs`/`dove-house-tt` entries there.
+3. `netpol-cnpg.yaml`'s `allow-cnpg-operator` (in `cnpg-system`) has a **per-namespace egress allowlist** (documented as `CLAUDE.md` Network Policies rule 8) — `akan` was never added.
+4. **The one that actually mattered, found last:** `akan-pg`'s own **ingress** side had no rule at all. Every existing CNPG-hosting namespace (see `yana-stocks`' `auth-service-pg`) gets a dedicated `allow-cnpg-operator` NetworkPolicy scoped via `podSelector: {cnpg.io/cluster: <name>}` (ingress from `cnpg-system` on 8000/5432/9187) **plus** an `allow-intra-namespace` policy (bare `podSelector: {}`, ingress+egress from/to `podSelector: {}`) so the app's own pods can reach the DB pod. Fixes 1-3 only ever opened *egress* paths **toward** `akan`/`akan-pg` from elsewhere — nothing had ever opened *ingress* **into** the new `akan-pg-1`/`akan-pg-2` pods, which fixes 1-3 alone can never fix no matter how long you wait (confirmed by polling the cluster phase for 5+ minutes with zero change after fixes 1-3 landed and synced).
+
+**Diagnosis method, not just guessing:** confirmed both original symptoms were genuine Cilium policy denies (not a propagation delay, not an app bug) by triggering a live connection attempt from a running `akan` pod while tailing `hubble observe` on the node's Cilium agent pod — `ETIMEDOUT` on a direct pod-IP target vs. the app's own instant `EPERM` on the ClusterIP target are two different Cilium enforcement paths (packet-level drop vs. synchronous sockops-level reject for service-routed traffic), both consistent with policy denial, not a code or DNS problem.
+
+**Fix:** two commits. First added the 3 egress-side rules above (`netpol-infrastructure.yaml` + `netpol-apiserver-egress.yaml` + `netpol-cnpg.yaml`). Confirmed via `kubectl` that ArgoCD synced all three within seconds, but the cluster phase stayed stuck on the extraction error for 5+ minutes — that's what triggered the deeper Hubble-based investigation that found gap 4. Second commit added `akan`'s own `allow-cnpg-operator` (podSelector on `cnpg.io/cluster: akan-pg`) + `allow-intra-namespace` to `netpol-infrastructure.yaml`, mirroring `yana-stocks` exactly. Cluster phase went `Instance Status Extraction Error` → `Creating a new replica` → `Waiting for the instances to become active` → `Cluster in healthy state` within ~90 seconds of that second commit syncing. Migrate initContainer succeeded on its next retry, deployment rolled out, and the live site (`akan.nkweini.org/blog/*`) was confirmed serving real DB-backed ratings/comments end-to-end.
+
+**Key lesson for the next app that gets its own CNPG cluster inside an existing app's namespace** (rather than a namespace created fresh alongside its CNPG cluster, like `k8s-docs`/`dove-house-tt`): that existing namespace's `NetworkPolicy` almost certainly predates any database need and won't have the CNPG-cluster's own ingress side covered — don't assume `k8s-docs`/`dove-house-tt`'s already-correct manifests (created namespace + CNPG cluster together from day one) are a complete checklist; the `yana-stocks`/`auth-service-pg` pattern (`allow-cnpg-operator` scoped by `cnpg.io/cluster` + `allow-intra-namespace`) is the one that generalizes to "adding a CNPG cluster to an already-existing namespace." See `CLAUDE.md`'s Network Policies section (rule 8 and the "Adding a new namespace" checklist) for the updated guidance.
+
 ## 2026-07-18
 
 ### `bootstrap.sh` drift fixed + CNPG Postgres backups moved off-cluster to B2

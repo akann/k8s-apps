@@ -136,6 +136,7 @@ spec:
 - **CNPG pg-main:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432` — shared cluster for vaultwarden, authentik, nextcloud, infisical, apicurio (4 instances; barman backup to MinIO `s3://cnpg-backups/pg-main/`)
 - **Immich postgres:** `immich-postgres-rw.immich.svc.cluster.local:5432` — dedicated CNPG cluster using `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (2 instances)
 - **k8s-docs postgres:** `k8s-docs-pg-rw.k8s-docs.svc.cluster.local:5432` — dedicated CNPG cluster, same `cloudnative-vectorchord` image as Immich (2 instances) but not shared with it — separate instance reserved for future ML work too
+- **akan postgres:** `akan-pg-rw.akan.svc.cluster.local:5432` — dedicated CNPG cluster (plain `cloudnative-pg/postgresql:16`, 2 instances) backing akan's blog comments/star-ratings feature, added 2026-07-23. First CNPG cluster to share a namespace with an already-deployed application rather than getting its own fresh namespace — see the Network Policies section's "Adding a CNPG cluster to an existing namespace" note and `UPDATES.md` (2026-07-23) for the 4-part NetworkPolicy gap this surfaced.
 - **MongoDB:** `mongodb-headless.mongodb.svc.cluster.local:27017` (replicaSet=rs0)
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
@@ -387,6 +388,7 @@ Not yet configured: prevent-pull-on-vulnerability threshold, and a scheduled sca
 6. **KEDA intra-namespace gRPC (port 9666):** `metrics-apiserver` → `keda-operator` requires an explicit `podSelector: {}` ingress rule on port 9666 in the `allow-keda` policy — `default-deny-all` blocks it otherwise
 7. **The first policy to select a pod flips its default from allow to deny — for that whole direction, not just what the new rule covers.** A namespace with zero NetworkPolicies/CiliumNetworkPolicies is fully open. The moment any policy's `endpointSelector`/`podSelector` matches a pod for a given `policyTypes` direction, that pod becomes default-deny for that direction except what's explicitly allowed — by _any_ policy selecting it, not just the new one. Adding a narrow `CiliumNetworkPolicy` to a previously-unrestricted namespace (e.g. to let one app reach a new internal-only Service) can silently break every _other_ egress path that app had — DNS included. If the target namespace has no prior policies, either scope the new rule to only the specific pods that need it, or pair it with a `toEntities: [all]` / `egress: [{}]` catch-all rule restoring the original open posture (see `ciliumnetpol-akan-k8s-docs.yaml` for an example that gets this right).
 8. **`cnpg-system`'s `allow-cnpg-operator` NetworkPolicy (`infrastructure/network-policies/netpol-cnpg.yaml`) has a per-namespace egress allowlist, not a wildcard** — the CNPG operator can only reach instance pods (ports 8000/5432/9187) in namespaces explicitly listed there. **Every new CNPG-hosting namespace needs an entry added to this list**, or the operator can never extract that cluster's instance status: it fails forever with `phase: Instance Status Extraction Error: HTTP communication issue` / `dial tcp <pod-ip>:8000: i/o timeout` in the operator's own logs (`kubectl logs -n cnpg-system deploy/cnpg-cloudnative-pg`), even though the cluster's own `allow-cnpg-operator` NetworkPolicy in its own namespace looks correct. Confirmed and fixed 2026-07-16 for `ops-agent-pg` — added when the cluster was created, but its namespace (`ops-agent`) was never added to this allowlist.
+9. **Adding a CNPG cluster to an *already-existing* namespace needs its own ingress-side rules too — rule 8 alone is not enough.** Rule 8's egress allowlist only opens the `cnpg-system` operator's *outbound* path toward the new cluster; something also has to open *inbound* access into the new instance pods themselves (`podSelector: {cnpg.io/cluster: <name>}`, ingress from `cnpg-system` on 8000/5432/9187) and allow the app's own pods same-namespace access to the DB (an `allow-intra-namespace` policy: bare `podSelector: {}`, ingress+egress from/to `podSelector: {}`). Every existing CNPG-hosting namespace already had this because its NetworkPolicy was written *together with* its CNPG cluster from day one (`k8s-docs`, `dove-house-tt`, `yana-stocks`/`auth-service-pg`) — so this gap only surfaces the first time a CNPG cluster is added to a namespace whose NetworkPolicy already existed for something else. Confirmed 2026-07-23 for `akan`/`akan-pg`: rules 2+8 alone left the cluster permanently stuck on `Instance Status Extraction Error`/`dial tcp <pod-ip>:8000: i/o timeout` for 5+ minutes with zero change (ruling out propagation delay) until the ingress-side `allow-cnpg-operator` + `allow-intra-namespace` pair (mirroring `yana-stocks`' exact shape) was added — resolved within ~90 seconds of that second fix syncing. See `UPDATES.md` (2026-07-23) for the full diagnosis, including how a live Hubble `hubble observe` trace (not guessing) confirmed both failure symptoms were genuine Cilium policy denies.
 
 ### Files
 
@@ -411,6 +413,16 @@ Not yet configured: prevent-pull-on-vulnerability threshold, and a scheduled sca
 2. Add specific ingress/egress policies
 3. Add `allow-kube-apiserver-egress` to `netpol-apiserver-egress.yaml` if namespace has operators
 4. Apply and commit
+
+### Adding a CNPG cluster to an existing (already-deployed) namespace
+
+Don't just follow rules 2/8 above and assume it's done — those only open paths *toward* the new cluster from elsewhere. Also needed, in the namespace's own netpol file:
+
+1. `allow-cnpg-operator`: `podSelector: {cnpg.io/cluster: <name>}`, ingress from `cnpg-system` on ports 8000/5432/9187
+2. `allow-intra-namespace`: bare `podSelector: {}`, ingress+egress from/to `podSelector: {}` — so the namespace's existing app pods can reach the DB
+3. Add the namespace to `netpol-cnpg.yaml`'s `allow-cnpg-operator` egress allowlist (rule 8) and to `netpol-apiserver-egress.yaml` (rule 2) if not already covered
+
+See rule 9 above and `UPDATES.md` (2026-07-23, `akan`/`akan-pg`) for why steps 1-2 are easy to miss — every prior CNPG-hosting namespace had its NetworkPolicy written together with its CNPG cluster from day one, so this gap only shows up the first time a cluster is added to a namespace that already existed for something else.
 
 ## Infisical Webhook (CRITICAL)
 
@@ -703,6 +715,28 @@ Dedicated `dove-house-tt-pg` cluster (2 instances, plain `ghcr.io/cloudnative-pg
 ### Staging environment
 
 A second, self-contained deployment at `https://stg.dovehousett.org`, sourced from the same repo's `staging` branch (`k8s/dove-house-tt-stg/`, own ArgoCD Application `apps/dove-house-tt-stg/`, own namespace `dove-house-tt-stg`). Reuses the existing `repo-dove-house-tt` git credential (not branch-scoped) but needs its own `ghcr-secret` in the new namespace (Secrets don't cross namespaces) and its own Infisical secrets under `/dove-house-tt-stg/`. CNPG is a minimal single-instance `dove-house-tt-stg-pg` cluster with no ScheduledBackup — disposable/re-seedable test data, deliberately not resilient to a node drain. TLS reuses the existing `wildcard-dovehousett-tls` wildcard cert (already covers `*.dovehousett.org`), so no new Certificate was needed — only the network-policy blocks (`netpol-apps.yaml`, `netpol-cnpg.yaml`, `netpol-apiserver-egress.yaml`) and the DNS record for the subdomain (created directly in Cloudflare, outside git) were.
+
+## akan (personal site — blog comments + star ratings, added 2026-07-23)
+
+### Repo
+
+`github.com/akann/akan` — standalone Turborepo (Next.js 16), private (own `repo-akan` git credential + `ghcr-secret`, same pattern as `dove-house-tt`). App manifests live in **its own repo** (`k8s/akan/`, root-level not co-located under `apps/akan/`), yanatech/shared-services-style.
+
+### Namespace / domain
+
+`akan` — served at `https://akan.nkweini.org`. Pre-existing namespace (the site itself has been live since before this feature); `akan-pg` is the first CNPG cluster ever added to it, not a namespace created alongside its own CNPG cluster the way `k8s-docs`/`dove-house-tt` were — see the Network Policies section's rule 9 and "Adding a CNPG cluster to an existing namespace" for why that distinction mattered.
+
+### CNPG
+
+Dedicated `akan-pg` cluster (2 instances, plain `ghcr.io/cloudnative-pg/postgresql:16`, no vector extension needed). `bootstrap.initdb.secret` (`akan-db-credentials`) is pre-created via its own `ExternalSecret`, same pattern as `k8s-docs-db-credentials`/`dove-house-tt-db-credentials` — CNPG won't auto-generate it. `DATABASE_URL` is composed manually in Infisical (`/akan-site/DATABASE_URL`) against `akan-pg-rw.akan.svc.cluster.local:5432`.
+
+### Migrations — no second ghcr image, unlike dove-house-tt
+
+Deliberately uses plain `pg` + hand-written SQL migration files instead of an ORM, specifically to avoid `dove-house-tt`'s `drizzle-kit`-needs-a-second-image problem (see that section above). The migrate initContainer uses the **same** `ghcr.io/akann/akan` image as the main app container — no second image, no second CI build step. One real gotcha this surfaced: Turbopack's `.next/standalone` output stores traced runtime deps (like `pg`) in an internal hashed path only its own bundler runtime can resolve — a bare `node migrate.mjs` initContainer process can't find them via plain Node resolution. Fixed with a dedicated Dockerfile stage that does a flat `npm install pg dotenv --omit=dev` into its own directory, copied into the runner stage — sidesteps pnpm's symlinked virtual store entirely. See `akan` repo's own `CLAUDE.md` section for full detail.
+
+### NetworkPolicy gap (fixed 2026-07-23)
+
+First CNPG cluster added to an already-existing app namespace rather than one created fresh alongside it — surfaced a 4-part NetworkPolicy gap (egress from `allow-akan`, `netpol-apiserver-egress.yaml`, `netpol-cnpg.yaml`'s operator allowlist, and — the one that actually mattered — `akan-pg`'s own ingress side via a dedicated `allow-cnpg-operator` + `allow-intra-namespace` pair). Full diagnosis (including a live Hubble trace confirming genuine Cilium policy denies, not propagation delay or an app bug) in `UPDATES.md` (2026-07-23) and Network Policies rule 9 above.
 
 ## Useful Commands
 

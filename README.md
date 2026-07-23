@@ -456,6 +456,7 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | `immich-postgres` | `immich`        | 1         | immich-postgres-1 | 20 Gi     | Immich (pgvector/VectorChord)                          |
 | `auth-service-pg` | `yana-stocks`   | 1         | auth-service-pg-1 | 10 Gi     | yana-stocks auth-service                               |
 | `k8s-docs-pg`     | `k8s-docs`      | 2         | k8s-docs-pg-1     | 10 Gi     | k8s-docs RAG chatbot (pgvector/VectorChord)             |
+| `akan-pg`         | `akan`          | 2         | akan-pg-1         | 5 Gi      | akan blog comments + star ratings                       |
 
 **pg-main connection:** `pg-main-rw.cnpg-clusters.svc.cluster.local:5432`  
 **Immich:** uses `ghcr.io/tensorchord/cloudnative-vectorchord:16-1.1.1` (vector extension for AI search)  
