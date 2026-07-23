@@ -47,6 +47,13 @@ spec:
               value: "price-ingestor"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://tempo.monitoring.svc.cluster.local:4318"
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: price-ingestor-secret
+                  key: SENTRY_DSN
+            - name: NODE_ENV
+              value: production
           resources:
             requests:
               cpu: 100m
