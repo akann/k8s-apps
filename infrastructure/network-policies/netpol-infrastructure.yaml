@@ -716,6 +716,53 @@ spec:
     - ports:
         - port: 5432  # akan-pg, dedicated CNPG cluster in this same namespace
 ---
+# akan-pg's own ingress side — allow-akan above only covers egress *from*
+# akan's app pods; the CNPG instance pods themselves (akan-pg-1, etc.) need
+# their own ingress rule for the operator's status extraction (port 8000)
+# and for Postgres connections (port 5432), same shape as yana-stocks'
+# auth-service-pg entry below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cnpg-operator
+  namespace: akan
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: akan-pg
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - port: 8000
+        - port: 5432
+        - port: 9187
+---
+# Same-namespace pod-to-pod traffic (app/migrate -> akan-pg-1) — mirrors
+# yana-stocks' allow-intra-namespace exactly. Without this, akan-pg-1's own
+# default-deny-all ingress has no rule allowing the app pods to reach it on
+# 5432, even though allow-akan above already allows their egress side.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: akan
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
 # immich (placeholder — removed, pending redeploy)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
