@@ -30,6 +30,11 @@
 # kafka-consumer-groups.sh --describe that each consumer group rebalanced
 # onto the new partitions cleanly (existing partition's lag stayed 0, new
 # partitions start at offset 0 with no errors).
+#
+# stocks.portfolio.events removed 2026-07-24: its portfolio-service
+# producer had no consumer anywhere in the codebase (verified 2026-07-23),
+# so the producer code was removed from yana-stocks and the KafkaTopic
+# deleted here — Strimzi's topic operator drops the live topic on prune.
 ---
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
@@ -104,18 +109,4 @@ spec:
   replicas: 3
   config:
     retention.ms: 604800000     # 7 days
-    cleanup.policy: delete
----
-apiVersion: kafka.strimzi.io/v1
-kind: KafkaTopic
-metadata:
-  name: stocks.portfolio.events
-  namespace: kafka
-  labels:
-    strimzi.io/cluster: kafka-cluster
-spec:
-  partitions: 3
-  replicas: 3
-  config:
-    retention.ms: 2592000000    # 30 days
     cleanup.policy: delete

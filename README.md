@@ -505,7 +505,6 @@ These apps show OutOfSync in ArgoCD UI but are functioning correctly:
 | `stocks.prices.processed`   | 3          | 3           | 7d        | price-processor    | ml-predictor, portfolio-api |
 | `stocks.signals.sentiment`  | 3          | 3           | 7d        | sentiment-analyzer | portfolio-api               |
 | `stocks.signals.prediction` | 3          | 3           | 7d        | ml-predictor       | portfolio-api               |
-| `stocks.portfolio.events`   | 3          | 3           | 30d       | portfolio-service  | price-processor             |
 
 ### 8.3 Container Registry — Harbor
 
@@ -624,7 +623,6 @@ graph TB
 
     PAPI --> PS["portfolio-service\n(NestJS, 2 replicas)"]
     PS --- Mongo
-    PS -->|"stocks.portfolio.events"| Kafka
 
     FE["frontend\n(Next.js 14, 2 replicas)"] --> PAPI
     Browser["🌐 Browser"] --> Kong["Kong API Gateway\n192.168.33.202"]
@@ -731,10 +729,6 @@ graph LR
         T3["stocks.signals.sentiment\n3p / RF3"]
         T4["stocks.signals.prediction\n3p / RF3"]
     end
-    subgraph Events["Events Layer (30d)"]
-        T5["stocks.portfolio.events\n3p / RF3"]
-    end
-
     PI["price-ingestor"] --> T1
     T1 --> PP["price-processor"]
     PP --> T2
@@ -744,8 +738,7 @@ graph LR
     T2 --> PA["portfolio-api"]
     T3 --> PA
     T4 --> PA
-    PS["portfolio-service"] --> T5
-    T5 --> PP
+    T2 --> PS["portfolio-service"]
 ```
 
 ### 10.8 Monorepo Structure

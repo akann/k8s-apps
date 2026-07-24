@@ -4,6 +4,16 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-24
+
+### `stocks.portfolio.events` removed — producer-only topic with no consumer
+
+**Context:** the topic was produced by `portfolio-service` (on portfolio creation and add-stock) but consumed by nothing anywhere — verified 2026-07-23 during the KafkaTopic-name audit, and previously documented in both repos' CLAUDE.md as an honest gap ("an event stream into the void") rather than a feature.
+
+**Change:** removed end to end rather than left in place. In `yana-stocks` (commit `d8163aa`): the whole `KafkaProducerService` (its only method was `emitPortfolioEvent`), both emit call sites, the `CurrentUser` param decorator that existed solely to stamp `userId` on those events, the `PortfolioEventType`/`PortfolioEventMessage` shared types, the `PORTFOLIO_EVENTS` constant in `kafka-client`, and every producer mock in the specs — `portfolio-service` is now Kafka consume-only (`stocks.prices.processed`). Here: the `stocks.portfolio.events` `KafkaTopic` deleted from `apps/kafka/yana-stocks-topics.yaml` — Strimzi's topic operator drops the live broker topic (and its ~30d of unread retained events, which nothing ever read) when ArgoCD prunes the CR. Docs updated in both repos plus the akan blog post that described the gap.
+
+**Why now:** the topic cost nothing to keep, but it was the workspace's one remaining "wired at the infra layer, never finished in code" artifact (same shape as `portfolio-service`'s phantom `users.registered` KEDA trigger removed 2026-07-23), and nothing on the roadmap consumes it — removing it is one small commit per repo; re-adding it later is the same.
+
 ## 2026-07-23
 
 ### akan's first CNPG cluster (`akan-pg`) — 4-part NetworkPolicy gap for a CNPG cluster hosted in an app's own namespace (not `cnpg-clusters`)

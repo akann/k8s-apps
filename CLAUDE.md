@@ -518,7 +518,7 @@ apps/yana-stocks/
 ├── price-processor/               # NestJS, KEDA ScaledObject (min 1, stocks.prices.raw)
 ├── sentiment-analyzer/            # Python, KEDA ScaledObject (min 0, stocks.prices.processed)
 ├── ml-predictor/                  # Python, Argo Rollouts canary
-├── portfolio-service/             # NestJS, KEDA ScaledObject (min 1, prices.processed + users.registered)
+├── portfolio-service/             # NestJS, KEDA ScaledObject (min 1, stocks.prices.processed)
 ├── portfolio-api/                 # NestJS, KEDA ScaledObject (min 1, prices.processed + signals)
 ├── frontend/                      # Next.js, ingress stocks.yanatech.co.uk
 └── turbo-cache/                   # ducktors/turborepo-remote-cache → MinIO bucket `turborepocache`
@@ -542,8 +542,12 @@ stocks.prices.raw
 stocks.prices.processed
 stocks.signals.sentiment
 stocks.signals.prediction
-stocks.portfolio.events
 ```
+
+(`stocks.portfolio.events` was removed 2026-07-24 — its `portfolio-service`
+producer had no consumer anywhere, so the producer code was removed from
+`yana-stocks` and the `KafkaTopic` deleted from
+`apps/kafka/yana-stocks-topics.yaml`.)
 
 Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
