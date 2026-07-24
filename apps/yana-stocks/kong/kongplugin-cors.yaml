@@ -22,6 +22,8 @@ config:
     - Accept
     - Origin
     - X-Requested-With
+    - sentry-trace
+    - baggage
   exposed_headers:
     - Authorization
   credentials: true
