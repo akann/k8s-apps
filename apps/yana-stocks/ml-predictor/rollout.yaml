@@ -21,7 +21,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: ml-predictor
-          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:b7d285d68d15195eb770bea29ce9efe4f45e9285
+          image: harbor.yanatech.co.uk/yana-stocks/ml-predictor:c0e43cd4adc9833b8d3436db5f8f482244405479
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
