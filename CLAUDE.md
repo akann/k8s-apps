@@ -376,6 +376,56 @@ curl -s -X PUT -u "admin:$PASS" -k -H "Content-Type: application/json" \
 
 Not yet configured: prevent-pull-on-vulnerability threshold, and a scheduled scan-all (for catching newly-disclosed CVEs in images that aren't re-pushed) — both are also per-project/system Harbor API settings; could be folded into the same CronJob pattern if wanted later.
 
+### Harbor: registry disk exhaustion and tag retention
+
+**Incident, 2026-07-26:** `harbor-registry`'s PVC (100Gi, `ceph-rbd`) hit 100%
+usage — every image push started failing with `500 Internal Server Error` /
+`no space left on device`, surfacing in `yana-stocks`' CI as a `docker/*` job
+failure (one service on an incremental push; all ten under `build_all=true`).
+Harbor's own `/api/v2.0/health` endpoint stayed "healthy" throughout — it only
+checks component liveness, not disk capacity, so it never caught this.
+Root cause: CI pushes both a SHA tag and `latest` on every push to `main`, and
+nothing ever removed old tags, so blobs accumulated indefinitely across all 6
+projects. A manual GC run reclaimed only ~150MB (19 blobs) — confirming almost
+every blob was still referenced by some tag, not actually garbage.
+
+**Fix:** `harbor-registry`'s PVC was expanded 100Gi → 250Gi in
+`argocd-app-harbor.yaml` (`ceph-rbd` supports online expansion; the underlying
+`kubernetes` Ceph pool had 1.6 TiB free). **Gotcha:** after this change synced,
+ArgoCD reported the `harbor` Application as `Synced/Healthy` while the live
+PVC was still 100Gi — `argocd app diff`-equivalent inspection of
+`.status.resources[]` for the PVC also showed `"status":"Synced"` despite a
+real, confirmed (via local `helm template`) difference in the desired
+manifest. Cause not fully root-caused; worked around by patching the PVC's
+`spec.resources.requests.storage` directly to the already-git-declared value
+(not a bypass of GitOps — just manually applying what was already committed).
+Worth revisiting if another PVC resize on this cluster shows the same silent
+non-apply.
+
+**Tag retention** (`retention-policy-cronjob.yaml`, `harbor-enforce-retention-policy`
+CronJob, daily at 04:45, same `harbor-backup` kustomization as the scan-policy
+job) now keeps the 10 most-recently-pushed tags per repository across all 6
+projects, swept weekly (`0 0 3 * * 0`). Same pattern as scan-on-push: this is
+per-project state in Harbor's own Postgres DB (`metadata.retention_id`), not
+declarative via Helm/git, so the CronJob is what makes it self-healing and
+extends automatically to any project created later — it only acts on projects
+where `retention_id` is still null, since Harbor allows exactly one retention
+policy per project and 400s on a second `POST`. Harbor's own GC is now also
+scheduled weekly (`0 0 4 * * 0`, an hour after the retention sweep so tags are
+already gone before GC looks for unreferenced blobs) via the same CronJob —
+previously GC only ever ran when triggered manually. The `library` project
+already had an identical policy pre-existing (unclear origin, possibly a
+Harbor chart default) when this was set up — left as-is since its parameters
+already matched what was being applied everywhere else.
+
+To check current state or set it manually:
+
+```bash
+PASS=$(kubectl get secret harbor-secret -n harbor -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d)
+curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/projects?page_size=100" | jq '.[] | {name, retention_id: .metadata.retention_id}'
+curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/system/gc/schedule" | jq '.schedule'
+```
+
 ## Network Policies
 
 ### Critical rules

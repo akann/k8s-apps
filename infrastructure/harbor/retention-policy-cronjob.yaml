@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: harbor-enforce-retention-policy
+  namespace: harbor
+spec:
+  schedule: "45 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          containers:
+            - name: enforce-retention-policy
+              image: alpine:3.20
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache curl jq >/dev/null
+                  base="http://harbor-core.harbor.svc.cluster.local/api/v2.0"
+
+                  # Weekly GC — reclaims blobs orphaned by retention's tag deletions.
+                  # Retention runs Sundays 03:00 UTC; GC an hour later so tags are
+                  # already gone before GC sweeps for unreferenced blobs.
+                  curl -sf -X PUT -u "admin:$HARBOR_ADMIN_PASSWORD" \
+                    -H "Content-Type: application/json" \
+                    -d '{"schedule":{"type":"Weekly","cron":"0 0 4 * * 0"}}' \
+                    "$base/system/gc/schedule"
+                  echo "GC schedule enforced: weekly"
+
+                  # Every project — including ones created after this job existed —
+                  # keeps the 10 most-recently-pushed tags per repository, swept
+                  # weekly. Only touches projects with no retention policy at all;
+                  # Harbor allows exactly one policy per project and rejects a
+                  # second POST, so this is naturally idempotent.
+                  ids=$(curl -sf -u "admin:$HARBOR_ADMIN_PASSWORD" "$base/projects?page_size=100" \
+                    | jq -r '.[] | select(.metadata.retention_id == null) | .project_id')
+                  for id in $ids; do
+                    curl -sf -X POST -u "admin:$HARBOR_ADMIN_PASSWORD" \
+                      -H "Content-Type: application/json" \
+                      -d "{\"algorithm\":\"or\",\"rules\":[{\"disabled\":false,\"action\":\"retain\",\"template\":\"latestPushedK\",\"params\":{\"latestPushedK\":10},\"tag_selectors\":[{\"kind\":\"doublestar\",\"decoration\":\"matches\",\"pattern\":\"**\"}],\"scope_selectors\":{\"repository\":[{\"kind\":\"doublestar\",\"decoration\":\"repoMatches\",\"pattern\":\"**\"}]}}],\"trigger\":{\"kind\":\"Schedule\",\"settings\":{\"cron\":\"0 0 3 * * 0\"},\"references\":{}},\"scope\":{\"level\":\"project\",\"ref\":$id}}" \
+                      "$base/retentions"
+                    echo "project $id: retention policy created (keep last 10 tags/repo)"
+                  done
+              env:
+                - name: HARBOR_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: harbor-secret
+                      key: HARBOR_ADMIN_PASSWORD

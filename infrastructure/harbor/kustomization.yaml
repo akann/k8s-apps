@@ -4,3 +4,4 @@ resources:
   - external-secret-minio.yaml
   - db-backup-cronjob.yaml
   - scan-policy-cronjob.yaml
+  - retention-policy-cronjob.yaml
