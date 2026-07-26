@@ -514,9 +514,9 @@ apps/yana-stocks/
 ├── kong/                          # KongConsumer (auth-service), JWT/CORS plugins, ingress routes
 ├── auth-service/                  # Go, CNPG cluster (auth-service-pg), golang-migrate at startup
 ├── profile-service/               # NestJS, MongoDB, KEDA ScaledObject (min 1, users.registered)
-├── price-ingestor/                # Python, KEDA ScaledObject
+├── price-ingestor/                # Python, standard Deployment, fixed 1 replica (no autoscaler — verified 2026-07-26, no ScaledObject exists for this service despite earlier versions of this doc saying so)
 ├── price-processor/               # NestJS, KEDA ScaledObject (min 1, stocks.prices.raw)
-├── sentiment-analyzer/            # Python, KEDA ScaledObject (min 0, stocks.prices.processed)
+├── sentiment-analyzer/            # Python, KEDA ScaledObject (min 0, stocks.prices.processed) — the only service that actually scales to zero
 ├── ml-predictor/                  # Python, Argo Rollouts canary
 ├── portfolio-service/             # NestJS, KEDA ScaledObject (min 1, stocks.prices.processed)
 ├── portfolio-api/                 # NestJS, KEDA ScaledObject (min 1, prices.processed + signals)
@@ -553,31 +553,54 @@ Broker: `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
 **Fixed 2026-07-16:** `apps/kafka/yana-stocks-topics.yaml`'s `KafkaTopic` resources previously used hyphenated `metadata.name`s (`stocks-prices-raw`, etc.) that didn't match the dotted names above at all — `packages/kafka-client/src/topics.ts` is what every producer/consumer actually connects with, and Kafka auto-created the real dotted-name topics on first use with 1 partition and no explicit retention config, while the hyphenated `KafkaTopic` resources quietly managed a completely separate, never-produced-to set of topics. `metadata.name` now matches the dotted topic names exactly, so Strimzi manages the real topics.
 
-**Follow-up completed 2026-07-16:** all topics above (and `notifications.email.send`) were bumped from 1 to 3 partitions — `users.registered` first as a pilot (confirmed consumer group lag=0 immediately before, broker partition count actually changed via `kafka-topics.sh --describe`, and `profile-service`'s consumer group rebalanced onto the new partitions cleanly with no errors), then the rest once that validated. KEDA's `maxReplicaCount` on price-ingestor/price-processor/sentiment-analyzer/profile-service/portfolio-service/portfolio-api can now actually take effect.
+**Follow-up completed 2026-07-16:** all topics above (and `notifications.email.send`) were bumped from 1 to 3 partitions — `users.registered` first as a pilot (confirmed consumer group lag=0 immediately before, broker partition count actually changed via `kafka-topics.sh --describe`, and `profile-service`'s consumer group rebalanced onto the new partitions cleanly with no errors), then the rest once that validated. KEDA's `maxReplicaCount` on price-processor/sentiment-analyzer/profile-service/portfolio-service/portfolio-api can now actually take effect.
 
-### KEDA ScaledObject pattern (price-ingestor, price-processor, sentiment-analyzer, profile-service, portfolio-service, portfolio-api)
+**Correction, 2026-07-26:** this section previously listed `price-ingestor` as
+KEDA-scaled, including a worked example below keyed off it. Reading the live
+manifests directly shows `price-ingestor/` has no `keda-scaledobject.yaml` at
+all — just a plain `deployment.yaml` with a static `replicas: 1`. It's a pure
+Kafka producer with no consumer lag of its own to trigger a scaler. The five
+services that actually have a `ScaledObject` are `price-processor`,
+`sentiment-analyzer`, `profile-service`, `portfolio-service`, and
+`portfolio-api`.
+
+### KEDA ScaledObject pattern (price-processor, sentiment-analyzer, profile-service, portfolio-service, portfolio-api)
+
+Four of the five run with `minReplicaCount: 1` (never scale to zero, since
+each also serves synchronous traffic or must exist immediately after an
+event). `sentiment-analyzer` is the exception, at `minReplicaCount: 0` — it's
+the one service in this stack that actually scales to zero. Real manifest
+(`sentiment-analyzer/keda-scaledobject.yaml`):
 
 ```yaml
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: price-ingestor-scaler
+  name: sentiment-analyzer
   namespace: yana-stocks
 spec:
   scaleTargetRef:
-    name: price-ingestor
+    name: sentiment-analyzer
   minReplicaCount: 0
-  maxReplicaCount: 5
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 300
   triggers:
     - type: kafka
       metadata:
-        bootstrapServers: kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092
-        consumerGroup: price-ingestor
-        topic: stocks.prices.raw
-        lagThreshold: "10"
+        bootstrapServers: "kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092"
+        consumerGroup: sentiment-analyzer
+        topic: stocks.prices.processed
+        lagThreshold: "100"
+        offsetResetPolicy: latest
 ```
 
-**Don't forget:** if the target Deployment's manifest also declares a static `replicas:` field (all of these do), the owning ArgoCD Application needs an `ignoreDifferences` entry for that Deployment's `/spec/replicas` — otherwise self-heal resets it to the static value on every sync, which KEDA then scales back down moments later (visible as pod churn right after every routine sync). See `argocd-app-yana-stocks.yaml` for the six existing entries.
+The other four follow the same shape with `minReplicaCount: 1` and their own
+topic/consumer-group; `portfolio-api`'s has three triggers (one each for
+`stocks.prices.processed`, `stocks.signals.sentiment`, and
+`stocks.signals.prediction`) instead of one.
+
+**Don't forget:** if the target Deployment's manifest also declares a static `replicas:` field (all of these do), the owning ArgoCD Application needs an `ignoreDifferences` entry for that Deployment's `/spec/replicas` — otherwise self-heal resets it to the static value on every sync, which KEDA then scales back down moments later (visible as pod churn right after every routine sync). See `argocd-app-yana-stocks.yaml` for the six existing entries — note that one of the six (`price-ingestor`) is a leftover from before this correction: it doesn't need the exemption since it isn't KEDA-scaled, but removing it isn't necessary either since a static `replicas: 1` matches itself on every diff regardless.
 
 ### Argo Rollouts pattern (ml-predictor)
 
