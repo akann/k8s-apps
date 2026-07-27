@@ -25,7 +25,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: frontend
-          image: harbor.yanatech.co.uk/yana-stocks/frontend:c774ff371109b3a60ded51d50e75f5772f92a866
+          image: harbor.yanatech.co.uk/yana-stocks/frontend:57f149e0488c4d034717a179c6fdc051bd56be37
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
