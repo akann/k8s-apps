@@ -53,7 +53,7 @@ spec:
             - name: HF_HOME
               value: "/tmp/huggingface"
             - name: POLL_INTERVAL_SECONDS
-              value: "3600"
+              value: "300"
             - name: OTEL_SERVICE_NAME
               value: "sentiment-analyzer"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
