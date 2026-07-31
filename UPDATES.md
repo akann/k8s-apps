@@ -4,6 +4,21 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-07-31
+
+### New alerting for yana-stocks' external-API reliability (circuit breakers added in the `yana-stocks` repo)
+
+**Context:** a code-review comment asked how `portfolio-api`/`price-processor`/`sentiment-analyzer` handle third-party outages (FMP, Massive/Polygon, Twelve Data) — investigation found solid timeout/fallback-cache behavior already, but zero metrics of any kind for external-API failures anywhere (only generic inbound `http_requests_total`), confirmed against a real past incident (FMP silently deprecated an endpoint; the failure was only ever visible as a `WARNING` log line). Fixed in `yana-stocks` by wrapping every FMP/Massive/Twelve Data call site in a per-provider circuit breaker (`opossum` in the two Node services, `pybreaker` in `sentiment-analyzer`) whose success/failure/open/close events emit two new same-named metrics across all three services: `external_api_requests_total{provider,outcome}` and `external_api_circuit_state{provider}` (0=closed/0.5=half-open/1=open).
+
+**Change here:** new `PrometheusRule` (`infrastructure/monitoring/rules/prometheusrule-yana-stocks-external-apis.yaml`, added to that directory's `kustomization.yaml`):
+
+- `ExternalApiCircuitOpen` — `external_api_circuit_state{job=~"portfolio-api|price-processor|sentiment-analyzer"} == 1` for 5m, `severity: warning`.
+- `MassiveFeedSilent` — `rate(bars_published_total[15m]) == 0` for 15m, `severity: warning`. Reuses `price-ingestor`'s pre-existing counter — no new instrumentation needed for this one.
+
+Also added a new Alertmanager `time_intervals` entry (`nyse-trading-hours`, `location: America/New_York`, Mon-Fri 09:30-16:00 — IANA timezone, so DST is handled automatically, unlike the frontend's own manual-UTC-offset market-hours check) and a child route matching `alertname = "MassiveFeedSilent"` with `active_time_intervals: [nyse-trading-hours]`, so the price feed going quiet overnight/weekends (expected) doesn't page anyone — `ExternalApiCircuitOpen` gets no such restriction, since a third-party API being down is meaningful at any hour. Both changes live in `argocd-app-monitoring.yaml`'s inline Helm `values:` block.
+
+**Verified before considering this done:** `kubectl kustomize infrastructure/monitoring/rules` builds cleanly with the new rule included (confirms the kustomization-whitelist gotcha this repo has hit before wasn't repeated); the embedded Alertmanager `values:` YAML block was separately parsed out and validated (a plain top-level YAML parse of the outer file does *not* recursively validate a literal block-scalar string's contents).
+
 ## 2026-07-24
 
 ### `stocks.portfolio.events` removed — producer-only topic with no consumer

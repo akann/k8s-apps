@@ -186,9 +186,31 @@ spec:
                 - matchers:
                     - alertname =~ "Watchdog|InfoInhibitor"
                   receiver: "null"
+                # MassiveFeedSilent alone is trading-hours-gated — the price
+                # feed is *expected* to go quiet nights/weekends, so without
+                # this it would page every night. Other alerts (e.g.
+                # ExternalApiCircuitOpen below) get no such restriction — a
+                # third-party API being down is meaningful at any hour.
+                - matchers:
+                    - alertname = "MassiveFeedSilent"
+                  receiver: gotify
+                  active_time_intervals:
+                    - nyse-trading-hours
                 - matchers:
                     - severity = critical
                   receiver: critical-alerts
+            time_intervals:
+              - name: nyse-trading-hours
+                time_intervals:
+                  - times:
+                      - start_time: '09:30'
+                        end_time: '16:00'
+                    weekdays: ['monday:friday']
+                    # IANA timezone — Alertmanager handles DST automatically,
+                    # unlike the frontend's own manual-UTC-offset market-hours
+                    # check (see yana-stocks' lib/market-hours.ts). No holiday
+                    # calendar here either, same accepted limitation.
+                    location: 'America/New_York'
             receivers:
               - name: "null"
               - name: gotify

@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: yana-stocks-external-apis
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: yana-stocks.external-apis
+      rules:
+        - alert: ExternalApiCircuitOpen
+          expr: external_api_circuit_state{job=~"portfolio-api|price-processor|sentiment-analyzer"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.provider }} circuit breaker open on {{ $labels.job }}"
+            description: "The {{ $labels.provider }} circuit breaker on {{ $labels.job }} has been open (failing fast) for more than 5 minutes — that third-party API is likely down or erroring persistently."
+
+        # Reuses price-ingestor's existing bars_published_total — no new
+        # instrumentation needed. Trading-hours-gated in Alertmanager
+        # (see argocd-app-monitoring.yaml's nyse-trading-hours time_interval)
+        # since the feed is expected to go quiet nights/weekends.
+        - alert: MassiveFeedSilent
+          expr: rate(bars_published_total[15m]) == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Massive price feed has gone quiet"
+            description: "price-ingestor has published no price bars in the last 15 minutes during trading hours — the Massive/Polygon WebSocket feed may be connected but silently not producing data."
