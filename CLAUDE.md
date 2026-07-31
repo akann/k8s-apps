@@ -508,6 +508,24 @@ kubectl patch ingress infisical-ingress -n infisical --type='json' \
 - **Mode:** DB-less — routes defined via Kubernetes Ingress with `ingressClassName: kong` or KongIngress CRDs
 - **No admin UI** in OSS mode
 
+### Rate limiting (yana-stocks, added 2026-07-31)
+
+`apps/yana-stocks/kong/kongplugin-rate-limiting.yaml` (300/min, JWT-protected
+routes) and `kongplugin-rate-limiting-public.yaml` (60/min, public routes) —
+both `rate-limiting` plugin, `policy: redis` against
+`redis-master.redis.svc.cluster.local:6379`, `limit_by: ip` (no per-end-user
+`KongConsumer` registry exists — the one `KongConsumer` here is `auth-service`
+itself, for JWT issuance, not an end-user identity). `policy: redis` chosen
+over `local`/`cluster`: Kong here is DB-less so `cluster` (needs Kong's own
+Postgres) isn't available, and `local` counts per-Kong-replica independently,
+so the effective limit would silently scale with replica count — `redis`
+gives one accurate cluster-wide count. Needed one new addition to
+`infrastructure/network-policies/netpol-infrastructure.yaml`'s `allow-kong`
+NetworkPolicy: an egress rule to the `redis` namespace on port 6379 (the
+Redis-side `allow-redis` policy already accepts ingress from any namespace, so
+nothing changed there). See `yana-stocks/CLAUDE.md`'s Kong Routes section for
+which plugin applies to which route.
+
 ### Webhook timeout (IMPORTANT)
 
 The `kong-controller-kong-validations` ValidatingWebhookConfiguration has three webhooks, all with `timeoutSeconds: 10` by default. Due to Cilium native routing, the kube-apiserver→webhook call takes ~10s each, causing timeouts in multiple operators.
@@ -561,7 +579,7 @@ spec:
 apps/yana-stocks/
 ├── namespace.yaml
 ├── argocd-app-yana-stocks.yaml    # app-of-apps
-├── kong/                          # KongConsumer (auth-service), JWT/CORS plugins, ingress routes
+├── kong/                          # KongConsumer (auth-service), JWT/CORS/rate-limiting plugins, ingress routes
 ├── auth-service/                  # Go, CNPG cluster (auth-service-pg), golang-migrate at startup
 ├── profile-service/               # NestJS, MongoDB, KEDA ScaledObject (min 1, users.registered)
 ├── price-ingestor/                # Python, standard Deployment, fixed 1 replica (no autoscaler — verified 2026-07-26, no ScaledObject exists for this service despite earlier versions of this doc saying so)

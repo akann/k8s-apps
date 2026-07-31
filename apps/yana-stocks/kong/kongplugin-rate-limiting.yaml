@@ -1,0 +1,19 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limiting
+  namespace: yana-stocks
+plugin: rate-limiting
+config:
+  minute: 300
+  limit_by: ip
+  # No KongConsumer registry for end users exists in this repo (the one
+  # KongConsumer here is auth-service itself, for JWT issuance) — even
+  # JWT-protected routes are IP-scoped, just at a higher threshold than the
+  # public routes' rate-limiting-public plugin.
+  policy: redis
+  redis:
+    host: redis-master.redis.svc.cluster.local
+    port: 6379
+  fault_tolerant: true
+  hide_client_headers: false

@@ -7,7 +7,7 @@ metadata:
   name: api-profile-me
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -29,7 +29,7 @@ metadata:
   name: api-profile-public
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:

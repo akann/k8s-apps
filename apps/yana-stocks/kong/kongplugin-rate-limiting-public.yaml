@@ -1,0 +1,23 @@
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limiting-public
+  namespace: yana-stocks
+plugin: rate-limiting
+config:
+  minute: 60
+  limit_by: ip
+  # No KongConsumer registry for end users exists in this repo (the one
+  # KongConsumer here is auth-service itself, for JWT issuance) — every public
+  # route is necessarily IP-scoped.
+  policy: redis
+  redis:
+    host: redis-master.redis.svc.cluster.local
+    port: 6379
+  # Kong is DB-less (env.database: "off") — the `cluster` policy needs Kong's
+  # own Postgres, and `local` counts per-Kong-replica independently (so the
+  # effective limit would silently scale with replica count). `redis` gives
+  # one accurate cluster-wide count; Redis already accepts ingress from any
+  # namespace (see netpol-infrastructure.yaml's allow-redis).
+  fault_tolerant: true
+  hide_client_headers: false

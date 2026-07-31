@@ -7,7 +7,7 @@ metadata:
   name: api-auth-register
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -29,7 +29,7 @@ metadata:
   name: api-auth-verify
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -51,7 +51,7 @@ metadata:
   name: api-auth-login
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -73,7 +73,7 @@ metadata:
   name: api-auth-refresh
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -95,7 +95,7 @@ metadata:
   name: api-auth-logout
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -117,7 +117,7 @@ metadata:
   name: api-auth-password-reset-request
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -139,7 +139,7 @@ metadata:
   name: api-auth-password-reset
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -161,7 +161,7 @@ metadata:
   name: api-auth-me
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -183,7 +183,7 @@ metadata:
   name: api-auth-password
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -205,7 +205,7 @@ metadata:
   name: api-auth-account
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -227,7 +227,7 @@ metadata:
   name: api-auth-mfa-verify
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: cors
+    konghq.com/plugins: rate-limiting-public,cors
 spec:
   ingressClassName: kong
   rules:
@@ -249,7 +249,7 @@ metadata:
   name: api-auth-mfa-status
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -271,7 +271,7 @@ metadata:
   name: api-auth-mfa-setup
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -293,7 +293,7 @@ metadata:
   name: api-auth-mfa-enable
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:
@@ -315,7 +315,7 @@ metadata:
   name: api-auth-mfa-disable
   namespace: yana-stocks
   annotations:
-    konghq.com/plugins: jwt-auth,cors
+    konghq.com/plugins: jwt-auth,rate-limiting,cors
 spec:
   ingressClassName: kong
   rules:

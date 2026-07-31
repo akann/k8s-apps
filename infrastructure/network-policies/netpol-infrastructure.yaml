@@ -934,6 +934,12 @@ spec:
         - port: 8080
         - port: 3000
         - port: 8000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redis
+      ports:
+        - port: 6379  # rate-limiting plugin's redis policy (yana-stocks routes)
     - ports:
         - port: 53
           protocol: UDP
