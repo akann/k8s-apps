@@ -40,8 +40,12 @@ spec:
           env:
             - name: NODE_ENV
               value: production
-            - name: NEXT_PUBLIC_API_URL
-              value: "https://api-gateway.yanatech.co.uk/api"
+            # Server-only now — the browser only ever calls this app's own
+            # origin; src/app/api/[...path] (the BFF) is what talks to Kong
+            # server-to-server, attaching Authorization from the httpOnly
+            # access_token cookie. See yana-stocks' src/lib/bff/upstream.ts.
+            - name: API_GATEWAY_URL
+              value: "https://api-gateway.yanatech.co.uk"
             - name: OTEL_SERVICE_NAME
               value: "frontend"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
