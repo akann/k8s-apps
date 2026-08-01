@@ -20,7 +20,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: price-processor
-          image: harbor.yanatech.co.uk/yana-stocks/price-processor:557f5585e1dac39afc14a766af59a748bbe376a7
+          image: harbor.yanatech.co.uk/yana-stocks/price-processor:cf77b425bba9674d7744182e6c54084a8de719e5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
