@@ -18,7 +18,7 @@ spec:
         - name: harbor-pull-secret
       containers:
         - name: api-docs
-          image: harbor.yanatech.co.uk/yana-stocks/api-docs:cf77b425bba9674d7744182e6c54084a8de719e5
+          image: harbor.yanatech.co.uk/yana-stocks/api-docs:5671d5e340732ecf2e3b12f4a63c06f58060192f
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
