@@ -4,6 +4,20 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-02
+
+### Sentry disabled everywhere except yana-stocks (free-tier quota conservation)
+
+**Context:** the workspace is on Sentry's free tier; with 15 services across 6 repos all reporting, quota was being spread thin for no real benefit outside the one production system (`yana-stocks`) that actually needs error tracking day to day.
+
+**Change:** added a new, explicit `SENTRY_ENABLED` (`NEXT_PUBLIC_SENTRY_ENABLED` for the 3 Next.js apps, build-time-inlined) env var to every non-yana-stocks Sentry integration, defaulting `"false"`, gating `Sentry.init`/`withSentryConfig`/the NestJS `SentryModule.forRoot()`+`SentryGlobalFilter` wiring. Disabled: `yanatech`, `akan`, `dove-house-tt` (both `main` and `staging`), `shared-services`' `email-api`/`email-service`, `ml`'s `k8s-docs`/`ops-agent`. `yana-stocks` (all 9 of its Sentry-integrated services) is untouched and stays fully enabled — it also only has a production environment, so no separate prod/staging split was needed there.
+
+Deliberately **not** a secrets change — every DSN stays wired exactly as before in Infisical/CI, so re-enabling any repo later is a one-line flip of `SENTRY_ENABLED`/`NEXT_PUBLIC_SENTRY_ENABLED` back to `"true"` in that repo's CI workflow build-args and/or k8s `deployment.yaml`, with no DSN to look up or re-enter. `shared-services`/`ml`'s separate CI "Upload source maps to Sentry" steps (which call `@sentry/cli` directly, independent of the app-level flag) were also gated off (`if: false`) so CI stops making Sentry API calls for those two repos.
+
+Also corrected `README.md`'s §11.3.1 Sentry Alerting section, which undercounted the integrated-service list as 11 — it was actually missing yana-stocks' `auth-service`, `price-ingestor`, `sentiment-analyzer`, `ml-predictor`, and `ml/ops-agent` (15 total), found while mapping out this change.
+
+**Verified before considering this done:** `pnpm build` for all 3 Next.js apps with the flag unset — succeeded, no Sentry sourcemap-upload output. `pnpm turbo lint/type-check/test` for `shared-services` (both apps) and `ml/k8s-docs` — all green, confirming the conditional NestJS module array doesn't break Nest's DI graph. `ops-agent`'s `mypy`/`ruff`/`pytest` (203 tests) — all green. No changes made to `yana-stocks`.
+
 ## 2026-07-31
 
 ### New alerting for yana-stocks' external-API reliability (circuit breakers added in the `yana-stocks` repo)
