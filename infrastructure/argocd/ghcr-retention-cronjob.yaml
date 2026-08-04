@@ -13,6 +13,23 @@
 # image on a low-traffic environment, which "newest 10" alone cannot
 # distinguish from "superseded". Sized generously given this workspace's
 # push cadence (yana-stocks/k8s-apps push multiple times most days).
+#
+# MUST paginate. A first version of this job silently looked at only the
+# first `per_page=100` versions — verified live 2026-08-04 against real
+# data (dove-house-tt: 518 versions, dove-house-tt-migrate: 221,
+# akan: 202, all >100), so every package here has always had versions
+# past page 1 that a single unpaginated GET simply never saw. GitHub
+# returns each page newest-first (verified live: page N's last created_at
+# is always newer than page N+1's first), and array concatenation across
+# pages in fetch order preserves that global ordering, so the same
+# to_entries/select logic below still ranks correctly across the full set.
+#
+# MUST route the accumulated version list through a file, not jq --argjson.
+# The first pagination fix passed the whole array as a CLI arg and hit
+# `jq: Argument list too long` once it grew past the shell's ARG_MAX —
+# the exact bug class already documented in this repo's own ml/k8s-docs
+# ingest workflow fix (see CLAUDE.md, 2026-07-16, "MUST route every file's
+# content through disk instead"). Same fix here: accumulate to a file.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -46,29 +63,45 @@ spec:
                   cutoff=$(( $(date +%s) - keep_days*86400 ))
 
                   for pkg in $packages; do
-                    versions=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
-                      -H "Accept: application/vnd.github+json" \
-                      "https://api.github.com/users/${owner}/packages/container/${pkg}/versions?per_page=100&state=active")
+                    versions_file=/tmp/versions.json
+                    echo '[]' > "$versions_file"
+                    page=1
+                    while true; do
+                      curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github+json" \
+                        "https://api.github.com/users/${owner}/packages/container/${pkg}/versions?per_page=100&page=${page}&state=active" \
+                        > /tmp/page.json
+                      n=$(jq 'length' /tmp/page.json)
+                      jq -s '.[0] + .[1]' "$versions_file" /tmp/page.json > /tmp/versions.json.new
+                      mv /tmp/versions.json.new "$versions_file"
+                      [ "$n" -lt 100 ] && break
+                      page=$((page+1))
+                      # Safety backstop, not an expected ceiling: 50 pages =
+                      # 5000 versions, far beyond anything these 3 packages
+                      # should reach even after several missed weekly runs.
+                      [ "$page" -gt 50 ] && { echo "package ${pkg}: aborting, exceeded 50 pages"; break; }
+                    done
 
-                    total=$(echo "$versions" | jq 'length')
+                    total=$(jq 'length' "$versions_file")
                     echo "package ${pkg}: ${total} versions"
 
                     # GitHub returns newest-first; drop the first keep_recent by
                     # position, then only delete what's also older than cutoff.
-                    del_ids=$(echo "$versions" | jq -r --argjson keep "$keep_recent" --argjson cutoff "$cutoff" '
+                    jq -r --argjson keep "$keep_recent" --argjson cutoff "$cutoff" '
                       to_entries
                       | map(select(.key >= $keep))
                       | map(select((.value.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) < $cutoff))
-                      | .[].value.id')
+                      | .[].value.id' "$versions_file" > /tmp/del_ids.txt
 
-                    count=$(echo "$del_ids" | grep -c . || true)
+                    count=$(grep -c . /tmp/del_ids.txt || true)
                     echo "package ${pkg}: deleting ${count} version(s) (outside newest ${keep_recent}, older than ${keep_days}d)"
 
-                    for id in $del_ids; do
+                    while read -r id; do
+                      [ -z "$id" ] && continue
                       curl -sf -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
                         -H "Accept: application/vnd.github+json" \
                         "https://api.github.com/users/${owner}/packages/container/${pkg}/versions/${id}"
-                    done
+                    done < /tmp/del_ids.txt
                   done
               env:
                 - name: GITHUB_TOKEN
