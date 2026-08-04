@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server/
+    chart: metrics-server
+    targetRevision: 3.13.1
+    helm:
+      releaseName: metrics-server
+      valuesObject:
+        args:
+          # kubeadm does NOT enable serverTLSBootstrap on this cluster
+          # (kubelet-config has only `rotateCertificates: true`, which covers
+          # kubelet *client* certs, and `kubectl get csr` is empty — no kubelet
+          # serving CSRs were ever issued). Kubelet therefore presents a
+          # self-signed serving cert that the cluster CA can't verify, and
+          # metrics-server fails every scrape with an x509 error without this.
+          # The alternative — turning on serverTLSBootstrap — is a kubeadm
+          # static-pod/kubelet-config change on all 6 nodes that isn't tracked
+          # in this repo, so it is deliberately not the path taken here.
+          - --kubelet-insecure-tls
+        # 2 replicas so kured's node reboots don't blank out `kubectl top` and
+        # the Metrics API. Anti-affinity is `required` rather than `preferred`:
+        # with 6 nodes there is no scheduling pressure, and co-scheduling both
+        # replicas would silently defeat the point of the second one.
+        replicas: 2
+        podDisruptionBudget:
+          enabled: true
+          maxUnavailable: 1
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: metrics-server
+                topologyKey: kubernetes.io/hostname
+        # Chart-default requests, and deliberately NO limits. metrics-server is
+        # a bursty scrape-loop workload of exactly the shape that produced a
+        # permanently-firing CPUThrottlingHigh on mongodb's exporter sidecar
+        # (see UPDATES.md 2026-08-04) — a low CPU limit throttles the burst
+        # while average utilisation sits near zero. This is also the chart's
+        # own default posture.
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        metrics:
+          enabled: true
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            release: kube-prometheus-stack
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -62,6 +62,7 @@ k8s-apps/
     ├── kured/
     ├── loki/
     ├── metallb/
+    ├── metrics-server/             # Metrics API — kubectl top, HPA (added 2026-08-04)
     ├── minio/                      # MinIO object storage
     ├── mongodb/                    # MongoDB replicaset
     ├── mongo-express/              # MongoDB UI
@@ -229,7 +230,7 @@ spec:
 - Wave 0: MetalLB, Ceph CSI
 - Wave 1: Cilium, cert-manager, ingress-nginx
 - Wave 2: MetalLB config, cert-manager config
-- Wave 3: Reflector, Reloader, Kured, Descheduler, KEDA, Argo Rollouts, NetworkPolicies
+- Wave 3: Reflector, Reloader, Kured, Descheduler, metrics-server, KEDA, Argo Rollouts, NetworkPolicies
 - Wave 4: Authentik, Monitoring, Tempo, Velero
 - Wave 5: Loki, Promtail, Headlamp, Goldilocks, Redis, MongoDB, MinIO, Kong
 - Wave 6: ESO, Infisical, Redis-Insight, Mongo-Express

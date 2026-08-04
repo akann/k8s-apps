@@ -32,6 +32,7 @@ resources:
   - infrastructure/reloader/argocd-app-reloader.yaml
   - infrastructure/kured/argocd-app-kured.yaml
   - infrastructure/descheduler/argocd-app-descheduler.yaml
+  - infrastructure/metrics-server/argocd-app-metrics-server.yaml
   - infrastructure/keda/argocd-app-keda.yaml
   - infrastructure/argo-rollouts/argocd-app-argo-rollouts.yaml
   - infrastructure/network-policies/argocd-app-network-policies.yaml
