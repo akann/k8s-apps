@@ -32,6 +32,14 @@ The two brand-new policies are an instance of Network Policies rule 7 in reverse
 
 **Separately noted, not addressed here:** `metrics-server` is not installed in any namespace, so `kubectl top` and the Metrics API return `Metrics API not available` cluster-wide. Goldilocks is deployed and normally depends on it. Not part of the 9 down targets; left as a follow-up.
 
+**What the restored visibility then exposed:** with `kube-state-metrics` scrapeable again for the first time, three `KubeJobFailed` alerts and a `KubePodNotReady`/`KubeContainerWaiting` pair went pending — none of them new problems, just newly *visible* ones. The three failed Jobs are long-dead one-offs whose successors all succeed: `kube-system/descheduler-29697840` (46d, CronJob-owned, recent runs all Complete — **deleted**, it was a retained `failedJobsHistory` entry with no pods left), `minio/minio-post-job` (19d) and `monitoring/kube-prometheus-stack-crds-upgrade` (36d). The latter two are **deliberately left in place**: both carry an `argocd.argoproj.io/tracking-id` and are Helm hooks, so deleting them flips their Application `OutOfSync` and invites selfHeal to recreate a Job that may just fail again — the alert is cosmetic, a delete would be the riskier move. The actions-runner pod was `runners-k8s-apps-...-listener` cycling normally on this very push (ARC ephemeral runners).
+
+### MongoDB exporter sidecar — CPUThrottlingHigh was a quota artifact, not CPU starvation
+
+Firing on both `mongodb-0` and `mongodb-1` for the `metrics` (mongodb_exporter) container. Measured before changing anything: **~3.7 millicores average, ~4.4m peak over 6h — about 2.5% of its 150m limit — while 33-37% of CFS periods were throttled.** That gap is the low-limit + bursty-workload artifact, not a starved container: the exporter does all its work in a short burst per scrape and exhausts its tiny per-100ms quota slice inside that burst.
+
+Raised the CPU limit 150m → 500m in `infrastructure/mongodb/argocd-app-mongodb.yaml` (`metrics.resources`), which widens the per-period slice; the request drops 100m → 25m since limits aren't reservations and 100m was over-reserving ~27x measured usage. Memory (128Mi/192Mi, peak working set ~52MiB/24h) and ephemeral-storage are restated **unchanged** — `resourcesPreset: "none"` is required for an explicit `resources` block to win over the chart's `nano` preset, and it drops *every* preset-supplied value, not just the cpu ones, so anything not restated would silently disappear. Applying this rolls the MongoDB StatefulSet (replica set failover, arbiter present).
+
 ## 2026-08-02
 
 ### Sentry disabled everywhere except yana-stocks (free-tier quota conservation)

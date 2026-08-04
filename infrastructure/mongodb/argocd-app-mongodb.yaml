@@ -50,6 +50,30 @@ spec:
             namespace: monitoring
             labels:
               release: kube-prometheus-stack
+          # CPUThrottlingHigh fired continuously on this sidecar under the
+          # chart's default "nano" preset (100m/150m). It is not CPU-starved:
+          # measured usage is ~3.7m average, ~4.4m peak over 6h — about 2.5% of
+          # the limit — while 33-37% of CFS periods were throttled. That gap is
+          # the known low-limit + bursty-workload artifact: the exporter does
+          # all its work in a short burst each scrape and exhausts its tiny
+          # per-100ms quota slice inside that burst. A bigger limit just widens
+          # the slice; limits aren't reservations, so the request stays low and
+          # nothing is actually reserved. resourcesPreset must be "none" or the
+          # preset wins over the explicit resources block.
+          resourcesPreset: "none"
+          # Memory/ephemeral-storage are carried over from the nano preset
+          # unchanged (peak working set is ~52MiB/24h against the 192Mi limit,
+          # so only the CPU side needed touching); they are restated explicitly
+          # because "none" drops every preset-supplied value, not just cpu.
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+              ephemeral-storage: 50Mi
+            limits:
+              cpu: 500m
+              memory: 192Mi
+              ephemeral-storage: 2Gi
         resources:
           requests:
             cpu: 200m
