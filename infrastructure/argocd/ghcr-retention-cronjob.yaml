@@ -5,6 +5,15 @@
 # forever. Root cause of the 2026-08-04 worker disk-pressure incident
 # (dove-house-tt-migrate alone: 36 tags/12.74GB on one node) — see UPDATES.md.
 #
+# Package list is DISCOVERED live, not hardcoded. The first version of this
+# job hardcoded 3 packages and missed `yanatech` entirely — it also pushes
+# to GHCR, and nothing here ever documented that, so it was invisible until
+# checked directly against GitHub. A hardcoded list silently drifts out of
+# sync the next time any repo in this workspace starts publishing to GHCR;
+# discovery means that can't recur. Not paginated (a personal account
+# reaching >100 container packages would itself be unusual) — this is a
+# known scope limit, not an oversight.
+#
 # Two-factor retention, deliberately more conservative than Harbor's plain
 # "keep newest 10": a version is deleted only if it is BOTH outside the 10
 # most-recently-pushed AND older than 14 days. The recency floor exists
@@ -57,7 +66,11 @@ spec:
                   apk add --no-cache curl jq >/dev/null
 
                   owner="akann"
-                  packages="dove-house-tt dove-house-tt-migrate akan"
+                  packages=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+                    -H "Accept: application/vnd.github+json" \
+                    "https://api.github.com/users/${owner}/packages?package_type=container&per_page=100" \
+                    | jq -r '.[].name')
+                  echo "discovered packages: $(echo "$packages" | tr '\n' ' ')"
                   keep_recent=10
                   keep_days=14
                   cutoff=$(( $(date +%s) - keep_days*86400 ))

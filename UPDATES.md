@@ -35,6 +35,60 @@ manually via GitHub's UI and added to Infisical as
 `/argocd/GITHUB_GHCR_RETENTION_TOKEN`; the CronJob will fail auth until that
 secret exists.
 
+**Follow-up, same day — token added, two real bugs found and fixed doing the
+end-to-end verification:**
+
+1. **Fine-grained PATs don't have a `Packages` permission at all.** Checked
+   both the Repository- and Account-permission lists in GitHub's fine-grained
+   token UI directly (scrolled the full alphabetical list of each, not just
+   searched) — genuinely absent from both, not a UI quirk. Classic PAT with
+   `read:packages` + `delete:packages` used instead. Trade-off: unlike
+   fine-grained, a classic token's scope can't be limited to just
+   `dove-house-tt`/`akan` — it applies to all of the account's packages.
+   Accepted as reasonable for a personal account with 3 packages total.
+2. **The CronJob only ever looked at page 1.** A first manual test run (37
+   deletions on `dove-house-tt-migrate`) succeeded but looked suspiciously
+   like it was leaving most of the junk untouched. Checked directly against
+   GitHub: `dove-house-tt` had 518 versions, `dove-house-tt-migrate` 221,
+   `akan` 202 — the job's `per_page=100` with no pagination meant it had
+   never seen anything past the newest ~100 pushes on any package, since the
+   day it was written. Fixed with a real pagination loop (capped at 50 pages
+   as a backstop, not an expected ceiling) — see `[[ghcr-retention-cronjob]]`
+   commit for detail. Hit a second bug fixing the first: passing the growing
+   version array through `jq --argjson` blew past the shell's ARG_MAX
+   (`Argument list too long`) once it exceeded page 1 — the exact bug class
+   `ml`'s k8s-docs ingest workflow already hit and documented above
+   (2026-07-16). Same fix: route the array through a file instead of argv.
+
+**Verified before trusting a live mass-delete:** confirmed GitHub returns
+each page strictly newest-first and that ordering survives concatenation
+across pages (page N's oldest entry is always newer than page N+1's newest
+— checked directly, not assumed); extracted the literal script from the
+committed manifest via YAML parsing (not copy-paste, so no risk of testing a
+diverged copy) and ran it with the DELETE calls stubbed to `echo`, getting
+392/158/98 — proportional, no red flags like near-100% or near-0% deletion.
+Then ran it for real from the actual cluster-synced CronJob (not a scratch
+copy). All 648 deletes succeeded (a single `curl -sf` failure under `set -e`
+would have aborted the whole job). Re-queried GitHub fresh afterward:
+`dove-house-tt` 518→126, `dove-house-tt-migrate` 221→63, `akan` 202→104 —
+each landed exactly on the precomputed "would keep" number.
+
+**Follow-up, same day — a fourth package was missing.** Asked directly why
+only `akan`/`dove-house-tt` were covered, which surfaced that the job's
+`packages="dove-house-tt dove-house-tt-migrate akan"` list was hardcoded and
+had simply never included `yanatech` — it also publishes to GHCR
+(`ghcr.io/akann/yanatech`), and nothing in this repo's docs ever stated
+that, so it was invisible until checked directly against GitHub's API
+(`GET /users/akann/packages?package_type=container` — 4 packages, not 3).
+Fixed the actual design flaw, not just the missing entry: the package list
+is now **discovered live** via that same endpoint every run, so this can't
+silently drift out of sync again the next time a repo starts publishing to
+GHCR. Verified with the same dry-run-then-real-run discipline as above:
+discovery correctly found all 4 packages, `akan`/`dove-house-tt`/
+`dove-house-tt-migrate` correctly showed 0 further deletions (consistent
+with having just been cleaned), `yanatech` showed 43 versions with 33
+flagged for deletion (its first-ever cleanup) — ran for real, succeeded.
+
 ## 2026-08-04
 
 ### 9 Prometheus scrape targets had been down for their entire history — NetworkPolicy ingress gaps, not broken components
