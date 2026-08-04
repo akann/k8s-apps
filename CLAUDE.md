@@ -307,6 +307,33 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 
 `webhook.github.secret` in `argocd-secret` is manually managed (no ExternalSecret — same as `dex.authentik.clientSecret`, matching this secret's established convention); `argocd-server` needs a rollout restart after changing it. All 7 repos (`k8s-apps`, `yana-stocks`, `shared-services`, `ml`, `dove-house-tt`, `akan`, `yanatech`) have the webhook registered, pointing at `https://argocd-webhook.yanatech.co.uk/api/webhook`, `content_type: json`, `events: [push]`. Verified via GitHub's own delivery log (`gh api repos/akann/<repo>/hooks/<id>/deliveries`), not just a generic external HTTP check — a plain `WebFetch` GET to the same URL returned a misleading `403` (almost certainly Cloudflare bot-protection reacting to a non-browser User-Agent on a POST-only endpoint), which would have been a false negative if trusted; GitHub's actual ping deliveries all came back `200`. A real push (the commit documenting this section) synced `bootstrap` in **8 seconds**.
 
+**GHCR image tag retention** (added 2026-08-04, same `argocd` namespace,
+`infrastructure/argocd/ghcr-retention-cronjob.yaml` + `external-secret-ghcr-retention.yaml`,
+both explicitly listed in the root `kustomization.yaml` — same pattern as the
+webhook files above): GHCR has no equivalent of Harbor's automated tag
+retention. `akan`/`dove-house-tt`/`dove-house-tt-migrate` are tagged by commit
+SHA on every CI push and nothing ever removed old tags, so every node that
+ever pulled a given SHA kept it forever — root cause of a 2026-08-04 worker
+disk-pressure incident (`dove-house-tt-migrate` alone: 36 tags/12.74GB on one
+node; see `UPDATES.md`). Weekly CronJob (`ghcr-enforce-retention-policy`,
+Sundays 03:30 UTC — same cadence as Harbor's retention sweep), same
+alpine+curl+jq idiom as `argocd-webhook-delivery-check` above, reusing the
+same `allow-argocd-egress` NetworkPolicy (no netpol change needed — port 443
+to GitHub's API was already open). **Two-factor retention, deliberately more
+conservative than Harbor's plain "keep newest 10":** a version is deleted only
+if it is BOTH outside the 10 most-recently-pushed AND older than 14 days.
+The recency floor exists because `dove-house-tt-stg` can go quiet between
+deploys — a pure rank-based cutoff can't distinguish "still the live deployed
+image on a low-traffic environment" from "superseded"; the 14-day floor
+protects it regardless of how many other packages/branches pushed in the
+meantime. Needs its own new fine-grained GitHub PAT — **not** a reuse of
+`GITHUB_WEBHOOK_MONITOR_TOKEN` or `GITHUB_RUNNERS_PAT`, same
+narrowly-scoped-per-purpose convention as those — `Packages: Read and write`
+permission, scoped to the `dove-house-tt` and `akan` repos, created manually
+via GitHub's UI (token creation isn't API-exposed) and added to Infisical as
+`/argocd/GITHUB_GHCR_RETENTION_TOKEN`; the CronJob will fail auth until that's
+done.
+
 **Alerting on webhook delivery failure** (added 2026-07-18): `argocd-webhook-delivery-check` CronJob (`infrastructure/argocd/webhook-delivery-check-cronjob.yaml`, every 15min) polls each repo's delivery log via GitHub's API and pushes an alert straight to Alertmanager's API (`POST /api/v2/alerts`, bypasses Prometheus scraping entirely — nothing here exports a metric) if a recent delivery failed, or the webhook itself is missing. Flows through the existing default `gotify` Alertmanager receiver for a push notification. Needs `github-webhook-monitor-token` (ExternalSecret pulling `/argocd/GITHUB_WEBHOOK_MONITOR_TOKEN` from Infisical) — **a fine-grained GitHub PAT scoped to exactly these 7 repos, "Webhooks: Read-only" permission, nothing else** — this must be created manually via GitHub's UI (token creation isn't API-exposed) and added to Infisical; the CronJob will show `SecretSyncedError`/auth failures until that's done. Cross-namespace reach to Alertmanager needed the same Cilium fix as every other case in this doc (`ciliumnetpol-argocd-to-alertmanager.yaml` + an `argocd` namespace entry in `netpol-monitoring.yaml`'s `allow-alertmanager-ingress`) — mirrors `ciliumnetpol-ops-agent-to-alertmanager.yaml` exactly.
 
 **Gotcha found while adding this:** `infrastructure/cilium/kustomization.yaml` — like `infrastructure/harbor/` and `infrastructure/monitoring/` — is a strict resource whitelist; the `cilium-policies` Application only applies files explicitly listed there, not everything in the directory. Three pre-existing files (`ciliumnetpol-ops-agent-to-alertmanager.yaml`, `-to-prometheus.yaml`, `-to-minio.yaml`) were committed but never added to this list, so ops-agent's observability and minio subagents had **no actual network path this whole time** despite being documented as working in `ml`'s CLAUDE.md — confirmed live (`kubectl get ciliumnetworkpolicy -n ops-agent` was missing all three). Fixed in the same commit as the new `argocd-to-alertmanager` policy. **When adding any new file to `infrastructure/cilium/` or `infrastructure/harbor/` or `infrastructure/monitoring/` (or any directory with its own `kustomization.yaml`), it must be added to that local `kustomization.yaml` too — the file existing in git is not sufficient.**

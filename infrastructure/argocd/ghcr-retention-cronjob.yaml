@@ -1,0 +1,78 @@
+# GHCR has no equivalent of Harbor's automated tag retention (see
+# infrastructure/harbor/retention-policy-cronjob.yaml). akan/dove-house-tt/
+# dove-house-tt-migrate are tagged by commit SHA on every CI push and nothing
+# ever removes old tags, so every node that ever pulled a given SHA keeps it
+# forever. Root cause of the 2026-08-04 worker disk-pressure incident
+# (dove-house-tt-migrate alone: 36 tags/12.74GB on one node) — see UPDATES.md.
+#
+# Two-factor retention, deliberately more conservative than Harbor's plain
+# "keep newest 10": a version is deleted only if it is BOTH outside the 10
+# most-recently-pushed AND older than 14 days. The recency floor exists
+# because dove-house-tt-stg can go quiet for a while between deploys — a
+# pure rank-based cutoff could delete a tag that's still the live deployed
+# image on a low-traffic environment, which "newest 10" alone cannot
+# distinguish from "superseded". Sized generously given this workspace's
+# push cadence (yana-stocks/k8s-apps push multiple times most days).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ghcr-enforce-retention-policy
+  namespace: argocd
+spec:
+  schedule: "30 3 * * 0" # weekly, Sunday — same cadence as Harbor's retention sweep
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          containers:
+            - name: enforce-retention-policy
+              image: alpine:3.20
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  apk add --no-cache curl jq >/dev/null
+
+                  owner="akann"
+                  packages="dove-house-tt dove-house-tt-migrate akan"
+                  keep_recent=10
+                  keep_days=14
+                  cutoff=$(( $(date +%s) - keep_days*86400 ))
+
+                  for pkg in $packages; do
+                    versions=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+                      -H "Accept: application/vnd.github+json" \
+                      "https://api.github.com/users/${owner}/packages/container/${pkg}/versions?per_page=100&state=active")
+
+                    total=$(echo "$versions" | jq 'length')
+                    echo "package ${pkg}: ${total} versions"
+
+                    # GitHub returns newest-first; drop the first keep_recent by
+                    # position, then only delete what's also older than cutoff.
+                    del_ids=$(echo "$versions" | jq -r --argjson keep "$keep_recent" --argjson cutoff "$cutoff" '
+                      to_entries
+                      | map(select(.key >= $keep))
+                      | map(select((.value.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) < $cutoff))
+                      | .[].value.id')
+
+                    count=$(echo "$del_ids" | grep -c . || true)
+                    echo "package ${pkg}: deleting ${count} version(s) (outside newest ${keep_recent}, older than ${keep_days}d)"
+
+                    for id in $del_ids; do
+                      curl -sf -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github+json" \
+                        "https://api.github.com/users/${owner}/packages/container/${pkg}/versions/${id}"
+                    done
+                  done
+              env:
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: github-ghcr-retention-token
+                      key: token

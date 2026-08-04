@@ -19,6 +19,22 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 2. Lowering kubelet's image-GC thresholds (default high/low watermark is 85%/80%, so this alert fired just *below* where kubelet's own automatic GC would have started reclaiming on its own) — a kubelet-config + static-pod change across all 3 workers, not tracked in this repo, same category as the scheduler/controller-manager/etcd metrics-bind-address changes noted above.
 3. Do nothing further and re-run the manual prune next time this alerts.
 
+**Follow-up, same day:** option 1 was chosen. Added
+`infrastructure/argocd/ghcr-retention-cronjob.yaml` +
+`external-secret-ghcr-retention.yaml` — see `CLAUDE.md`'s GHCR image tag
+retention entry for the full design (two-factor retention: outside the 10
+most-recent AND older than 14 days, to protect a low-traffic environment like
+`dove-house-tt-stg` from a pure rank-based cutoff). Verified the retention jq
+logic against two synthetic scenarios before trusting it against real data: 15
+versions spread over 42 days correctly kept the newest 10 and deleted the 5
+past both cutoffs; a 12-version rapid-push burst (all within 2 days) correctly
+deleted nothing, since the 2 outside the top-10 were still under the 14-day
+floor. **Not yet functional** — needs a new fine-grained GitHub PAT
+(`Packages: Read and write`, scoped to `dove-house-tt`+`akan`) created
+manually via GitHub's UI and added to Infisical as
+`/argocd/GITHUB_GHCR_RETENTION_TOKEN`; the CronJob will fail auth until that
+secret exists.
+
 ## 2026-08-04
 
 ### 9 Prometheus scrape targets had been down for their entire history — NetworkPolicy ingress gaps, not broken components
