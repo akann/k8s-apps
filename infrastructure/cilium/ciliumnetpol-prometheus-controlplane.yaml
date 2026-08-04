@@ -16,3 +16,5 @@ spec:
               protocol: TCP
             - port: "10259" # kube-scheduler metrics
               protocol: TCP
+            - port: "2381" # etcd metrics
+              protocol: TCP
