@@ -4,6 +4,34 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-04
+
+### 9 Prometheus scrape targets had been down for their entire history — NetworkPolicy ingress gaps, not broken components
+
+**Context:** an `ops-agent` health check reported `Observability — DEGRADED`: 9 unreachable scrape targets and 7 `TargetDown` alerts firing. Every one of them had `avg_over_time(up[7d]) == 0` — these were never intermittent, they had simply never scraped successfully since the policies that block them were written. Two `TargetDown` fixes had already landed earlier the same day (`ce520df`, `1a4b4cf`, for scheduler/controller-manager/etcd); this is the rest of the set.
+
+**Diagnosis:** every failure surfaced identically as `context deadline exceeded`, which is what a silent Cilium drop looks like to a scraper — misleadingly like a slow or hung endpoint. A live `hubble observe` on `k8s-worker-1` (Prometheus's node) gave the actual verdict: `policy-verdict:none INGRESS DENIED → DROPPED (TCP Flags: SYN)`. The drop is at the **destination** pod, not on Prometheus's egress — `allow-prometheus-egress` is already unrestricted, so `monitoring`'s `default-deny-all` catching the inbound side was the whole story. No component was actually unhealthy.
+
+**Change — 6 in-cluster targets** (`infrastructure/network-policies/netpol-monitoring.yaml`, `netpol-argocd.yaml`):
+
+| Target | Port | Gap |
+|---|---|---|
+| kube-state-metrics | 8080 | no policy selected the pod at all → new `allow-kube-state-metrics-ingress` |
+| prometheus-operator | 10250 | no policy selected the pod at all → new `allow-prometheus-operator-ingress` |
+| grafana | 3000 | `allow-grafana-ingress` permitted only `ingress-nginx` |
+| tempo | 3200 | `allow-tempo-ingress` permitted only `app.kubernetes.io/name=grafana` |
+| alertmanager | 8080 | `allow-alertmanager-ingress` permitted only 9093 (the config-reloader's `/metrics` is a *second*, separate target — its 9093 target was up the whole time, which is why this looked half-working) |
+| argocd-application-controller | 8082 | `argocd`'s `allow-argocd-internal` permits only the `argocd` namespace → new `allow-monitoring-argocd-metrics` |
+
+The two brand-new policies are an instance of Network Policies rule 7 in reverse: `default-deny-all` had already flipped these pods to deny-by-default, and nothing was ever written to allow the scrape back in.
+
+**Change — 3 Ceph MGR exporters** (`192.168.22.11-13:9283`, `infrastructure/cilium/ciliumnetpol-pve-scrape.yaml`): `allow-prometheus-to-pve-exporters` listed only ports 9100 and 9221; 9283 was never added. **Two independent blocks, both required** — the Cilium fix alone is not sufficient:
+
+1. *(fixed here)* the CNP now includes 9283.
+2. *(NOT fixed here — needs a manual pfSense change)* APP_VLAN(33) → PMX_VLAN(22) doesn't permit 9283. From `k8s-cp-1` (192.168.33.21), ports 9100/9221/8006 to all three PVE nodes are OPEN while 9283 is FILTERED. `pve-firewall` is **not** the blocker: `/etc/pve/nodes/pve1/host.fw` and the live `PVEFW-HOST-IN` chain both already accept `192.168.33.0/24 → 9283`. Almost certainly a gap left by the 2026-07-14 segmentation hardening. The exporter itself is healthy — `ceph mgr module ls` shows `prometheus on`, `ceph-mgr` listens on `*:9283`, and `curl localhost:9283/metrics` returns 200 on pve1.
+
+**Separately noted, not addressed here:** `metrics-server` is not installed in any namespace, so `kubectl top` and the Metrics API return `Metrics API not available` cluster-wide. Goldilocks is deployed and normally depends on it. Not part of the 9 down targets; left as a follow-up.
+
 ## 2026-08-02
 
 ### Sentry disabled everywhere except yana-stocks (free-tier quota conservation)

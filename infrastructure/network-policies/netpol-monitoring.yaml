@@ -12,7 +12,7 @@ spec:
     - Ingress
     - Egress
 ---
-# Grafana — ingress from nginx
+# Grafana — ingress from nginx + Prometheus scrape
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -31,6 +31,12 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - port: 3000
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 3000 # /metrics — same port as the UI
 ---
 # Prometheus — scrapes cluster-wide; needs egress to all namespaces
 apiVersion: networking.k8s.io/v1
@@ -209,6 +215,12 @@ spec:
               app.kubernetes.io/name: grafana
       ports:
         - port: 3200 # Tempo query
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 3200 # /metrics — same port as the query API
 ---
 # Promtail egress — ships logs to Loki
 apiVersion: networking.k8s.io/v1
@@ -256,6 +268,7 @@ spec:
               app.kubernetes.io/name: prometheus
       ports:
         - port: 9093
+        - port: 8080 # config-reloader /metrics — a second scrape target
     - from:
         - namespaceSelector:
             matchLabels:
@@ -274,3 +287,45 @@ spec:
               kubernetes.io/metadata.name: argocd
       ports:
         - port: 9093
+---
+# kube-state-metrics — scrape only. No policy selected this pod before, so
+# default-deny-all silently dropped every scrape (Hubble: INGRESS DENIED).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-state-metrics-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 8080
+---
+# prometheus-operator — scrape only (HTTPS self-metrics on 10250). Same
+# default-deny-all gap as kube-state-metrics above.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-operator-ingress
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-prometheus-stack-prometheus-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - port: 10250

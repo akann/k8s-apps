@@ -16,3 +16,8 @@ spec:
               protocol: TCP
             - port: "9221"
               protocol: TCP
+            # Ceph MGR Prometheus exporter. pve-firewall's host.fw already
+            # accepts 192.168.33.0/24 → 9283; pfSense APP_VLAN→PMX_VLAN must
+            # allow it too or this stays timed out.
+            - port: "9283"
+              protocol: TCP

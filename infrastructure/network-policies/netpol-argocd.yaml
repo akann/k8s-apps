@@ -41,6 +41,28 @@ spec:
       ports:
         - port: 8080
 ---
+# Allow monitoring → argocd-application-controller metrics (port 8082).
+# allow-argocd-internal only permits the argocd namespace itself, so this
+# scrape was dropped by default-deny for the life of the policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-argocd-metrics
+  namespace: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-application-controller
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8082
+---
 # Allow egress to kube-apiserver, git/helm repos, and DNS
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
