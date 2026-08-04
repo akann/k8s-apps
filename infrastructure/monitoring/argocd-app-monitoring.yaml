@@ -131,6 +131,44 @@ spec:
               - hosts:
                   - grafana.yanatech.co.uk
                 secretName: wildcard-yanatech-tls
+        kubelet:
+          serviceMonitor:
+            # Full copy of the chart's default cAdvisorMetricRelabelings (kube-prometheus-stack
+            # 87.3.0) plus one addition at the bottom. Helm values lists replace rather than
+            # merge, so this has to be the complete list, not just the new rule — see the
+            # retentionSize comment above for why this exists.
+            cAdvisorMetricRelabelings:
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)'
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)'
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_memory_(mapped_file|swap)'
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_(file_descriptors|tasks_state|threads_max)'
+              - sourceLabels: [__name__, scope]
+                action: drop
+                regex: 'container_memory_failures_total;hierarchy'
+              - sourceLabels: [__name__, interface]
+                action: drop
+                regex: 'container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*'
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_spec.*'
+              - sourceLabels: [id, pod]
+                action: drop
+                regex: '.+;'
+              # Addition: container_memory_failures_total was the single biggest
+              # cardinality offender found during the 2026-08-01 incident investigation
+              # (~111k series, ~2x every other cAdvisor metric — the chart default above
+              # only drops its scope="hierarchy" half). Rarely queried, rarely alerted on.
+              - sourceLabels: [__name__]
+                action: drop
+                regex: 'container_memory_failures_total'
         prometheus:
           prometheusSpec:
             serviceMonitorSelector:
@@ -171,6 +209,17 @@ spec:
                 relabel_configs:
                   - source_labels: [__address__]
                     target_label: instance
+            # Hard backstop against the 2026-08-01 incident: the 20Gi PVC filled
+            # completely from cardinality growth (cAdvisor container_* metrics,
+            # ~55k distinct cgroup ids from ephemeral CI runner pods + KEDA
+            # scale-to-zero churn), and every WAL write failed silently for 3+
+            # days ("no space left on device") until manually caught — every
+            # dashboard/alert was blind that whole time. retentionSize below
+            # 50Gi means Prometheus proactively deletes its oldest blocks well
+            # before the disk actually fills, so a future cardinality spike
+            # degrades gracefully (shorter retention) instead of hard-failing
+            # every write with no warning.
+            retentionSize: 45GB
             storageSpec:
               volumeClaimTemplate:
                 spec:
