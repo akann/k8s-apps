@@ -17,6 +17,16 @@ spec:
         crds:
           upgradeJob:
             enabled: false
+        defaultRules:
+          disabled:
+            # Cilium runs in full kube-proxy-replacement mode (see cilium-config
+            # ConfigMap) — there is no kube-proxy DaemonSet on this cluster, ever,
+            # so this alert is structurally unfixable and has fired continuously
+            # since 2026-07-31. Confirmed via Alertmanager: KubeAPIDown/
+            # KubeControllerManagerDown/KubeSchedulerDown are a separate, real
+            # issue (control-plane components bind their metrics ports to
+            # 127.0.0.1 — see the accompanying bind-address fix), not disabled here.
+            KubeProxyDown: true
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret

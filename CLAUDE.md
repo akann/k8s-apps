@@ -456,6 +456,7 @@ curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/system/gc/sc
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-prometheus.yaml` — ops-agent's observability subagent → Prometheus (port 9090)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-alertmanager.yaml` — ops-agent's observability subagent → Alertmanager (port 9093)
 - `infrastructure/cilium/ciliumnetpol-ops-agent-to-minio.yaml` — ops-agent's minio subagent → MinIO S3 API health endpoints (port 9000)
+- `infrastructure/cilium/ciliumnetpol-prometheus-controlplane.yaml` — Prometheus → kube-scheduler/kube-controller-manager metrics (toCIDR 192.168.33.0/24, ports 10257/10259). Paired with a live `--bind-address=0.0.0.0` change on those two static pods on all 3 control-plane nodes (not tracked in git — kubeadm-generated manifests aren't in this repo) to fix `KubeControllerManagerDown`/`KubeSchedulerDown`, which had fired continuously since 2026-08-01 despite both components being healthy — Prometheus simply couldn't reach their `127.0.0.1`-bound metrics ports. `KubeProxyDown` is a separate, permanent false positive (disabled via `defaultRules.disabled` in `argocd-app-monitoring.yaml` instead) since this cluster runs Cilium kube-proxy-replacement and has no kube-proxy DaemonSet at all. etcd's metrics port (`2381`) has the same `127.0.0.1`-only binding and is equally unreachable, but was deliberately left as-is given etcd's higher blast radius if a manifest edit goes wrong — a known follow-up gap, not an oversight.
 
 ### Adding a new namespace
 
