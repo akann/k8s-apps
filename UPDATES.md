@@ -4,6 +4,21 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-04 (later)
+
+### Worker node disk pressure — unbounded GHCR image tag accumulation (immediate fix only, root cause open)
+
+**Alert:** `k8s-worker-1` (192.168.33.31) at 83% disk (18G free of 96G). Checking the other 2 workers showed this was fleet-wide, not isolated: worker-2 at 71%, worker-3 at 74% — worker-1 was just the one that crossed first.
+
+**Root cause:** `du` showed 71G of worker-1's 79G in `/var/lib/containerd`. Grouping `crictl images` by repository named it precisely: `ghcr.io/akann/dove-house-tt-migrate` (36 tags, 12.74GB) and `ghcr.io/akann/dove-house-tt` (36 tags, 2.83GB) — every `yana-stocks` image on Harbor showed only 1-2 tags each, because Harbor has the automated retention/GC CronJobs documented above (2026-07-26). GHCR — used by `dove-house-tt` and `akan`, both tagged by commit SHA every CI push — has **no equivalent**, so every historical tag any node ever pulled just accumulates on that node's disk forever.
+
+**Immediate fix:** `crictl rmi --prune` on all 3 workers (removes only images with zero current container references — safe, and anything pruned just re-pulls on next use). First pass with the default 2s per-image gRPC timeout logged `DeadlineExceeded` on most removals and looked like it did nothing — misleading: `df` was racing ahead of containerd's async snapshotter cleanup, not a failed prune. A `-t 60s` second pass confirmed zero remaining prunable images and the real numbers: worker-1 79G→55G (83%→58%, 18G→41G free), worker-2 68G→57G, worker-3 71G→58G. Image count on worker-1 dropped 203→66.
+
+**Not fixed — needs a decision:** nothing prevents this from re-accumulating. Options considered but not built without checking in first, since either needs new automation and/or a new credential (same class of decision as the `argocd-webhook-delivery-check` GitHub PAT, 2026-07-18):
+1. A GHCR-side retention CronJob mirroring Harbor's `harbor-enforce-retention-policy` pattern — needs a new fine-grained GitHub PAT (`packages:delete` on the `dove-house-tt`/`akan` packages) created manually via GitHub's UI, same as every prior narrowly-scoped PAT in this repo.
+2. Lowering kubelet's image-GC thresholds (default high/low watermark is 85%/80%, so this alert fired just *below* where kubelet's own automatic GC would have started reclaiming on its own) — a kubelet-config + static-pod change across all 3 workers, not tracked in this repo, same category as the scheduler/controller-manager/etcd metrics-bind-address changes noted above.
+3. Do nothing further and re-run the manual prune next time this alerts.
+
 ## 2026-08-04
 
 ### 9 Prometheus scrape targets had been down for their entire history — NetworkPolicy ingress gaps, not broken components
