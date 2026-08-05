@@ -264,6 +264,10 @@ spec:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 8080 # Alertmanager -> alertmanager-uptime-kuma-bridge (POST->GET translator) -> push monitor (dead-man's-switch)
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 3001 # alertmanager-uptime-kuma-bridge -> uptime-kuma itself (same namespace) - nothing else ever needed intra-namespace access before this bridge
   egress:
     - {} # uptime-kuma probes all services — needs wide egress
 ---
