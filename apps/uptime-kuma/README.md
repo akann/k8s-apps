@@ -31,16 +31,16 @@ against the live UI periodically, since drift here is otherwise invisible.
 | Redis | port | redis-master.redis.svc.cluster.local |
 | PostgreSQL (pg-main) | port | pg-main-rw.cnpg-clusters.svc.cluster.local |
 | PostgreSQL (auth-service-pg) | port | auth-service-pg-rw.yana-stocks.svc.cluster.local |
-| **akan personal site** | http | https://akan.nkweini.org |
-| **dovehousett.org** | http | https://dovehousett.org |
-| **stg.dovehousett.org** | http | https://stg.dovehousett.org |
-| **Grafana** | http | https://grafana.yanatech.co.uk |
-| **shared-api-docs** | http | https://shared-api-docs.yanatech.co.uk |
-| **ops-agent (ml)** | http | https://ml.yanatech.co.uk/ops-agent/ |
-| **Lighthouse CI** | http | https://lighthouse.yanatech.co.uk |
+| akan personal site | http | https://akan.nkweini.org |
+| dovehousett.org | http | https://dovehousett.org |
+| stg.dovehousett.org | http | https://stg.dovehousett.org |
+| Grafana | http | https://grafana.yanatech.co.uk |
+| shared-api-docs | http | https://shared-api-docs.yanatech.co.uk (Authentik-gated — monitor checks reachability, not authenticated content) |
+| ops-agent (ml) | http | https://ml.yanatech.co.uk/ops-agent/ (Authentik-gated — same caveat) |
+| Lighthouse CI | http | https://lighthouse.yanatech.co.uk (HTTP Basic Auth configured on the monitor itself, credentials from Infisical `/lighthouse-ci/BASIC_AUTH_*`) |
 
-Bold rows (audited 2026-08-05) confirmed **missing** live — add via the UI.
-Everything else was confirmed present as of the same date.
+All rows confirmed present and reporting `Up` as of 2026-08-05 (the last 7 were
+added that day — previously missing, audited via the live DB).
 
 ## Meta-monitoring push heartbeat
 
