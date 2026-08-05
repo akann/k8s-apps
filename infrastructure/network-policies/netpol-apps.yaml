@@ -118,6 +118,12 @@ spec:
               kubernetes.io/metadata.name: gotify
       ports:
         - port: 80
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ops-agent
+      ports:
+        - port: 80 # ops-agent-health-digest CronJob -> Gotify /message API
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -252,6 +258,12 @@ spec:
               kubernetes.io/metadata.name: authentik
       ports:
         - port: 3001
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 3001 # Alertmanager -> Watchdog heartbeat push monitor (dead-man's-switch)
   egress:
     - {} # uptime-kuma probes all services — needs wide egress
 ---
@@ -1183,3 +1195,9 @@ spec:
           protocol: TCP
     - ports:
         - port: 443  # Anthropic API, and later GitHub/Harbor read-only API calls (release subagent)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gotify
+      ports:
+        - port: 80 # ops-agent-health-digest CronJob -> Gotify /message API

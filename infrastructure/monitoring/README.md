@@ -45,11 +45,38 @@ argocd app sync monitoring --grpc-web
 
 | Receiver | Trigger | Channel |
 |----------|---------|---------|
-| `null` | `Watchdog`, `InfoInhibitor` | discarded |
+| `null` | `InfoInhibitor` | discarded |
+| `uptime-kuma-heartbeat` | `Watchdog` | uptime-kuma push monitor, every 2min (dead-man's-switch, see below) |
 | `gotify` | all other alerts (default) | Gotify push (`alertmanager-gotify-bridge`) |
 | `critical-alerts` | `severity=critical` | Gotify push (`alertmanager-gotify-bridge`) |
 
-All alerts route to Gotify only. Email notifications were removed 2026-06-29.
+All real alerts route to Gotify only. Email notifications were removed 2026-06-29.
+
+### Meta-monitoring — Watchdog → uptime-kuma push (dead-man's-switch)
+
+Prometheus's built-in `Watchdog` rule always fires. It used to be routed to
+`null`, so a dead Prometheus or Alertmanager went completely undetected —
+nothing external was watching the watchers. It's now routed to its own
+`uptime-kuma-heartbeat` receiver with `repeat_interval: 2m`, which pings a
+push-type monitor in uptime-kuma (a separate pod/deployment). If Prometheus
+stops evaluating the rule, or Alertmanager stops routing it, the pings stop
+and uptime-kuma — independently of this stack — flags the monitor down and
+fires its own Gotify notification.
+
+**One-time manual setup required** (uptime-kuma's monitor config lives in its
+own SQLite DB, not git — see `apps/uptime-kuma/README.md`):
+
+1. In uptime-kuma (https://status.yanatech.co.uk), create a new **Push**
+   monitor named e.g. "Prometheus/Alertmanager Heartbeat", heartbeat interval
+   ~2-3min, retries set to flag down after a couple of missed pings. Attach
+   the existing Gotify notification (id 1).
+2. Copy the generated push token from the monitor's URL
+   (`.../api/push/<TOKEN>?status=up&msg=...`).
+3. Replace `<PUSH_TOKEN>` in `argocd-app-monitoring.yaml`'s
+   `uptime-kuma-heartbeat` receiver `url` with the real token and push.
+
+Until step 3 is done, the receiver 404s harmlessly every 2 minutes
+(`send_resolved: false`, so no resolved-notification noise either).
 
 ## Secrets
 

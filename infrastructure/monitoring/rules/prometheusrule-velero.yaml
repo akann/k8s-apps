@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: velero-backup-health
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: velero.backup.health
+      rules:
+        - alert: VeleroBackupFailure
+          expr: increase(velero_backup_failure_total[8d]) > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup {{ $labels.schedule }} failed"
+            description: "At least one Velero backup for schedule {{ $labels.schedule }} failed completely in the last 8 days."
+
+        - alert: VeleroBackupPartialFailure
+          expr: increase(velero_backup_partial_failure_total[8d]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup {{ $labels.schedule }} partially failed"
+            description: "At least one Velero backup for schedule {{ $labels.schedule }} came back PartiallyFailed in the last 8 days. Check `kubectl get backups.velero.io -n velero`."
+
+        - alert: VeleroExporterDown
+          expr: up{job="velero"} == 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero metrics endpoint is down"
+            description: "Prometheus has not been able to scrape Velero's /metrics endpoint for 15 minutes — backups may not be running at all."

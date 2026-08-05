@@ -1,1 +1,51 @@
 # Uptime Kuma
+
+`https://status.yanatech.co.uk` — external uptime monitoring, alerting via the
+Gotify notification configured in its UI (id 1, reused by the meta-monitoring
+push heartbeat too — see `infrastructure/monitoring/README.md`).
+
+## Monitor configuration is not in git
+
+Monitors, notifications, and everything else live in uptime-kuma's own SQLite
+DB (`/app/data/kuma.db` in the pod's PVC), managed entirely through its web
+UI/socket.io API — there is no CRD or declarative config to commit. This list
+is the source of truth for what's *intended* to be monitored; check it
+against the live UI periodically, since drift here is otherwise invisible.
+
+## Intended monitor coverage
+
+| Monitor | Type | Target |
+|---|---|---|
+| yana-stocks frontend | http | https://stocks.yanatech.co.uk |
+| yana-stocks API (market) | http | https://api-gateway.yanatech.co.uk/api/market/movers |
+| Immich | http | https://photos.yanatech.co.uk |
+| Nextcloud | http | https://cloud.yanatech.co.uk |
+| Vaultwarden | http | https://vault.yanatech.co.uk |
+| yanatech.co.uk | http | http://yanatech.yanatech.svc.cluster.local:3000 (in-cluster) |
+| ArgoCD | http | https://argocd.yanatech.co.uk |
+| Harbor | http | https://harbor.yanatech.co.uk |
+| Infisical | http | https://infisical.yanatech.co.uk |
+| Authentik | http | https://authentik.yanatech.co.uk |
+| Kafka | port | kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local |
+| MongoDB | port | mongodb-headless.mongodb.svc.cluster.local |
+| Redis | port | redis-master.redis.svc.cluster.local |
+| PostgreSQL (pg-main) | port | pg-main-rw.cnpg-clusters.svc.cluster.local |
+| PostgreSQL (auth-service-pg) | port | auth-service-pg-rw.yana-stocks.svc.cluster.local |
+| **akan personal site** | http | https://akan.nkweini.org |
+| **dovehousett.org** | http | https://dovehousett.org |
+| **stg.dovehousett.org** | http | https://stg.dovehousett.org |
+| **Grafana** | http | https://grafana.yanatech.co.uk |
+| **shared-api-docs** | http | https://shared-api-docs.yanatech.co.uk |
+| **ops-agent (ml)** | http | https://ml.yanatech.co.uk/ops-agent/ |
+| **Lighthouse CI** | http | https://lighthouse.yanatech.co.uk |
+
+Bold rows (audited 2026-08-05) confirmed **missing** live — add via the UI.
+Everything else was confirmed present as of the same date.
+
+## Meta-monitoring push heartbeat
+
+A dedicated Push-type monitor ("Prometheus/Alertmanager Heartbeat") also
+lives here — it's the receiving end of the Watchdog dead-man's-switch
+described in `infrastructure/monitoring/README.md`, not a normal target
+check. Set up manually per that README; not listed in the table above since
+it isn't checking an external target.

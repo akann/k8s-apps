@@ -4,3 +4,5 @@ resources:
   - prometheusrule-nvme-temperature.yaml
   - prometheusrule-argocd.yaml
   - prometheusrule-yana-stocks-external-apis.yaml
+  - prometheusrule-velero.yaml
+  - prometheusrule-cert-manager.yaml

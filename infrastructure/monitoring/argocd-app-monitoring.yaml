@@ -243,8 +243,20 @@ spec:
               receiver: gotify
               routes:
                 - matchers:
-                    - alertname =~ "Watchdog|InfoInhibitor"
+                    - alertname = "InfoInhibitor"
                   receiver: "null"
+                # Watchdog is Prometheus's built-in always-firing heartbeat rule.
+                # Routed to its own receiver (not null) with a short repeat_interval
+                # so it pings an uptime-kuma push monitor every ~2min — a dead-man's
+                # -switch for Prometheus/Alertmanager itself: if either one dies, the
+                # pings stop and uptime-kuma (a separate pod) flags it down and alerts
+                # independently via its own Gotify notification.
+                - matchers:
+                    - alertname = "Watchdog"
+                  receiver: uptime-kuma-heartbeat
+                  group_wait: 0s
+                  group_interval: 1m
+                  repeat_interval: 2m
                 # MassiveFeedSilent alone is trading-hours-gated — the price
                 # feed is *expected* to go quiet nights/weekends, so without
                 # this it would page every night. Other alerts (e.g.
@@ -280,6 +292,15 @@ spec:
                 webhook_configs:
                   - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook'
                     send_resolved: true
+              # TODO: replace <PUSH_TOKEN> once the uptime-kuma push monitor
+              # ("Prometheus/Alertmanager Heartbeat") is created via its UI —
+              # see infrastructure/monitoring/README.md. Until then this
+              # receiver 404s harmlessly every 2min (send_resolved: false, so
+              # no resolved-notification noise either).
+              - name: uptime-kuma-heartbeat
+                webhook_configs:
+                  - url: 'http://uptime-kuma.uptime-kuma.svc.cluster.local:3001/api/push/<PUSH_TOKEN>?status=up&msg=OK&ping='
+                    send_resolved: false
             inhibit_rules:
               - source_matchers:
                   - severity = critical

@@ -7,3 +7,4 @@ resources:
   - external-secret-nkweini.yaml
   - certificate-dovehousett.yaml
   - external-secret-dovehousett.yaml
+  - service-monitor.yaml

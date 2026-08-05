@@ -30,3 +30,20 @@ velero restore create --from-backup <backup-name>
 - Bucket: yanatech-velero
 - Endpoint: s3.eu-central-003.backblazeb2.com
 - Region: eu-central-003
+
+## Monitoring
+
+`argocd-app-velero.yaml` sources the upstream Helm chart directly (not this
+directory), so files that live here alongside it — `external-secret.yaml`,
+`service-monitor.yaml` — are **not** synced by anything and must be applied
+manually after committing:
+
+```bash
+kubectl apply -f infrastructure/velero/service-monitor.yaml
+```
+
+`service-monitor.yaml` scrapes Velero's own `/metrics` (port 8085, already
+exposed by the chart). `infrastructure/monitoring/rules/prometheusrule-velero.yaml`
+(synced continuously via the monitoring stack's rules child-app) alerts on
+`velero_backup_failure_total`/`velero_backup_partial_failure_total` increases
+and on the exporter itself going down.
