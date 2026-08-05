@@ -63,20 +63,13 @@ stops evaluating the rule, or Alertmanager stops routing it, the pings stop
 and uptime-kuma — independently of this stack — flags the monitor down and
 fires its own Gotify notification.
 
-**One-time manual setup required** (uptime-kuma's monitor config lives in its
-own SQLite DB, not git — see `apps/uptime-kuma/README.md`):
-
-1. In uptime-kuma (https://status.yanatech.co.uk), create a new **Push**
-   monitor named e.g. "Prometheus/Alertmanager Heartbeat", heartbeat interval
-   ~2-3min, retries set to flag down after a couple of missed pings. Attach
-   the existing Gotify notification (id 1).
-2. Copy the generated push token from the monitor's URL
-   (`.../api/push/<TOKEN>?status=up&msg=...`).
-3. Replace `<PUSH_TOKEN>` in `argocd-app-monitoring.yaml`'s
-   `uptime-kuma-heartbeat` receiver `url` with the real token and push.
-
-Until step 3 is done, the receiver 404s harmlessly every 2 minutes
-(`send_resolved: false`, so no resolved-notification noise either).
+**Setup (done 2026-08-05):** a Push monitor "Prometheus/Alertmanager
+Heartbeat" was created in uptime-kuma (heartbeat interval 180s, retries 2,
+Gotify notification id 1 attached), and its push token wired into
+`argocd-app-monitoring.yaml`'s `uptime-kuma-heartbeat` receiver. Monitor
+config lives in uptime-kuma's own SQLite DB, not git — see
+`apps/uptime-kuma/README.md` — so if this monitor is ever deleted/recreated,
+the receiver `url` needs updating with the new token the same way.
 
 ## Secrets
 

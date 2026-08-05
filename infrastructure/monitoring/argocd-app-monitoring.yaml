@@ -292,14 +292,12 @@ spec:
                 webhook_configs:
                   - url: 'http://alertmanager-gotify-bridge.gotify.svc.cluster.local/gotify_webhook'
                     send_resolved: true
-              # TODO: replace <PUSH_TOKEN> once the uptime-kuma push monitor
-              # ("Prometheus/Alertmanager Heartbeat") is created via its UI —
-              # see infrastructure/monitoring/README.md. Until then this
-              # receiver 404s harmlessly every 2min (send_resolved: false, so
-              # no resolved-notification noise either).
+              # Push monitor "Prometheus/Alertmanager Heartbeat" in uptime-kuma
+              # (heartbeat interval 180s, retries 2 — see
+              # infrastructure/monitoring/README.md for the full rationale).
               - name: uptime-kuma-heartbeat
                 webhook_configs:
-                  - url: 'http://uptime-kuma.uptime-kuma.svc.cluster.local:3001/api/push/<PUSH_TOKEN>?status=up&msg=OK&ping='
+                  - url: 'http://uptime-kuma.uptime-kuma.svc.cluster.local:3001/api/push/HynV318oyG?status=up&msg=OK&ping='
                     send_resolved: false
             inhibit_rules:
               - source_matchers:

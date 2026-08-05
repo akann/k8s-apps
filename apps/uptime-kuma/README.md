@@ -44,8 +44,9 @@ Everything else was confirmed present as of the same date.
 
 ## Meta-monitoring push heartbeat
 
-A dedicated Push-type monitor ("Prometheus/Alertmanager Heartbeat") also
-lives here — it's the receiving end of the Watchdog dead-man's-switch
-described in `infrastructure/monitoring/README.md`, not a normal target
-check. Set up manually per that README; not listed in the table above since
-it isn't checking an external target.
+A dedicated Push-type monitor ("Prometheus/Alertmanager Heartbeat", created
+2026-08-05) also lives here — it's the receiving end of the Watchdog
+dead-man's-switch described in `infrastructure/monitoring/README.md`, not a
+normal target check. Not listed in the table above since it isn't checking an
+external target. If it's ever deleted/recreated, `argocd-app-monitoring.yaml`'s
+`uptime-kuma-heartbeat` receiver needs the new push token.
