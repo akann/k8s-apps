@@ -1,0 +1,76 @@
+# Alertmanager's webhook_configs mechanism always sends POST — hardcoded,
+# no config option to change it. uptime-kuma's push-monitor endpoint only
+# accepts GET (confirmed live: POST /api/push/<token> -> 404, same route
+# with GET -> 200). This is the same class of protocol mismatch already
+# solved twice in this repo (alertmanager-gotify-bridge, sentry-gotify-bridge)
+# — a tiny translator in between. Plain nginx (proxy_method GET +
+# proxy_pass_request_body off) does the job with no custom image to build
+# or push.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-uptime-kuma-bridge-config
+  namespace: uptime-kuma
+data:
+  nginx.conf: |
+    events {}
+    http {
+      server {
+        listen 8080;
+        location / {
+          proxy_pass http://uptime-kuma.uptime-kuma.svc.cluster.local:3001;
+          proxy_method GET;
+          proxy_pass_request_body off;
+          proxy_set_header Content-Length "";
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-uptime-kuma-bridge
+  namespace: uptime-kuma
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager-uptime-kuma-bridge
+  template:
+    metadata:
+      labels:
+        app: alertmanager-uptime-kuma-bridge
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: bridge
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-uptime-kuma-bridge-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-uptime-kuma-bridge
+  namespace: uptime-kuma
+spec:
+  selector:
+    app: alertmanager-uptime-kuma-bridge
+  ports:
+    - port: 8080
+      targetPort: 8080

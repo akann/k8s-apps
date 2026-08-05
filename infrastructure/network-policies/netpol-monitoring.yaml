@@ -123,7 +123,7 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: uptime-kuma
       ports:
-        - port: 3001 # Watchdog heartbeat -> uptime-kuma push monitor (dead-man's-switch)
+        - port: 8080 # Watchdog heartbeat -> alertmanager-uptime-kuma-bridge (POST->GET translator)
     - ports:
         - port: 53
           protocol: UDP

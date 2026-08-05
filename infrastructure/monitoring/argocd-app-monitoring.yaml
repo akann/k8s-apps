@@ -295,9 +295,13 @@ spec:
               # Push monitor "Prometheus/Alertmanager Heartbeat" in uptime-kuma
               # (heartbeat interval 180s, retries 2 — see
               # infrastructure/monitoring/README.md for the full rationale).
+              # Goes through alertmanager-uptime-kuma-bridge, not uptime-kuma
+              # directly - Alertmanager's webhook_configs always POSTs, but
+              # uptime-kuma's push-monitor endpoint only accepts GET. The
+              # bridge (apps/uptime-kuma/alertmanager-bridge.yaml) translates.
               - name: uptime-kuma-heartbeat
                 webhook_configs:
-                  - url: 'http://uptime-kuma.uptime-kuma.svc.cluster.local:3001/api/push/HynV318oyG?status=up&msg=OK&ping='
+                  - url: 'http://alertmanager-uptime-kuma-bridge.uptime-kuma.svc.cluster.local:8080/api/push/HynV318oyG?status=up&msg=OK&ping='
                     send_resolved: false
             inhibit_rules:
               - source_matchers:

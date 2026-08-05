@@ -63,13 +63,25 @@ stops evaluating the rule, or Alertmanager stops routing it, the pings stop
 and uptime-kuma — independently of this stack — flags the monitor down and
 fires its own Gotify notification.
 
+**`alertmanager-uptime-kuma-bridge` (`apps/uptime-kuma/alertmanager-bridge.yaml`)
+sits in between — not a direct call.** Alertmanager's `webhook_configs`
+always sends POST (no config to change this); uptime-kuma's push-monitor
+endpoint only accepts GET (confirmed live: POST → 404, GET → 200 on the same
+URL). This is the same protocol-mismatch shape already solved twice in this
+repo (`alertmanager-gotify-bridge`, `sentry-gotify-bridge`) — a plain
+`nginx:alpine` Deployment with `proxy_method GET` + `proxy_pass_request_body
+off` translates the POST into the GET uptime-kuma expects, no custom image
+needed. The receiver `url` therefore points at
+`alertmanager-uptime-kuma-bridge.uptime-kuma.svc.cluster.local:8080`, not at
+uptime-kuma directly.
+
 **Setup (done 2026-08-05):** a Push monitor "Prometheus/Alertmanager
 Heartbeat" was created in uptime-kuma (heartbeat interval 180s, retries 2,
-Gotify notification id 1 attached), and its push token wired into
-`argocd-app-monitoring.yaml`'s `uptime-kuma-heartbeat` receiver. Monitor
-config lives in uptime-kuma's own SQLite DB, not git — see
-`apps/uptime-kuma/README.md` — so if this monitor is ever deleted/recreated,
-the receiver `url` needs updating with the new token the same way.
+Gotify notification id 1 attached), and its push token wired into the
+receiver `url` above (through the bridge). Monitor config lives in
+uptime-kuma's own SQLite DB, not git — see `apps/uptime-kuma/README.md` — so
+if this monitor is ever deleted/recreated, the receiver `url` needs updating
+with the new token the same way.
 
 ## Secrets
 
