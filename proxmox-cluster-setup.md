@@ -1059,12 +1059,12 @@ All K8s VMs and LXC containers are enrolled in Proxmox HA. HA provides automatic
 Affinity rules guide VM placement preferences without hard restrictions (`strict: false`):
 
 ```bash
-# Control-plane VMs prefer pve2 and pve3; pve1 is last resort
+# Control-plane VMs are balanced equally across all nodes
 pvesh create /cluster/ha/rules \
   --rule k8s-cp-affinity \
   --type node-affinity \
   --resources "vm:101,vm:102,vm:103" \
-  --nodes "pve2:2,pve3:2,pve1:1" \
+  --nodes "pve1:2,pve2:2,pve3:2" \
   --strict 0
 
 # Worker VMs are balanced equally across all nodes
@@ -1076,7 +1076,9 @@ pvesh create /cluster/ha/rules \
   --strict 0
 ```
 
-Rationale for lower pve1 CP priority: pve1 has experienced recurring Ceph daemon crashes (mon.pve1 and osd.0/osd.3). K8s control-plane nodes are more sensitive to instability than workers, since losing a CP node triggers etcd re-election. Root cause identified 2026-06-23: Ceph 19.2.3 bugs in MonitorDBStore and BlueStore RocksDB — see Mon Leader Management section. Mitigated by switching to classic election strategy; full fix requires upgrade to 19.2.4+.
+**Both rules are balanced across all three nodes** (verified live 2026-08-12). Control-plane VMs previously carried a lower pve1 priority (`pve2:2,pve3:2,pve1:1`) because pve1 was crashing Ceph daemons, and CP nodes are more sensitive to instability than workers since losing one triggers an etcd re-election. That rationale no longer applies: the cause was a failing non-ECC DIMM, physically replaced 2026-07-31 (see UPDATES.md 2026-07-02 for the memtest verdict, and the pve1-bad-ram history). pve1 has been stable since.
+
+Note the rule's `comment` field is not enforcement — it was left reading "prefer pve2/pve3, avoid pve1 while crash-prone" long after the priorities had been equalised, describing an intent the rule did not implement. Corrected 2026-08-12. If a node ever does need de-prioritising again, change `--nodes`, not the comment.
 
 ### Enrolment Commands
 
@@ -1281,9 +1283,13 @@ ceph osd primary-affinity osd.<id> 1.0
 
 ### Mon Leader Management
 
-**Current state (2026-06-23):** `election_strategy classic`. pve1 is the mon leader (rank 0 always wins in classic mode). The `disallowed_leaders` mechanism only works with `connectivity` strategy and is currently a no-op.
+**Current state (verified live 2026-08-12):** `election_strategy classic` (strategy `1`). pve1 is the mon leader — rank 0 always wins in classic mode. `disallowed_leaders` is still set to `pve1` and is a **no-op**: only the `disallow` (2) and `connectivity` (3) strategies consult that list.
 
-**Root cause of recurring crashes (investigated 2026-06-23):**
+⚠️ **It cannot be cleared while classic is active.** `ceph mon rm disallowed_leader pve1` returns `Error EINVAL: You cannot disallow monitors in your current election mode` — the guard applies to removal as well as addition. Clearing it requires `set election_strategy 2` → `rm disallowed_leader pve1` → `set election_strategy 1`, and each strategy change forces a re-election, so it is a maintenance-window action rather than a casual cleanup. Left in place deliberately as of 2026-08-12. **The risk to be aware of: the entry arms itself the moment the strategy changes for any other reason**, silently barring pve1 from leadership on the basis of a hardware fault that no longer exists. Remove it as part of any future strategy change.
+
+**Root cause of the recurring crashes — superseded (see below):** the 2026-06-23 investigation below attributed them to Ceph 19.2.3 bugs. That analysis explains why the crashes took the *form* they did, but the actual root cause was found on 2026-07-02 to be a failing non-ECC DIMM in pve1 (memtester: 2,561 failures, contiguous ~16 KB region, bit 0 stuck low). DIMMs replaced 2026-07-31; `ceph crash ls` has recorded nothing since 2026-07-29. Do not re-diagnose new pve1 crashes as this issue.
+
+**Original analysis (investigated 2026-06-23):**
 
 - `mon.pve1` and `mon.pve3` both crashed with `MonitorDBStore::apply_transaction: ceph_abort_msg("failed to write to db")` — a Ceph 19.2.3 bug where any RocksDB write error causes an abort rather than a retry.
 - The `connectivity` election strategy worsened this by writing connectivity scores to the mon DB on **every ping**, dramatically increasing write frequency and triggering the bug. Switching to `classic` eliminates that write path.

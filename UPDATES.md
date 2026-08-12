@@ -4,6 +4,38 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-12
+
+### Two stale pve1 mitigations found — one fixed, one blocked by Ceph
+
+Both date from the period when pve1 was crashing Ceph daemons, whose real cause (a failing non-ECC DIMM) was found 2026-07-02 and physically fixed 2026-07-31. Neither had been revisited, and neither was doing what its description claimed.
+
+**1. HA rule comment vs. actual priorities — fixed.** `k8s-cp-affinity` read `comment: K8s control-plane: prefer pve2/pve3, avoid pve1 while crash-prone`, but its `nodes` were `pve1:2,pve2:2,pve3:2` — all equal, i.e. identical in effect to the worker rule labelled "balanced across all nodes". The comment described an intent the rule did not implement, and at a glance it reads like an active safeguard. Corrected live:
+
+```bash
+ha-manager rules set node-affinity k8s-cp-affinity \
+  --comment 'K8s control-plane VMs, balanced across all three nodes'
+```
+
+`proxmox-cluster-setup.md` also documented the old `--nodes "pve2:2,pve3:2,pve1:1"` form as current; updated to match live state.
+
+**2. `disallowed_leaders pve1` — still set, still inert, could not be cleared.** `ceph mon dump` shows `election_strategy: 1` (classic) with `disallowed_leaders pve1`. Classic never consults that list — only `disallow` (2) and `connectivity` (3) do — so it has done nothing since the election strategy was reverted, and pve1 is in fact the current mon leader.
+
+Attempting the obvious cleanup fails:
+
+```
+$ ceph mon rm disallowed_leader pve1
+Error EINVAL: You cannot disallow monitors in your current election mode
+```
+
+The mode guard applies to removal as well as addition. Clearing it therefore needs `set election_strategy 2` → `rm disallowed_leader pve1` → `set election_strategy 1`, and each strategy change forces a mon re-election — brief, but it blocks RBD clients (i.e. every VM disk and PVC) for the duration. Not worth it for a dormant flag, so it is **left in place deliberately**.
+
+**Why it still matters:** the entry is inert by circumstance, not by design. It arms itself the moment the election strategy changes for any unrelated reason, silently barring pve1 from leadership over a hardware fault that no longer exists — and nothing would connect the two events. Actioned as: remove it as part of any future election-strategy change (e.g. the pending move to `connectivity` after a 19.2.4+ upgrade). Recorded in `proxmox-cluster-setup.md` § Mon Leader Management.
+
+**Also corrected in that section:** the 2026-06-23 root-cause analysis (Ceph 19.2.3 MonitorDBStore/BlueStore bugs) was still presented as the explanation for the crash spree. It is retained as the reason the crashes took the form they did, but is now explicitly marked superseded by the 2026-07-02 memtest verdict.
+
+---
+
 ## 2026-08-04 (later)
 
 ### Worker node disk pressure — unbounded GHCR image tag accumulation (immediate fix only, root cause open)

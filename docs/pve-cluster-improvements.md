@@ -261,8 +261,9 @@ Given you have a 3-node K8s control plane, losing one node is survivable. Howeve
 ### Recommended — enroll K8s VMs in HA with node preferences
 
 ```bash
-# Create HA group — prefer pve2/pve3 for k8s-cp-1 to avoid running on pve1
-# (pve1 is currently crash-prone)
+# Create HA group — historical: pve2/pve3 were preferred while pve1 was crash-prone.
+# Superseded 2026-08-12: pve1's failing DIMM was replaced 2026-07-31 and the live
+# k8s-cp-affinity rule is now balanced (pve1:2,pve2:2,pve3:2).
 ha-manager groupadd k8s-cp \
   --nodes "pve2:2,pve3:2,pve1:1" \
   --comment "K8s control-plane VMs"
