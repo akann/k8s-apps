@@ -4,7 +4,9 @@ metadata:
   name: auth-service-pg-backup
   namespace: yana-stocks
 spec:
-  schedule: "0 1 * * *"
+  # CNPG cron is 6-field (leading seconds) — a 5-field "0 1 * * *" parses as
+  # sec=0 min=1 hour=* and runs HOURLY. Keep the leading 0.
+  schedule: "0 0 1 * * *"
   backupOwnerReference: self
   cluster:
     name: auth-service-pg

@@ -4,7 +4,9 @@ metadata:
   name: pg-main-backup
   namespace: cnpg-clusters
 spec:
-  schedule: "0 2 * * *"
+  # CNPG cron is 6-field (leading seconds) — a 5-field "0 2 * * *" parses as
+  # sec=0 min=2 hour=* and runs HOURLY. Keep the leading 0.
+  schedule: "0 0 2 * * *"
   backupOwnerReference: self
   cluster:
     name: pg-main

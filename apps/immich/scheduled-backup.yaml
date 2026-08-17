@@ -4,7 +4,9 @@ metadata:
   name: immich-postgres-backup
   namespace: immich
 spec:
-  schedule: "0 3 * * *"
+  # CNPG cron is 6-field (leading seconds) — a 5-field "0 3 * * *" parses as
+  # sec=0 min=3 hour=* and runs HOURLY. Keep the leading 0.
+  schedule: "0 0 3 * * *"
   backupOwnerReference: self
   cluster:
     name: immich-postgres

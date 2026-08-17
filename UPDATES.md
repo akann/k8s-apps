@@ -4,6 +4,46 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-17
+
+### Backblaze B2 silently lost object payloads in both backup buckets
+
+A Velero alert (`nextcloud-default-kopia-maintain-job-*` failed to complete) turned out to be one visible symptom of a **B2 data-integrity problem affecting both backup buckets**. The alert's own suggested remediation — "removing failed job should clear this alert" — was wrong: the job was retrying every 5 minutes and failing identically each time.
+
+**Signature.** B2 returns a valid `list`/`HEAD` — correct size and ETag — then serves **zero bytes** on GET (`IncompleteRead(0 bytes read, N more expected)`). It fails the same way on a 1 KB ranged GET, so it is total payload loss, not truncation. Confirmed non-transient: every affected object failed 3/3 retries. Bucket versioning is Enabled on both buckets, but every affected key had exactly **one** version — there was nothing to roll back to.
+
+**Detection method (read-only, reusable).** Enumerate the bucket, then issue a **1 KB ranged GET per object** — corrupt objects fail even that, so it costs ~26 MB of egress instead of a 215 GB full read. Full-read the small critical blobs (kopia `xn`/`xe`/`xw`/`kopia.*`/`udmrepo`; CNPG `backup.info`) since those are what break repo-open. Two limits worth stating: a ranged probe cannot see corruption *beyond* the first KB, and a readable object can still be silently wrong — only `kopia snapshot verify` checks content hashes. **The counts below are floors, not ceilings.**
+
+**`yanatech-velero` — 21 bad of 25,687.** 17 `_log_` blobs (cosmetic), 3 pack blobs in `kopia/monitoring` (21.0 + 22.4 + 21.0 MB of real backup content, unrecoverable), and 1 index blob in `kopia/nextcloud` — the last of which blocks repo-open, so nextcloud backup *and* restore were broken, not just maintenance. Loss dates spanned 2026-07-23 to 2026-08-15; Velero reported backups `Completed` throughout. Nothing surfaced it until maintenance happened to touch the one object whose loss blocks repo-open.
+
+Since everything in this bucket is reconstructible (Harbor images, Prometheus metrics), it was **wiped and rebuilt** rather than repaired: 120,147 items deleted (108,322 versions + 11,825 delete markers), 278 GB reclaimed, all Velero `Backup`/`PodVolumeBackup`/`BackupRepository` CRs and 69 stale maintenance Jobs removed, then a fresh backup taken immediately rather than waiting for the Sunday schedule — `9026/9026` items, 0 errors, 0 warnings, 23 PVBs Completed, 13 repos re-initialized.
+
+**A `NoncurrentVersionExpiration` lifecycle rule (7 days) was added to `yanatech-velero`, which had none.** Versioning was on with nothing pruning it, so 62.28 GB of dead versions had accumulated since 1 June.
+
+**`yanatech-cnpg` — 37 bad of 21,314, and deliberately NOT wiped.** 24 WAL segments + 13 base-backup files across 6 of 7 clusters (only `akan-pg` clean). Unlike the Velero bucket, nothing here is reconstructible. Crucially the damage is **entirely historical**: every cluster still had an intact base backup from 2026-08-17, and **zero damaged WALs postdate it**, so current recovery capability was never lost. Only the 13 damaged base-backup directories were pruned (38 objects), guarded by an assertion that none was the newest backup for its cluster. The 24 damaged WAL segments were left in place on purpose — deleting them would break the archive chain, and they only affect PITR into windows before the current base backups.
+
+No Backblaze support ticket was raised (deliberate call). Evidence preserved on `kc1`: `/tmp/b2sweep_bad.json`, `/tmp/cnpgsweep_bad.json`, `/tmp/velero-wipe-20260817/velero-crs.yaml`.
+
+### CNPG ScheduledBackup cron was 5-field — five clusters were backing up hourly, not daily
+
+Found while investigating the above. `ScheduledBackup.spec.schedule` is a **6-field** cron (leading seconds), not the 5-field Kubernetes CronJob format. A 5-field `"0 2 * * *"` is silently accepted and parsed as `sec=0 min=2 hour=*` — **hourly at HH:02**. No validation error, no warning.
+
+Five of seven clusters were affected and had been taking hourly base backups for ~30 days:
+
+| Cluster | Was | Now | Base backups retained |
+| --- | --- | --- | --- |
+| `pg-main` | `"0 2 * * *"` | `"0 0 2 * * *"` | 722 |
+| `immich-postgres` | `"0 3 * * *"` | `"0 0 3 * * *"` | 736 |
+| `auth-service-pg` | `"0 1 * * *"` | `"0 0 1 * * *"` | 735 |
+| `k8s-docs-pg` | `"0 2 * * *"` | `"0 0 2 * * *"` | 735 |
+| `ops-agent-pg` | `"0 2 * * *"` | `"0 0 2 * * *"` | 721 |
+
+`akan-pg` (25 base backups) and `dove-house-tt-pg` (31) were already correct — both were written `"0 0 2 * * *"` from the start, which is what made the discrepancy visible. The tell in live state is `lastScheduleTime` landing on the current hour: `kubectl get scheduledbackup -A` showed `17:01`/`17:02`/`17:03` for the five broken ones.
+
+Fixed in `infrastructure/cnpg-clusters/`, `apps/immich/`, `apps/yana-stocks/auth-service/` (this repo) and `k8s/ops-agent/`, `k8s/k8s-docs/` (ml repo), each with an inline comment explaining the field count so it does not regress.
+
+---
+
 ## 2026-08-12
 
 ### Two stale pve1 mitigations found — one fixed, one blocked by Ceph
