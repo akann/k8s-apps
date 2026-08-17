@@ -4,6 +4,32 @@
 # metric) when a recent delivery failed, or the webhook itself is missing.
 # Flows through the existing Alertmanager -> Gotify bridge (netpol/cilium
 # policy: ciliumnetpol-argocd-to-alertmanager.yaml).
+#
+# An unreachable GitHub API must NEVER be reported as a missing webhook.
+# The original version ran `curl -sf ... | jq`, which prints nothing on an HTTP
+# error; because that is a pipeline, `set -e` does not catch it (a pipeline's
+# status is the last command's, and jq succeeds on empty input), so an empty
+# hook_id was indistinguishable from a genuinely absent webhook and escalated
+# to a critical ArgoCDWebhookMissing. That misfired on 2026-08-17 for
+# shared-services during a GitHub-wide 503 event (4 of 7 repos returned "No
+# server is currently available"), and its own remediation text told the reader
+# to recreate a webhook that already existed — which would have duplicated it
+# and double-delivered every push to ArgoCD.
+#
+# Now: every call goes through api_get(), which checks the HTTP status
+# explicitly, requires a JSON array body, and retries with backoff. A
+# persistent API failure raises ArgoCDWebhookCheckFailed (warning) instead;
+# ArgoCDWebhookMissing (critical) is only ever raised when the hook list was
+# genuinely fetched and contained no matching hook. The deliveries call is
+# guarded the same way — previously a failure there returned an empty list,
+# counted 0 failures and silently reported healthy (a false NEGATIVE that could
+# mask real delivery failures).
+#
+# Note: a repo with zero recent deliveries is NOT an error. GitHub ages
+# delivery history out within days, so any repo not pushed recently reports 0
+# deliveries and last_response "unused" — normal for low-activity repos
+# (shared-services and yanatech, both last pushed 2026-08-02, sat like this
+# while their webhooks were perfectly healthy).
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -38,22 +64,60 @@ spec:
                   repos="k8s-apps yana-stocks shared-services ml dove-house-tt akan yanatech"
                   alerts="[]"
 
+                  # GET a GitHub API path. Echoes the JSON array body and returns 0
+                  # only on a real HTTP 200 with an array payload; returns 1 after 5
+                  # attempts otherwise. Never conflates "API unreachable" with "empty".
+                  api_get() {
+                    _path="$1"; _attempt=1
+                    while [ "$_attempt" -le 5 ]; do
+                      _resp=$(curl -s -w '\n%{http_code}' \
+                        -H "Authorization: Bearer $GITHUB_TOKEN" \
+                        -H "Accept: application/vnd.github+json" \
+                        "https://api.github.com/${_path}" 2>/dev/null) || _resp=""
+                      _code=$(printf '%s' "$_resp" | tail -n1)
+                      _body=$(printf '%s' "$_resp" | sed '$d')
+                      if [ "$_code" = "200" ] && printf '%s' "$_body" | jq -e 'type=="array"' >/dev/null 2>&1; then
+                        printf '%s' "$_body"
+                        return 0
+                      fi
+                      echo "  api_get ${_path} attempt ${_attempt} failed (http=${_code:-none})" >&2
+                      _attempt=$((_attempt + 1))
+                      [ "$_attempt" -le 5 ] && sleep $((_attempt * 5))
+                    done
+                    return 1
+                  }
+
+                  check_failed_alert() {
+                    alerts=$(echo "$alerts" | jq --arg repo "$1" --arg what "$2" '. + [{
+                      "labels": {"alertname": "ArgoCDWebhookCheckFailed", "repo": $repo, "severity": "warning"},
+                      "annotations": {"summary": ("Could not verify ArgoCD webhook on " + $repo), "description": ("GitHub API call (" + $what + ") failed after 5 attempts. This is a CHECK failure, not a confirmed webhook problem - usually a transient GitHub API error. Do NOT recreate the webhook on the strength of this alert; verify with: gh api repos/akann/" + $repo + "/hooks")}
+                    }]')
+                  }
+
                   for repo in $repos; do
-                    hook_id=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
-                      "https://api.github.com/repos/akann/${repo}/hooks" \
-                      | jq -r --arg url "$webhook_url" '.[] | select(.config.url == $url) | .id')
+                    if ! hooks_json=$(api_get "repos/akann/${repo}/hooks"); then
+                      echo "${repo}: hooks API unreachable - reporting check failure, NOT missing"
+                      check_failed_alert "$repo" "list hooks"
+                      continue
+                    fi
+
+                    hook_id=$(echo "$hooks_json" | jq -r --arg url "$webhook_url" '.[] | select(.config.url == $url) | .id' | head -n1)
 
                     if [ -z "$hook_id" ]; then
                       alerts=$(echo "$alerts" | jq --arg repo "$repo" '. + [{
                         "labels": {"alertname": "ArgoCDWebhookMissing", "repo": $repo, "severity": "critical"},
-                        "annotations": {"summary": ("No ArgoCD webhook found on " + $repo), "description": "Expected a webhook pointing at argocd-webhook.yanatech.co.uk/api/webhook - none found. Recreate it (see k8s-apps CLAUDE.md)."}
+                        "annotations": {"summary": ("No ArgoCD webhook found on " + $repo), "description": "The hook list was fetched successfully and contained no webhook pointing at argocd-webhook.yanatech.co.uk/api/webhook. Confirm with `gh api repos/akann/<repo>/hooks` before acting, then recreate it (see k8s-apps CLAUDE.md)."}
                       }]')
                       continue
                     fi
 
-                    failures=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
-                      "https://api.github.com/repos/akann/${repo}/hooks/${hook_id}/deliveries?per_page=5" \
-                      | jq --argjson cutoff "$cutoff_epoch" '[.[] | select((.delivered_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > $cutoff and (.status_code < 200 or .status_code >= 300))]')
+                    if ! deliveries_json=$(api_get "repos/akann/${repo}/hooks/${hook_id}/deliveries?per_page=5"); then
+                      echo "${repo}: deliveries API unreachable - reporting check failure, NOT healthy"
+                      check_failed_alert "$repo" "list deliveries"
+                      continue
+                    fi
+
+                    failures=$(echo "$deliveries_json" | jq --argjson cutoff "$cutoff_epoch" '[.[] | select((.delivered_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > $cutoff and (.status_code < 200 or .status_code >= 300))]')
 
                     count=$(echo "$failures" | jq 'length')
                     if [ "$count" -gt 0 ]; then

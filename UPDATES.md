@@ -24,6 +24,35 @@ Since everything in this bucket is reconstructible (Harbor images, Prometheus me
 
 No Backblaze support ticket was raised (deliberate call). Evidence preserved on `kc1`: `/tmp/b2sweep_bad.json`, `/tmp/cnpgsweep_bad.json`, `/tmp/velero-wipe-20260817/velero-crs.yaml`.
 
+### False `ArgoCDWebhookMissing` on shared-services — the check couldn't tell "API down" from "webhook absent"
+
+An `ArgoCDWebhookMissing` (critical) fired for `shared-services`, advising that the webhook be recreated. **The webhook existed and was healthy** — hook `654013140`, created 2026-07-18, `active: true`, correct URL, `content_type: json`, secret set. All 7 repos had theirs, with sequential IDs from the single 18 July batch. Following the alert's own remediation would have created a **duplicate** webhook and double-delivered every push to ArgoCD.
+
+Root cause was in `webhook-delivery-check-cronjob.yaml`:
+
+```sh
+hook_id=$(curl -sf ... "/repos/akann/${repo}/hooks" | jq -r '... | .id')
+if [ -z "$hook_id" ]; then   # -> ArgoCDWebhookMissing, severity: critical
+```
+
+`curl -sf` prints nothing on an HTTP error, and because it's a *pipeline*, `set -e` doesn't catch it — a pipeline's exit status is the last command's, and `jq` succeeds on empty input. So a transient GitHub API error produced an empty `hook_id` and escalated straight to critical. GitHub was mid-incident at the time: a single manual pass had **4 of 7 repos return HTTP 503** (`No server is currently available to service your request`), which is why one arbitrary repo alerted.
+
+Fixed by routing every call through an `api_get()` helper that checks the HTTP status explicitly, requires a JSON array body, and retries 5x with backoff. Persistent API failure now raises **`ArgoCDWebhookCheckFailed` (warning)** with text explicitly warning *not* to recreate the webhook on its strength; `ArgoCDWebhookMissing` (critical) is raised only when the hook list was genuinely fetched and contained no match. The deliveries call got the same guard — a failure there previously yielded an empty list, counted 0 failures and reported healthy, a false *negative* masking real delivery failures. Parsing was unit-tested across six cases (200+array, 200+empty array, 503+error object, 200+non-array, curl-died, multiline JSON); note 200+`[]` still correctly resolves to a genuine `ArgoCDWebhookMissing`.
+
+Same bug class as ops-agent's `list_repo_runners` reporting zero runners for a scale-to-zero ARC set, and as this same alert's sibling in the Velero incident above: **absence of data reported as a confirmed negative, with confidently wrong remediation attached.**
+
+**Also established: zero recent deliveries is not an error.** `shared-services` showed 0 deliveries and `last_response: {"status":"unused"}`, which looks like a webhook that never fired. It isn't — GitHub ages delivery history out within days:
+
+| repo | last push | deliveries | last_response |
+| --- | --- | --- | --- |
+| shared-services | Aug 2 | 0 | unused |
+| yanatech | Aug 2 | 0 | unused |
+| dove-house-tt | Aug 16 | 12 | 200 OK |
+| ml | Aug 17 | 2 | 200 OK |
+| k8s-apps | Aug 17 | 1 | 200 OK |
+
+The two with zero deliveries are exactly the two not pushed since 2 August, and `dove-house-tt`'s oldest retained delivery was only ~1.5 days old. Distinguishing "expired" from "never fired" with certainty would need a test push; the correlation across five repos makes expiry the clear explanation.
+
 ### CNPG ScheduledBackup cron was 5-field — five clusters were backing up hourly, not daily
 
 Found while investigating the above. `ScheduledBackup.spec.schedule` is a **6-field** cron (leading seconds), not the 5-field Kubernetes CronJob format. A 5-field `"0 2 * * *"` is silently accepted and parsed as `sec=0 min=2 hour=*` — **hourly at HH:02**. No validation error, no warning.
