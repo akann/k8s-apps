@@ -6,6 +6,41 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-08-18
 
+### Transient B2 read failure took out 5 kopia maintenance jobs — NOT a repeat of the 17th
+
+At 21:40–21:42 UTC, five Velero kopia maintenance jobs failed in sequence (pgadmin,
+vaultwarden, mongodb, nextcloud, uptime-kuma), each with
+`error loading index blob ... unexpected EOF`. The alert named only vaultwarden and
+advised removing the failed job. Given the 2026-08-17 silent-data-loss incident had the
+same surface symptom — and there the same advice was actively wrong — this was
+investigated before touching anything.
+
+**How to tell the two apart: check WHICH blob failed.** vaultwarden failed on
+`xn0_e1b7fa3d…`, uptime-kuma on a completely different `xn0_d527d77c…`, in different
+repos inside the same two-minute window. Object corruption does not distribute like
+that; a degraded read path does. On the 17th the failures were *deterministic* — the
+same objects failing 3/3 retries, even on a 1 KB ranged GET.
+
+Confirmed transient, not corruption:
+
+- Both implicated blobs now full-read clean 3/3 at exact size (565/565 and 3907/3907).
+- All 8 critical small blobs in `kopia/vaultwarden` (`xn`/`xe`/`xw`/`kopia.*`/`udmrepo`)
+  full-read clean.
+- Every one of the five repos maintained **successfully** on the next run at ~22:50.
+- No CNPG WAL-archiving failures against the same B2 provider in that window.
+- BSL `Available`; `velero-weekly-backup-20260817114110` is `Completed`, 0 errors,
+  0 warnings, 9026/9026 items, 23/23 PodVolumeBackups.
+
+The five failed Job objects were deleted after this diagnosis, which cleared the alert.
+
+**Two traps worth remembering.** `kubectl get backup -n velero` returns *nothing* — the
+short name resolves to CNPG's `backups.postgresql.cnpg.io`, not Velero's. It reads
+exactly like "no backups exist". Always use `kubectl get backups.velero.io`. Separately,
+`VeleroBackupPartialFailure` is currently firing and is expected to keep firing until
+about 2026-08-24: it counts `increase(velero_backup_partial_failure_total[8d])`, and the
+single event in that window is the 2026-08-16 weekly run — the one that preceded the
+data-loss discovery and was already remediated. It will self-clear as the event ages out.
+
 ### Two pg-main replicas silently diverged for 9 days; unbounded slot WAL retention filled a volume
 
 A `PersistentVolume` fill-prediction alert fired for `pg-main-1` in `cnpg-clusters` (14.64% free, ~4 days to full). The disk was the symptom; the cause was that **two of the four `pg-main` replicas had not replicated in 9 days while everything reported healthy.**
