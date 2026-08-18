@@ -20,3 +20,13 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # Required for the Barman Cloud Plugin migration, and the only
+      # cluster-owning Application that lacked it (immich, yana-stocks, ml,
+      # dove-house-tt and akan all had it already). Without SSA, ArgoCD owns
+      # spec.backup via an Update-operation field-manager entry and cannot
+      # remove it when the manifest drops it — the merged object then holds
+      # both barmanObjectStore and plugins, which the CNPG webhook rejects
+      # with "Cannot enable a WAL archiver plugin when barmanObjectStore is
+      # configured". That surfaces as a ComparisonError / Sync=Unknown on this
+      # Application, not as a failed sync.
+      - ServerSideApply=true
