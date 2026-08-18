@@ -1,0 +1,89 @@
+---
+# Postgres-level alerting for the CNPG clusters.
+#
+# Written after the 2026-08-18 incident, in which pg-main-2 and pg-main-4 sat
+# diverged and not replicating for 9 days while `kubectl get cluster` reported
+# "Cluster in healthy state" and listed all four instances as healthy. Nothing
+# detected it until a generic PersistentVolume fill-prediction alert fired —
+# a storage alert standing in for a replication alert, 4 days before the volume
+# would have run out.
+#
+# Metric names below are taken from the operator's own default query set
+# (ConfigMap cnpg-default-monitoring in cnpg-system), not from documentation.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-cluster-health
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cnpg.replication
+      rules:
+        - alert: CNPGWalReceiverDown
+          expr: cnpg_pg_replication_is_wal_receiver_up == 0 and cnpg_pg_replication_in_recovery == 1
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG standby {{ $labels.pod }} is not receiving WAL"
+            description: "Standby {{ $labels.pod }} in {{ $labels.namespace }} has had no WAL receiver for 15 minutes. This is the exact signature of the 2026-08-18 incident: a standby that diverged at a failover cannot follow the new timeline and will retry forever while still reporting Ready. Check `kubectl logs <pod> -c postgres | grep 'not in this server.s history'`; if diverged, the fix is to delete the instance PVC and pod so the operator re-clones it."
+
+        - alert: CNPGReplicationLagHigh
+          expr: cnpg_pg_replication_lag > 300
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG standby {{ $labels.pod }} is {{ $value | humanizeDuration }} behind"
+            description: "Standby {{ $labels.pod }} in {{ $labels.namespace }} has been more than 5 minutes behind the primary for 15 minutes."
+
+        - alert: CNPGReplicationLagCritical
+          expr: cnpg_pg_replication_lag > 3600
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG standby {{ $labels.pod }} is {{ $value | humanizeDuration }} behind"
+            description: "Standby {{ $labels.pod }} in {{ $labels.namespace }} is more than an hour behind the primary. Treat as a failed replica, not as lag."
+
+        - alert: CNPGTooFewStreamingReplicas
+          expr: cnpg_pg_replication_streaming_replicas < 3 and cnpg_pg_replication_in_recovery == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG primary {{ $labels.pod }} has only {{ $value }} streaming replicas"
+            description: "Primary {{ $labels.pod }} in {{ $labels.namespace }} sees fewer than the expected 3 streaming standbys (spec.instances is 4). An instance may be Ready but not actually replicating."
+
+    - name: cnpg.slots
+      rules:
+        - alert: CNPGReplicationSlotInactive
+          expr: cnpg_pg_replication_slots_active == 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG replication slot {{ $labels.slot_name }} inactive on {{ $labels.pod }}"
+            description: "Slot {{ $labels.slot_name }} on {{ $labels.pod }} has been inactive for 30 minutes. An inactive slot keeps pinning WAL for a consumer that is not consuming it."
+
+        - alert: CNPGReplicationSlotRetainingWAL
+          expr: cnpg_pg_replication_slots_pg_wal_lsn_diff > 10e9
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG slot {{ $labels.slot_name }} is pinning {{ $value | humanize1024 }}B of WAL"
+            description: "Slot {{ $labels.slot_name }} on {{ $labels.pod }} is retaining over 10GB of WAL. max_slot_wal_keep_size is 16GB, so the slot will be invalidated if this keeps growing — investigate before that happens. This alert is the early warning the 2026-08-18 incident did not have."
+
+    - name: cnpg.exporter
+      rules:
+        - alert: CNPGMetricsDown
+          expr: up{namespace="cnpg-clusters"} == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG metrics endpoint down for {{ $labels.pod }}"
+            description: "Prometheus has not scraped {{ $labels.pod }} in cnpg-clusters for 15 minutes. Without this every other alert in this file is silently inert — which is how the 2026-08-18 incident stayed invisible for 9 days."

@@ -6,3 +6,4 @@ resources:
   - prometheusrule-yana-stocks-external-apis.yaml
   - prometheusrule-velero.yaml
   - prometheusrule-cert-manager.yaml
+  - prometheusrule-cnpg.yaml

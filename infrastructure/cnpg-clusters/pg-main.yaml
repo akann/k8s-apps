@@ -11,6 +11,14 @@ spec:
       max_connections: "200"
       shared_buffers: "256MB"
       effective_cache_size: "1GB"
+      # Cap how much WAL an inactive replication slot may pin. Default is -1
+      # (unlimited): on 2026-08-18 two replicas diverged at a failover, their
+      # slots went inactive, and unbounded retention grew pg_wal to 43GB on
+      # pg-main-1 (88% of a 50Gi volume) and 26GB on the primary. With a cap,
+      # an abandoned slot is invalidated instead of filling the disk — the
+      # affected replica then needs a re-clone, which at this database size
+      # (<1GB) takes about 30 seconds.
+      max_slot_wal_keep_size: "16GB"
   storage:
     size: 50Gi
     storageClass: ceph-rbd
@@ -31,6 +39,8 @@ spec:
         compression: gzip
     retentionPolicy: 30d
   monitoring:
+    # Intentionally false — see infrastructure/cnpg-clusters/podmonitor.yaml for
+    # why the PodMonitor is hand-written instead of operator-generated.
     enablePodMonitor: false
   resources:
     requests:

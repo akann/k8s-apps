@@ -4,6 +4,42 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-18
+
+### Two pg-main replicas silently diverged for 9 days; unbounded slot WAL retention filled a volume
+
+A `PersistentVolume` fill-prediction alert fired for `pg-main-1` in `cnpg-clusters` (14.64% free, ~4 days to full). The disk was the symptom; the cause was that **two of the four `pg-main` replicas had not replicated in 9 days while everything reported healthy.**
+
+**Root cause.** Repeated failovers walked the cluster from timeline 54 to 58. At the 54→55 fork (LSN `45/940000A0`), `pg-main-2` and `pg-main-4` had already replayed to `45/95000000` — roughly 16 MB *past* the fork point — so they held WAL records that were never part of the surviving history. Postgres correctly refused to let them follow the new timeline:
+
+```
+FATAL: could not start WAL streaming: ERROR: requested starting point 45/95000000
+on timeline 54 is not in this server's history
+DETAIL: This server's history forked from timeline 54 at 45/940000A0.
+```
+
+Both sat in that retry loop from 2026-08-09, each with an empty `pg_stat_wal_receiver`, replay frozen at a 9d 7h lag. Their replication slots stayed defined but inactive, and with `max_slot_wal_keep_size = -1` (the default, unlimited) they pinned WAL indefinitely: 26 GB on the primary `pg-main-5` via `_cnpg_pg_main_2`, and 42 GB on `pg-main-1` via the HA-synced copy of `_cnpg_pg_main_4`. `pg-main-1` reached 43 GB of `pg_wal` (1,645 segments) against a 269 MB database.
+
+**Nothing detected any of this.** `kubectl get cluster` reported `Cluster in healthy state` and listed all four instances under `status.instancesStatus.healthy`; all four pods were `1/1 Running`. A storage alert stood in for a replication alert, 4 days before the volume would have run out.
+
+**Fix.** Re-bootstrapped both diverged instances the standard CNPG way — delete the instance PVC, then the pod, and let the operator re-clone from the primary. `pg-main-4` was re-created as `pg-main-3` (the operator picks the lowest free serial, which is also why the set had been 1,2,4,5). Each clone took ~30 seconds at this database size. The primary was never restarted and no failover occurred, so there was no application-facing interruption.
+
+Once the slots went active again the retained WAL was released at the next restartpoint: `pg-main-1` 43 GB/88% → 945 MB/2%, primary 26 GB → 867 MB. All three replicas now stream with sub-second lag and all three slots report 0 bytes retained.
+
+**Data note.** The two destroyed volumes held the only remaining copy of the ~16 MB of timeline-54 WAL orphaned at the 9-day-old promotion. Those transactions were already lost to the cluster then — ordinary asynchronous-replication failover behaviour — and were unreachable across four subsequent timeline changes, but the re-bootstrap did discard the last physical copy.
+
+### Guardrails added
+
+- **`max_slot_wal_keep_size: "16GB"`** on `pg-main` (`infrastructure/cnpg-clusters/pg-main.yaml`). An abandoned slot is now invalidated rather than allowed to fill a 50Gi volume; the affected replica then needs a re-clone, which is the same 30-second operation performed above. Accepted by the CNPG admission webhook (verified with `kubectl apply --dry-run=server`).
+- **Postgres-level alerting, which this cluster had none of** — no PodMonitor in `cnpg-clusters` and no `PrometheusRule` anywhere referencing CNPG or Postgres. Added `infrastructure/monitoring/rules/prometheusrule-cnpg.yaml`: `CNPGWalReceiverDown` (the exact signature of this incident), replication-lag warning/critical, `CNPGTooFewStreamingReplicas`, `CNPGReplicationSlotInactive`, `CNPGReplicationSlotRetainingWAL` (>10 GB, i.e. before `max_slot_wal_keep_size` bites), and `CNPGMetricsDown` so the monitoring is itself monitored. Metric names were read from the operator's own default query set (ConfigMap `cnpg-default-monitoring` in `cnpg-system`) rather than from documentation.
+- **A hand-written PodMonitor** (`infrastructure/cnpg-clusters/podmonitor.yaml`) instead of `spec.monitoring.enablePodMonitor: true`. kube-prometheus-stack's Prometheus CR sets `podMonitorSelector: matchLabels: {release: kube-prometheus-stack}`, and CNPG exposes no way to put labels on the PodMonitor it generates (only `podMonitorRelabelings`/`podMonitorMetricRelabelings`, which rewrite scraped samples, not the object's own metadata) — so an operator-generated PodMonitor would have been created and then silently ignored, reproducing the same blind spot the rules are meant to close. `enablePodMonitor` stays `false` so there is exactly one PodMonitor and no duplicate scrapes. The existing `allow-monitoring-scrape` NetworkPolicy in `netpol-cnpg.yaml` already permits `monitoring` → 9187, so no network change was needed.
+
+Both new files were added to their directory `kustomization.yaml` whitelists — omitting that step is the silent-no-op trap already recorded for the ops-agent CiliumNetworkPolicies.
+
+**Unrelated finding, not actioned:** the server dry-run surfaced a CNPG deprecation warning — native Barman Cloud backup/recovery (`spec.backup.barmanObjectStore`, used by every cluster here) is removed in CloudNativePG 1.31.0 and needs migrating to the Barman Cloud Plugin before that upgrade.
+
+---
+
 ## 2026-08-17
 
 ### Backblaze B2 silently lost object payloads in both backup buckets
