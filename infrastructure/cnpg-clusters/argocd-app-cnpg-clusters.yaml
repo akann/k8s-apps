@@ -5,6 +5,20 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "9"
+    # Opt out of ArgoCD's server-side diff for this Application.
+    #
+    # The diff pass runs a dry-run server-side apply WITHOUT force-conflicts.
+    # pg-main's spec.backup is still owned by an older argocd-controller
+    # managedFields entry with operation: Update (from before this app had
+    # ServerSideApply), and enabling SSA does not retroactively convert that
+    # ownership. So the dry-run cannot drop spec.backup, the merged object
+    # holds both barmanObjectStore and plugins, and the CNPG webhook rejects
+    # it — leaving the app permanently ComparisonError / Sync=Unknown, which
+    # blocks the sync that would actually fix it.
+    #
+    # The sync itself applies with force-conflicts and succeeds. Once it has
+    # run and ownership is held via Apply, this annotation can be removed.
+    argocd.argoproj.io/compare-options: ServerSideDiff=false
 spec:
   project: default
   source:
