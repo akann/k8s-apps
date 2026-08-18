@@ -79,6 +79,76 @@ which its own manifest comment documents as intentional ("data is disposable/re-
 Four stale `.spec.backup.barmanObjectStore.target` `ignoreDifferences` entries were
 also cleared from the immich/ml/dove-house-tt/dove-house-tt-stg ArgoCD Applications.
 
+**pg-main needed three further fixes that the other six did not — all one root cause:
+field ownership.** `cnpg-clusters` was the only cluster-owning Application without
+`ServerSideApply=true`, so ArgoCD owned `spec.backup` through a managedFields entry with
+`operation: Update`. SSA only removes fields its manager previously owned via **Apply**,
+so the field survived every attempt and the webhook kept rejecting the result.
+
+The diagnostic contrast that identified this: `immich-postgres` and `auth-service-pg`
+both showed `argocd-controller` / `Apply` and migrated with no intervention; `pg-main`
+showed `Update` and could not. Check it with:
+
+```sh
+kubectl get cluster <c> -n <ns> --show-managed-fields -o json \
+  | jq '.metadata.managedFields[] | {manager, operation}'
+```
+
+In order, what was needed:
+
+1. `ServerSideApply=true` on the Application — necessary but **not sufficient**, because
+   it does not retroactively convert the existing `Update` ownership.
+2. `argocd.argoproj.io/compare-options: ServerSideDiff=false`, plus a **hard refresh**
+   (`kubectl annotate app cnpg-clusters argocd.argoproj.io/refresh=hard --overwrite`) to
+   make the cached comparison re-run. ArgoCD's diff pass dry-runs an apply *without*
+   force-conflicts, so it failed the webhook and left the app at `ComparisonError` /
+   `Sync: Unknown` — which blocked the sync that would have fixed it. Note the app's
+   `operationState` still read "successfully synced (all tasks run)" throughout, so it
+   looked healthy unless you read `status.conditions`.
+3. Even then the sync itself reported `Cluster/pg-main: SyncFailed` while every sibling
+   resource (ObjectStore, ScheduledBackup, PodMonitor) applied fine. **`kubectl apply
+   --server-side --force-conflicts` also failed** — force-conflicts resolves conflicts,
+   it does not remove `Update`-owned fields. What worked was a single atomic JSON patch
+   removing `/spec/backup` and adding `/spec/plugins` in one request, so the webhook only
+   ever saw a valid final object:
+
+```sh
+kubectl patch cluster pg-main -n cnpg-clusters --type=json -p \
+  '[{"op":"remove","path":"/spec/backup"},
+    {"op":"add","path":"/spec/plugins","value":[...]}]'
+```
+
+   This was a deliberate out-of-band write, run only after git already carried the same
+   desired state, so it was a convergence repair rather than drift. ArgoCD reconciled it
+   afterwards and now holds the field via Apply, so the `ServerSideDiff=false` annotation
+   should be removable at the next opportunity.
+
+**The rollout caused a ~4.5 minute write outage on pg-main.** Switching a Cluster to the
+plugin triggers a rolling restart, and the old primary pod — which has no plugin sidecar —
+could not archive under the new config (`Error loading plugins, retrying`,
+`archive command failed with exit code 1`) and refused to exit. `pg-main-rw` lost all
+endpoints, so reads continued via `-ro`/`-r` but writes stopped for authentik, vaultwarden,
+nextcloud, infisical, apicurio and uptime-kuma. `smartShutdownTimeout` (180s) did not clear
+it; the pod would not have been force-killed until its 1800s grace expired, ~28 minutes.
+Resolved with `kubectl delete pod pg-main-5 --grace-period=0 --force` — the PVC persists, so
+it restarted on the same data with the sidecar and no promotion was required; writes returned
+within ~30 seconds. Five of the six clusters drained on their own; only the busiest stalled.
+**Watch `kubectl get endpoints <cluster>-rw` during any future plugin migration.**
+
+**End-to-end verification.** An on-demand `method: plugin` Backup on akan-pg completed in 30s,
+and the objects were confirmed present in B2 rather than trusted from the phase — 
+`base/20260818T104329/` holding `backup.info` and a 4.25 MB `data.tar.gz`, alongside the
+pre-migration backups in the same path, plus WAL segments archived at 10:38 and 10:43, both
+after cutover. That verification Backup CR (`akan-pg-plugin-verify`) was left in place; it is
+a genuine backup.
+
+**A method warning worth keeping.** The first validation pass used plain
+`kubectl apply --dry-run=server` and rejected six of the seven clusters as invalid. They
+were all correct — client-side apply cannot compute the removal of `spec.backup` on
+SSA-managed objects, so it merged the old `barmanObjectStore` straight back in. Taken at
+face value that reads as "this migration is impossible".
+
+
 ### Guardrails added
 
 - **`max_slot_wal_keep_size: "16GB"`** on `pg-main` (`infrastructure/cnpg-clusters/pg-main.yaml`). An abandoned slot is now invalidated rather than allowed to fill a 50Gi volume; the affected replica then needs a re-clone, which is the same 30-second operation performed above. Accepted by the CNPG admission webhook (verified with `kubectl apply --dry-run=server`).
