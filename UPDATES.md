@@ -28,6 +28,57 @@ Once the slots went active again the retained WAL was released at the next resta
 
 **Data note.** The two destroyed volumes held the only remaining copy of the ~16 MB of timeline-54 WAL orphaned at the 9-day-old promotion. Those transactions were already lost to the cluster then — ordinary asynchronous-replication failover behaviour — and were unreachable across four subsequent timeline changes, but the re-bootstrap did discard the last physical copy.
 
+### Migrated all 7 CNPG clusters from in-tree Barman Cloud to the Barman Cloud Plugin
+
+Surfaced by a deprecation warning during the pg-main work above: CNPG's in-tree
+`spec.backup.barmanObjectStore` is deprecated since 1.26 and **removed in 1.31.0**.
+All seven clusters backed up through it, so this gated the next operator upgrade.
+
+Installed `plugin-barman-cloud` chart 0.7.1 (plugin v0.14.0) as its own ArgoCD
+Application at sync-wave 8 — before `cnpg-clusters` (9) and the app namespaces,
+since a Cluster referencing a plugin that is not yet running cannot archive WAL.
+Pinned rather than `"*"`, unlike the operator, because it sits in the backup path.
+
+Migrated: `pg-main`, `immich-postgres`, `auth-service-pg` (k8s-apps), `k8s-docs-pg`,
+`ops-agent-pg` (ml), `dove-house-tt-pg` (dove-house-tt), `akan-pg` (akan). Each
+gained an `objectstore.yaml` beside its manifest; the Cluster's `backup` block was
+replaced by `spec.plugins`, and its ScheduledBackup by `method: plugin`.
+`destinationPath` is unchanged throughout, so existing B2 backups stay valid.
+
+`dove-house-tt-stg-pg` was deliberately left alone — it has no backup config at all,
+which its own manifest comment documents as intentional ("data is disposable/re-seedable").
+
+**Three things worth recording, each of which could have silently broken backups:**
+
+1. **`kubectl apply --dry-run=server` gives a false rejection here.** Six of the seven
+   clusters failed validation with `Cannot enable a WAL archiver plugin when
+   barmanObjectStore is configured` — while being entirely correct. ArgoCD applies with
+   Server-Side Apply, so the live objects have no `last-applied-configuration`; a
+   client-side apply cannot compute the removal of `spec.backup` and merges the old
+   barmanObjectStore back in. Re-running as
+   `kubectl apply --server-side --field-manager=argocd-controller --force-conflicts
+   --dry-run=server` succeeded on all of them, and inspecting the returned object
+   confirmed `spec.backup` genuinely absent and `spec.plugins` present — the atomic
+   swap the migration procedure requires. **Had this been taken at face value it would
+   have looked like the migration was impossible.**
+
+2. **The plugin needed a new NetworkPolicy, `allow-cnpg-plugin-grpc`.** The operator
+   talks gRPC to the plugin on 9090 inside `cnpg-system`, and nothing opened it:
+   `allow-cnpg-operator` covers 8080/9443 ingress and app-namespace egress only, over
+   `default-deny-all`. The operator logging `Registered plugin` is **not** evidence the
+   path works — that step only reads the Service and TLS Secret from the API server;
+   the gRPC call happens later, on reconciling a Cluster that uses the plugin. Without
+   the rule the plugin would have looked healthy while every cluster failed to archive.
+
+3. **The DR runbook was silently invalidated.** Its restore procedure used
+   `externalClusters[].barmanObjectStore`, which is now `externalClusters[].plugin`
+   referencing the ObjectStore by name. Also recorded there: `.spec.bootstrap.recovery.
+   backup.name` is not supported for plugin-based backups — recovery must go through
+   `.spec.bootstrap.recovery.source` plus `externalClusters`.
+
+Four stale `.spec.backup.barmanObjectStore.target` `ignoreDifferences` entries were
+also cleared from the immich/ml/dove-house-tt/dove-house-tt-stg ArgoCD Applications.
+
 ### Guardrails added
 
 - **`max_slot_wal_keep_size: "16GB"`** on `pg-main` (`infrastructure/cnpg-clusters/pg-main.yaml`). An abandoned slot is now invalidated rather than allowed to fill a 50Gi volume; the affected replica then needs a re-clone, which is the same 30-second operation performed above. Accepted by the CNPG admission webhook (verified with `kubectl apply --dry-run=server`).
@@ -36,7 +87,7 @@ Once the slots went active again the retained WAL was released at the next resta
 
 Both new files were added to their directory `kustomization.yaml` whitelists — omitting that step is the silent-no-op trap already recorded for the ops-agent CiliumNetworkPolicies.
 
-**Unrelated finding, not actioned:** the server dry-run surfaced a CNPG deprecation warning — native Barman Cloud backup/recovery (`spec.backup.barmanObjectStore`, used by every cluster here) is removed in CloudNativePG 1.31.0 and needs migrating to the Barman Cloud Plugin before that upgrade.
+**Unrelated finding:** the server dry-run surfaced a CNPG deprecation warning — native Barman Cloud backup/recovery (`spec.backup.barmanObjectStore`, used by every cluster here) is removed in CloudNativePG 1.31.0. **Actioned the same day** — see the Barman Cloud Plugin migration entry above.
 
 ---
 

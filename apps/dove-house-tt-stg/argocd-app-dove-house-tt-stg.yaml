@@ -52,7 +52,6 @@ spec:
         - .spec.managed.roles[].connectionLimit
         - .spec.managed.roles[].ensure
         - .spec.managed.roles[].inherit
-        - .spec.backup.barmanObjectStore.target
         - .spec.postgresql.parameters
   syncPolicy:
     automated:

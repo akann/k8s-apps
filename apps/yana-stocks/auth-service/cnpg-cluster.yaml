@@ -15,22 +15,15 @@ spec:
       postInitSQL:
         - CREATE SCHEMA IF NOT EXISTS auth
         - ALTER ROLE app SET search_path = auth
-  backup:
-    barmanObjectStore:
-      destinationPath: s3://yanatech-cnpg/auth-service-pg
-      endpointURL: https://s3.eu-central-003.backblazeb2.com
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: cnpg-b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-    retentionPolicy: 30d
+  # Continuous WAL archiving + base backups via the Barman Cloud Plugin.
+  # Replaced spec.backup.barmanObjectStore on 2026-08-18 (removed in CNPG
+  # 1.31.0). isWALArchiver designates this plugin as the WAL archiver; the
+  # destination itself lives in the ObjectStore named below.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: auth-service-pg-store
   storage:
     size: 10Gi
     storageClass: ceph-rbd

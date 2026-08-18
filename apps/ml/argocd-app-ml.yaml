@@ -54,7 +54,8 @@ spec:
         - .spec.managed.roles[].connectionLimit
         - .spec.managed.roles[].ensure
         - .spec.managed.roles[].inherit
-        - .spec.backup.barmanObjectStore.target
+        # .spec.backup.barmanObjectStore.target dropped 2026-08-18 — backup config
+        # moved to the ObjectStore CR; the operator no longer injects this field.
         - .spec.postgresql.parameters
   syncPolicy:
     automated:

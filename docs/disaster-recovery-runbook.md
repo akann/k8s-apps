@@ -159,33 +159,36 @@ spec:
       source: <same as metadata.name above>   # see gotcha below
   externalClusters:
     - name: <must match bootstrap.recovery.source above>
-      barmanObjectStore:
-        # serverName only needed if externalClusters[].name differs from the
-        # ORIGINAL cluster's own name — CNPG defaults to looking for the
-        # backup under <destinationPath>/<externalClusters[].name>/, which is
-        # only correct if that name matches what the original cluster
-        # actually archived under. Hit this exact bug during testing
-        # (2026-07-18): naming the entry "pg-main-source" and omitting
-        # serverName made it look under a path that never existed
-        # ("no target backup found") even though the real backup was right
-        # there under the original name.
-        serverName: pg-main
-        destinationPath: s3://yanatech-cnpg/pg-main
-        endpointURL: https://s3.eu-central-003.backblazeb2.com
-        s3Credentials:
-          accessKeyId:
-            name: cnpg-b2-credentials
-            key: ACCESS_KEY_ID
-          secretAccessKey:
-            name: cnpg-b2-credentials
-            key: ACCESS_SECRET_KEY
-        wal:
-          compression: gzip
-        data:
-          compression: gzip
-  # keep the cluster's normal `backup:` block from the git-tracked manifest
+      # CHANGED 2026-08-18: this used to be an inline `barmanObjectStore:` block.
+      # Recovery now goes through the Barman Cloud Plugin, so the object store
+      # lives in an ObjectStore CR and is referenced by name here.
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          # The ObjectStore CR in this namespace (objectstore.yaml, git-tracked
+          # alongside the cluster manifest). It must exist BEFORE the restore —
+          # if the namespace was lost too, recreate it first.
+          barmanObjectName: pg-main-store
+          # serverName only needed if externalClusters[].name differs from the
+          # ORIGINAL cluster's own name — CNPG defaults to looking for the
+          # backup under <destinationPath>/<externalClusters[].name>/, which is
+          # only correct if that name matches what the original cluster
+          # actually archived under. Hit this exact bug during testing
+          # (2026-07-18): naming the entry "pg-main-source" and omitting
+          # serverName made it look under a path that never existed
+          # ("no target backup found") even though the real backup was right
+          # there under the original name.
+          serverName: pg-main
+  # keep the cluster's normal `plugins:` block from the git-tracked manifest
   # too, so it resumes archiving to B2 once recovered
 ```
+
+
+> **Plugin-era gotcha:** `.spec.bootstrap.recovery.backup.name` (restoring by naming a
+> `Backup` object) is **not supported** for plugin-based backups. Use
+> `.spec.bootstrap.recovery.source` together with the `externalClusters` entry above.
+> The destination path in B2 is unchanged by the migration, so backups taken before
+> 2026-08-18 under the in-tree barman support restore through this same procedure.
 
 Swap `pg-main`/`cnpg-clusters` for the target cluster/namespace and its B2 path from the table above. Watch it:
 

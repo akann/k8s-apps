@@ -22,22 +22,15 @@ spec:
   storage:
     size: 50Gi
     storageClass: ceph-rbd
-  backup:
-    barmanObjectStore:
-      destinationPath: s3://yanatech-cnpg/pg-main
-      endpointURL: https://s3.eu-central-003.backblazeb2.com
-      s3Credentials:
-        accessKeyId:
-          name: cnpg-b2-credentials
-          key: ACCESS_KEY_ID
-        secretAccessKey:
-          name: cnpg-b2-credentials
-          key: ACCESS_SECRET_KEY
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-    retentionPolicy: 30d
+  # Continuous WAL archiving + base backups via the Barman Cloud Plugin.
+  # Replaced spec.backup.barmanObjectStore on 2026-08-18 (removed in CNPG
+  # 1.31.0). isWALArchiver designates this plugin as the WAL archiver; the
+  # destination itself lives in the ObjectStore named below.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: pg-main-store
   monitoring:
     # Intentionally false — see infrastructure/cnpg-clusters/podmonitor.yaml for
     # why the PodMonitor is hand-written instead of operator-generated.

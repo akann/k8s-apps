@@ -8,5 +8,10 @@ spec:
   # sec=0 min=1 hour=* and runs HOURLY. Keep the leading 0.
   schedule: "0 0 1 * * *"
   backupOwnerReference: self
+  # Base backups now go through the plugin rather than the operator's own
+  # in-tree barman support (removed in CNPG 1.31.0).
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
   cluster:
     name: auth-service-pg

@@ -1,0 +1,33 @@
+---
+# Backup destination for pg-main, migrated 2026-08-18 from the cluster's
+# in-tree spec.backup.barmanObjectStore. CNPG removes in-tree Barman Cloud
+# support in 1.31.0; see k8s-apps/UPDATES.md.
+#
+# Field mapping is mechanical — everything under the old barmanObjectStore
+# moves verbatim into spec.configuration — with ONE exception:
+# retentionPolicy moves from the Cluster (.spec.backup.retentionPolicy) to
+# the ObjectStore's own .spec.retentionPolicy, a sibling of configuration.
+#
+# destinationPath is unchanged, so the existing base backups and WAL archive
+# in B2 stay in place and remain usable for PITR.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: pg-main-store
+  namespace: cnpg-clusters
+spec:
+  configuration:
+    destinationPath: s3://yanatech-cnpg/pg-main
+    endpointURL: https://s3.eu-central-003.backblazeb2.com
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-b2-credentials
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: cnpg-b2-credentials
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+  retentionPolicy: 30d

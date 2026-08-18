@@ -110,6 +110,38 @@ spec:
         - port: 53
           protocol: TCP
 ---
+# CNPG-I plugin traffic: the operator talks gRPC to the Barman Cloud Plugin
+# Deployment on 9090, both inside cnpg-system.
+#
+# Needed because this namespace has default-deny-all and NOTHING else opens
+# 9090: allow-cnpg-operator's ingress covers only 8080/9443, and its egress
+# only reaches the app namespaces on 8000/5432/9187. The operator logging
+# "Registered plugin" is NOT evidence this path works — registration only
+# reads the Service and TLS Secret from the API server. The gRPC call happens
+# later, when reconciling a Cluster that references the plugin, so without
+# this rule every plugin-backed cluster would fail to archive WAL while the
+# plugin still looked healthy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cnpg-plugin-grpc
+  namespace: cnpg-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 9090
+  egress:
+    - to:
+        - podSelector: {}
+      ports:
+        - port: 9090
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
