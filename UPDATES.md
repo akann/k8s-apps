@@ -45,8 +45,17 @@ gained an `objectstore.yaml` beside its manifest; the Cluster's `backup` block w
 replaced by `spec.plugins`, and its ScheduledBackup by `method: plugin`.
 `destinationPath` is unchanged throughout, so existing B2 backups stay valid.
 
-`dove-house-tt-stg-pg` was deliberately left alone — it has no backup config at all,
-which its own manifest comment documents as intentional ("data is disposable/re-seedable").
+`dove-house-tt-pg` was committed to that repo's `staging` branch first, per its
+staging-first convention, and promoted to `main` by merge shortly after — its rollout
+dropped writes for only ~40s and the old primary drained on its own, no intervention
+needed. `dove-house-tt-stg-pg` was deliberately left alone — it has no backup config at
+all, which its own manifest comment documents as intentional ("data is
+disposable/re-seedable").
+
+All seven are now on the plugin, every ArgoCD Application Synced/Healthy. A second
+end-to-end check on dove-house-tt-pg matched akan-pg's: base backup `20260818T105430`
+(`backup.info` + 4.75 MB `data.tar.gz`) beside the pre-migration ones in the same path,
+and a WAL segment archived at 10:53:05, after its 10:52:35 cutover.
 
 **Three things worth recording, each of which could have silently broken backups:**
 
