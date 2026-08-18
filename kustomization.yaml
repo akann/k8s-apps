@@ -65,6 +65,7 @@ resources:
 
   # Wave 7 — CNPG
   - infrastructure/cnpg/argocd-app-cnpg.yaml
+  - infrastructure/cnpg-plugin-barman-cloud/argocd-app-plugin-barman-cloud.yaml
   - infrastructure/cnpg-clusters/argocd-app-cnpg-clusters.yaml
 
   # Wave 8 — harbor and CI runners

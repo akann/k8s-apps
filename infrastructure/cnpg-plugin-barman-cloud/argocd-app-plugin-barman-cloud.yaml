@@ -1,0 +1,42 @@
+---
+# Barman Cloud Plugin for CloudNativePG (CNPG-I).
+#
+# CNPG's in-tree Barman Cloud support (spec.backup.barmanObjectStore) is
+# deprecated as of 1.26 and REMOVED in 1.31.0. Every CNPG cluster in this
+# workspace backs up through it, so this plugin is a hard prerequisite for the
+# next operator upgrade — see UPDATES.md (2026-08-18).
+#
+# Must be installed in the same namespace as the CNPG operator (cnpg-system),
+# and requires cert-manager, which this cluster already runs.
+#
+# Wave 8 puts it alongside the operator and, critically, BEFORE cnpg-clusters
+# (wave 9) and the app namespaces that own the other clusters — a Cluster that
+# references a plugin which is not yet running cannot archive WAL, and WAL then
+# accumulates on the volume until it is.
+#
+# targetRevision is PINNED, unlike the operator's "*": this sits directly in the
+# backup path, so chart upgrades should be a deliberate, reviewable commit.
+# Chart 0.7.1 -> plugin appVersion v0.14.0.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-plugin-barman-cloud
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"
+spec:
+  project: default
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: plugin-barman-cloud
+    targetRevision: "0.7.1"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cnpg-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
