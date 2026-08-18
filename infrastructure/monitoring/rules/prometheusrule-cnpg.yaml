@@ -59,15 +59,26 @@ spec:
 
     - name: cnpg.slots
       rules:
+        # Primary-only, deliberately. CNPG's HA slot synchronisation copies the
+        # primary's slots onto every standby, and those copies are ALWAYS
+        # active=0 there — nothing consumes a standby's copy. Alerting on them
+        # cluster-wide fires permanently on every standby (verified live: 6
+        # such series on a fully healthy 4-instance pg-main), which trains
+        # people to ignore the alert. Only an inactive slot on the primary
+        # means a consumer has stopped consuming.
         - alert: CNPGReplicationSlotInactive
-          expr: cnpg_pg_replication_slots_active == 0
+          expr: cnpg_pg_replication_slots_active == 0 and on(namespace, pod) cnpg_pg_replication_in_recovery == 0
           for: 30m
           labels:
             severity: warning
           annotations:
-            summary: "CNPG replication slot {{ $labels.slot_name }} inactive on {{ $labels.pod }}"
-            description: "Slot {{ $labels.slot_name }} on {{ $labels.pod }} has been inactive for 30 minutes. An inactive slot keeps pinning WAL for a consumer that is not consuming it."
+            summary: "CNPG replication slot {{ $labels.slot_name }} inactive on primary {{ $labels.pod }}"
+            description: "Slot {{ $labels.slot_name }} on primary {{ $labels.pod }} has been inactive for 30 minutes. An inactive slot keeps pinning WAL for a consumer that is not consuming it — this is how the 2026-08-18 incident retained 26GB on the primary."
 
+        # Cluster-wide on purpose, unlike the alert above: a standby's synced
+        # slot copy pins WAL on that standby's own disk. In the 2026-08-18
+        # incident the 42GB that filled pg-main-1 to 88% was held by exactly
+        # such a synced copy, not by a slot on the primary.
         - alert: CNPGReplicationSlotRetainingWAL
           expr: cnpg_pg_replication_slots_pg_wal_lsn_diff > 10e9
           for: 30m
