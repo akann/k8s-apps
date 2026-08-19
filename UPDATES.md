@@ -4,6 +4,82 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-19
+
+### authentik 2026.8 Rust proxy outpost: back-channel token exchange rejected by ingress-nginx → login loop on every gated app
+
+**Symptom:** `api-docs.yanatech.co.uk` (and other Authentik-gated hosts) appeared
+"offline" in a browser — the login flow completed successfully but never landed on the
+app, looping back to authentik indefinitely.
+
+**Not the cause, ruled out first:** the cluster had been rebooted (pve1/2/3, manually, as
+a remediation attempt) and Harbor's registry API was briefly 503, which put
+`ops-agent`/`api-docs`/`k8s-docs` into `ImagePullBackOff`. Both recovered on their own.
+Prometheus confirmed no node went `NotReady` in 48h, and
+`kube_deployment_status_replicas_available{deployment="api-docs"}` held at 1 continuously
+from 08-16 up to the reboot — the app was never down.
+
+**Actual cause:** authentik was upgraded 2026.5.6 → **2026.8.0** on 2026-08-18 22:22 UTC
+(outposts followed at 00:24 UTC). 2026.8 is the release that **rewrote the proxy outpost
+from Go to Rust**. The Rust back-channel's `POST /application/o/token/` — sent to the
+public `https://authentik.yanatech.co.uk/` — is **rejected by ingress-nginx with a 400
+before it is ever proxied upstream**. The outpost then logs
+`failed to redeem callback; restarting auth flow` (`src/outpost/proxy/backchannel.rs:86`)
+and bounces the browser back into the flow.
+
+**How it was pinned down** — the nginx access log distinguishes the two cases cleanly:
+
+| field | working client (`curl`) | Rust outpost |
+| --- | --- | --- |
+| `proxy_upstream_name` | `authentik-authentik-server-80` | *(empty)* |
+| `upstream_addr` | `10.244.3.203:9000` | *(empty)* |
+| `upstream_status` | `400` (real `invalid_client`) | *(empty)* |
+| `request_time` | `0.035` | `0.000` |
+| `request_length` | `138` | `30` |
+
+An empty `proxy_upstream_name` with `request_time 0.000` means nginx never routed the
+request at all — so the 400 is nginx's, not authentik's. Corroborating: the *same outpost
+pod's* API polling (GET, `user-agent: goauthentik.io/outpost/2026.8.0`) succeeds with 200
+throughout, and every token POST that does succeed on this cluster comes from an HTTP/1.1
+client (`Go-http-client/1.1`, `Authlib/1.7.2`). The exact parse failure was not proven —
+HTTP/2 prior-knowledge was tested and ruled out; the leading hypothesis is a
+connection-specific header or `Transfer-Encoding` on an ALPN-negotiated HTTP/2 connection,
+which HTTP/2 forbids and nginx 400s instantly. That would also explain why bodyless GETs
+survive.
+
+**Confirmed affected** (count of `failed to redeem callback` in the outpost log):
+`api-docs` 50, `argo-rollouts` 10, `mongo-express` 10, `kafka-ui` 8, `apicurio` 7.
+The other 7 outposts logged **zero token attempts** — meaning nobody attempted a fresh
+login through them, **not** that they work. Expect all 12 to be affected as sessions
+expire. All 12 pods are `1/1 Running` and connected to authentik, so pod health is not a
+useful signal here.
+
+**Fix:** move the back-channel inside the cluster so it never touches nginx — set each
+outpost's `authentik_host` to `http://authentik-server.authentik.svc.cluster.local/`
+(Service port 80 → pod 9000) while `authentik_host_browser` stays
+`https://authentik.yanatech.co.uk/` for browser-facing redirects. These Secrets are
+created by the authentik operator, so this must be changed in the **authentik admin UI**
+(Applications → Outposts → each outpost's configuration); editing the Kubernetes Secret
+directly gets reverted.
+
+**This needs a NetworkPolicy change or it swaps one breakage for another** (same class as
+the 2026-07-23 `akan-pg` gap): `allow-ingress-nginx` admits `authentik-server` traffic on
+9000/9443 **only from the `ingress-nginx` namespace**, and `allow-egress` opens
+53/443/6443/2525/465 — not 9000. So the in-cluster path is blocked in *both* directions by
+default. Two additive policies now cover it in `netpol-authentik.yaml`:
+`allow-outpost-to-server-egress` (outpost pods → server pods :9000) and
+`allow-server-ingress-from-outposts` (the counterpart ingress rule).
+
+**Observability gaps this exposed:**
+
+- **ingress-nginx is not scraped by Prometheus at all** — `nginx_ingress_controller_requests`
+  returns empty, so there is no HTTP status/error-rate history or alerting for any ingress.
+  The entire HTTP-level timeline had to be reconstructed from Loki and live log tails.
+- **`api-docs.yanatech.co.uk` is not monitored by uptime-kuma** (`shared-api-docs` is) —
+  Loki held no requests to that host at all before the manual browser attempts.
+
+---
+
 ## 2026-08-18
 
 ### Transient B2 read failure took out 5 kopia maintenance jobs — NOT a repeat of the 17th

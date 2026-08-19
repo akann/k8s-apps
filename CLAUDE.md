@@ -188,6 +188,23 @@ nginx.ingress.kubernetes.io/auth-snippet: |
 - **CRITICAL:** `auth-url` must use the external hostname, NOT the internal service URL. The outpost matches by external host.
 - **ingress-nginx** requires `allowSnippetAnnotations: true` AND `annotations-risk-level: Critical` for `auth-snippet`
 
+- **CRITICAL (authentik 2026.8+):** the proxy outpost's **back-channel must point at the
+  in-cluster Service, not the public hostname** — `authentik_host:
+  http://authentik-server.authentik.svc.cluster.local/`, with `authentik_host_browser:
+  https://authentik.yanatech.co.uk/` for browser redirects. 2026.8 rewrote the outpost
+  from Go to Rust, and the Rust back-channel's `POST /application/o/token/` is **rejected
+  by ingress-nginx with a 400 before it is ever proxied upstream** — every gated app then
+  sits in an endless login loop while looking completely healthy. Note this is the exact
+  opposite of the `auth-url` rule above: `auth-url` must stay the *external* hostname
+  (the outpost matches by external host), while the back-channel must be *internal*.
+  These Secrets are operator-generated, so change them in the authentik admin UI —
+  editing the Kubernetes Secret gets reverted. **Pod health is worthless as a signal
+  here:** all 12 outposts stay `1/1 Running` and connected. The diagnostic that actually
+  works is the nginx access log — an empty `proxy_upstream_name` with `request_time
+  0.000` means nginx rejected it itself and the 400 is not authentik's. And an outpost
+  with *zero* `failed to redeem callback` lines is not proven working, only untried; the
+  count only reflects who attempted a fresh login. See `UPDATES.md` (2026-08-19).
+
 **Deliberate exception — `lighthouse-ci`** (2026-07-22): uses HTTP Basic Auth
 built into `@lhci/server` instead of the Authentik forward-auth pattern above.
 Reason: the server needs to be usable by both `yana-stocks` CI's automated
@@ -482,6 +499,8 @@ curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/system/gc/sc
 9. **Adding a CNPG cluster to an *already-existing* namespace needs its own ingress-side rules too — rule 8 alone is not enough.** Rule 8's egress allowlist only opens the `cnpg-system` operator's *outbound* path toward the new cluster; something also has to open *inbound* access into the new instance pods themselves (`podSelector: {cnpg.io/cluster: <name>}`, ingress from `cnpg-system` on 8000/5432/9187) and allow the app's own pods same-namespace access to the DB (an `allow-intra-namespace` policy: bare `podSelector: {}`, ingress+egress from/to `podSelector: {}`). Every existing CNPG-hosting namespace already had this because its NetworkPolicy was written *together with* its CNPG cluster from day one (`k8s-docs`, `dove-house-tt`, `yana-stocks`/`auth-service-pg`) — so this gap only surfaces the first time a CNPG cluster is added to a namespace whose NetworkPolicy already existed for something else. Confirmed 2026-07-23 for `akan`/`akan-pg`: rules 2+8 alone left the cluster permanently stuck on `Instance Status Extraction Error`/`dial tcp <pod-ip>:8000: i/o timeout` for 5+ minutes with zero change (ruling out propagation delay) until the ingress-side `allow-cnpg-operator` + `allow-intra-namespace` pair (mirroring `yana-stocks`' exact shape) was added — resolved within ~90 seconds of that second fix syncing. See `UPDATES.md` (2026-07-23) for the full diagnosis, including how a live Hubble `hubble observe` trace (not guessing) confirmed both failure symptoms were genuine Cilium policy denies.
 
 10. **A Prometheus scrape target needs its own ingress rule on the *scraped* pod — `allow-prometheus-egress` being unrestricted proves nothing.** `monitoring`'s `default-deny-all` selects every pod in the namespace, so a component nobody wrote an ingress policy for (or wrote one for on a *different* port) is silently unscrapeable. This fails as `context deadline exceeded` in Prometheus's target list — indistinguishable from a hung endpoint, which is why it can sit undetected indefinitely: 9 targets were found this way on 2026-08-04, all with `avg_over_time(up[7d]) == 0`. Two traps in particular: (a) a component can expose **two** targets on different ports and have only one allowed — Alertmanager's 9093 was up while its config-reloader's 8080 was denied; (b) `/metrics` is often on the *same* port as the UI/API, so an existing rule for `ingress-nginx` or Grafana on that port still won't cover Prometheus, since NetworkPolicy `from` and `ports` are ANDed. Diagnose with `hubble observe --from-pod monitoring/prometheus-... --verdict DROPPED` on the scraper's own node — a `policy-verdict:none INGRESS DENIED` names the destination and settles it in one command.
+
+11. **The authentik outposts' in-cluster back-channel needs rules in *both* directions.** `allow-ingress-nginx` admits `authentik-server` on 9000/9443 only from the `ingress-nginx` namespace, and `allow-egress` opens 53/443/6443/2525/465 — not 9000. So pointing the outposts at `authentik-server.authentik.svc` (required on 2026.8+, see the SSO section) is blocked at the source *and* the destination until both `allow-outpost-to-server-egress` and `allow-server-ingress-from-outposts` exist in `netpol-authentik.yaml`. Same shape as rule 9: opening one direction and assuming it's done is the recurring failure here.
 
 ### Files
 

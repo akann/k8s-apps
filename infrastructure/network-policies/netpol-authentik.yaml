@@ -91,3 +91,55 @@ spec:
     - ports:
         - port: 2525  # SMTP2GO STARTTLS
         - port: 465   # SMTP2GO SSL
+---
+# Proxy outposts redeem OAuth codes over the in-cluster authentik-server Service
+# rather than the public ingress hostname. authentik 2026.8 rewrote the proxy
+# outpost from Go to Rust, and its back-channel POST to /application/o/token/ is
+# rejected by ingress-nginx with a 400 before it is ever proxied upstream
+# (empty proxy_upstream_name, request_time 0.000) — breaking the auth callback and
+# putting every gated app into a login loop. Keeping the back-channel inside the
+# cluster bypasses nginx entirely. The outposts' own GET API polling still goes out
+# over 443 via allow-egress; only the token exchange moves in-cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-outpost-to-server-egress
+  namespace: authentik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: goauthentik.io
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: authentik
+              app.kubernetes.io/instance: authentik
+              app.kubernetes.io/component: server
+      ports:
+        - port: 9000
+---
+# Counterpart ingress rule: allow-ingress-nginx only admits the ingress-nginx
+# namespace, so without this the outposts would be blocked at the server side.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-server-ingress-from-outposts
+  namespace: authentik
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/instance: authentik
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: goauthentik.io
+      ports:
+        - port: 9000
