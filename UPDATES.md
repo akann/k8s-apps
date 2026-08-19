@@ -70,6 +70,26 @@ default. Two additive policies now cover it in `netpol-authentik.yaml`:
 `allow-outpost-to-server-egress` (outpost pods → server pods :9000) and
 `allow-server-ingress-from-outposts` (the counterpart ingress rule).
 
+**RESOLVED same day.** All 12 outposts switched to the in-cluster back-channel and
+verified: `AUTHENTIK_HOST` internal on all 12, all `1/1`, all `connected to websocket`,
+zero `warn` lines, and **zero nginx rejections since 17:04 UTC** (the last one predates
+the first restart). End-to-end proof came from `api-docs`: 2 callback requests with **0**
+`failed to redeem callback` (previously every callback produced one), and 4×
+`status:200` on the `/outpost.goauthentik.io/auth/nginx` forward-auth subrequest —
+an actually-authenticated session being served. No issuer mismatch materialised.
+
+**Gotcha that cost the most time here: changing the outpost config in the authentik UI
+does nothing on its own.** `AUTHENTIK_HOST`/`AUTHENTIK_HOST_BROWSER` are injected into
+the pod via `valueFrom.secretKeyRef`, which is read **only at pod start** — updating the
+Secret leaves the running pod on the old value indefinitely. After the UI change the
+Secret read correctly while `kubectl exec ... echo $AUTHENTIK_HOST` still returned the
+public URL, and the outpost logged **63 further failures in 10 minutes**. Every outpost
+needs `kubectl rollout restart deployment ak-outpost-<name> -n authentik` afterwards.
+Reloader does not cover these (operator-generated Deployments carry no reloader
+annotation). Note the restart also drops the outpost's in-memory sessions, so everyone is
+signed out of that service once — validate the login path on **one** outpost before
+restarting the rest, or a bad config locks you out of all twelve at once.
+
 **Observability gaps this exposed:**
 
 - **ingress-nginx is not scraped by Prometheus at all** — `nginx_ingress_controller_requests`

@@ -204,6 +204,16 @@ nginx.ingress.kubernetes.io/auth-snippet: |
   0.000` means nginx rejected it itself and the 400 is not authentik's. And an outpost
   with *zero* `failed to redeem callback` lines is not proven working, only untried; the
   count only reflects who attempted a fresh login. See `UPDATES.md` (2026-08-19).
+- **Changing an outpost's config in the authentik UI does nothing until the pod is
+  restarted.** `AUTHENTIK_HOST`/`AUTHENTIK_HOST_BROWSER` reach the pod via
+  `valueFrom.secretKeyRef`, read only at pod start — the Secret updates immediately while
+  the running pod keeps the old value forever. Confirm with
+  `kubectl exec -n authentik deploy/ak-outpost-<name> -- sh -c 'echo $AUTHENTIK_HOST'`,
+  not by reading the Secret. Always follow a config change with
+  `kubectl rollout restart deployment ak-outpost-<name> -n authentik`; Reloader does not
+  cover these operator-generated Deployments. The restart also clears the outpost's
+  in-memory sessions (everyone signs in again), so **validate on one outpost before
+  restarting the rest** — a bad config otherwise locks you out of all twelve at once.
 
 **Deliberate exception — `lighthouse-ci`** (2026-07-22): uses HTTP Basic Auth
 built into `@lhci/server` instead of the Authentik forward-auth pattern above.
