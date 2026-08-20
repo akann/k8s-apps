@@ -4,6 +4,69 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20 (3)
+
+### `runners-k8s-apps` listener crash-looping for weeks, and `runners-yana-forex` stuck Terminating since June
+
+**`runners-k8s-apps` — the one that mattered.** Its ARC listener was restarting every
+~10 seconds with:
+
+```
+createSession failed: ... RunnerScaleSetNotFoundException: No runner scale set found with identifier 1.
+```
+
+The in-cluster `AutoscalingRunnerSet` (created 2026-06-04) still pinned
+`runner-scale-set-id: "1"`, but that scale set no longer existed on GitHub's side. Two
+`runs-on: runners-k8s-apps` workflows depend on it — `build-cnpg-image.yaml` and
+`build-sentry-gotify-bridge.yaml` — both path-triggered and infrequent, which is why this
+went unnoticed.
+
+**Ruled out first:** an ID collision. All five scale sets annotate `runner-scale-set-id:
+1`, including the three that were perfectly healthy — the IDs are per-repo, so `1` is
+simply the first scale set on each. Only `akann/k8s-apps` had lost its GitHub-side
+registration.
+
+**Fix:** delete the `AutoscalingRunnerSet` and let ArgoCD's `selfHeal` recreate it. It
+came back in ~10s, re-registered, and picked up a fresh `runner-scale-set-id: 2`. The
+listener has been `1/1 Running`, 0 restarts, and is polling normally
+(`Getting next message`, `Calculated target runner count {min:0, max:4}`).
+
+**Two ways this hides from you, both hit during diagnosis:**
+
+- The ARC controller deletes and recreates the listener pod instead of letting it sit in
+  `CrashLoopBackOff`, so `kubectl get pods` mostly catches it Pending/Terminating/absent.
+  The tell is pod **AGE** — healthy listeners were 24h old, this one was always seconds
+  old.
+- `gh api repos/akann/k8s-apps/actions/runners` returns `total_count: 0` **both before and
+  after the fix** — `minRunners: 0` means no runner is registered while idle. It is not a
+  health signal. The listener log is. (Same scale-to-zero misreading ops-agent's
+  `list_repo_runners` once made.)
+
+And: **green CI is not evidence this runner works.** `ingest-docs.yml` runs on
+`ubuntu-latest`, so every push to this repo went green throughout.
+
+**`runners-yana-forex` — correcting the 2026-08-20 (2) entry.** It was written up as an
+orphan left behind by a git-only Application deletion. It was not. Its
+`deletionTimestamp` was **2026-06-09T16:13:00Z** — the delete had been issued correctly
+and then hung on ARC's own `autoscalingrunnerset.actions.github.com/finalizer`, which
+de-registers the scale set from GitHub and can never succeed for `akann/yana-forex`,
+a repo that no longer exists. It sat in Terminating for **two months**, printing as an
+ordinary `kubectl get` row the whole time. Cleared with:
+
+```bash
+kubectl patch autoscalingrunnerset runners-yana-forex -n actions-runner --type=merge \
+  -p '{"metadata":{"finalizers":null}}'
+```
+
+**Lesson:** check `.metadata.deletionTimestamp` before concluding anything was orphaned —
+a stuck-Terminating object and an orphaned one look identical in `kubectl get`, and they
+have completely different causes and fixes.
+
+`actions-runner` now holds exactly four scale sets: `runners-k8s-apps`, `runners-ml`,
+`runners-shared-services`, `runners-yana-stocks`.
+
+---
+
 ## 2026-08-20 (2)
 
 ### Removed the unused `runners-yana-ecommerce` ARC scale set — and found `runners-yana-forex` orphaned by the same removal done wrong
@@ -19,18 +82,12 @@ cascading — `bootstrap` prunes the Application object and the `AutoscalingRunn
 `AutoscalingListener` and listener pod are simply left behind, still running, with nobody
 managing them.
 
-This is not hypothetical. `runners-yana-forex` is live in `actions-runner` right now with:
-
-- **no** corresponding ArgoCD Application (`applications.argoproj.io "runners-yana-forex"
-  not found`)
-- **no** reference anywhere in this repo (`grep -rn yana-forex` returns nothing)
-- an `argocd.argoproj.io/tracking-id: runners-yana-forex:...` annotation proving it *was*
-  ArgoCD-managed once
-- a `githubConfigUrl` pointing at `akann/yana-forex`, **a repo that no longer exists**
-
-So a previous removal did exactly the git-only deletion, and the runner set has been
-sitting there un-managed ever since. Left in place for now — flagged, not silently
-cleaned up, since it was outside the scope of this request.
+`runners-yana-forex` was flagged here as live proof of that trap. **That diagnosis was
+wrong** — see the 2026-08-20 (3) entry below. It carried a `deletionTimestamp` of
+2026-06-09: the deletion *had* been issued properly and had been stuck on ARC's own
+finalizer for two months. The Application-finalizer point above still stands on its own
+(verified against `runners-yana-ecommerce` and `runners-ml`, neither of which sets
+`resources-finalizer`), but yana-forex was never an example of it.
 
 **Correct removal order used here**, to avoid adding a second orphan:
 

@@ -378,19 +378,14 @@ done.
 
 **Gotcha found while adding this:** `infrastructure/cilium/kustomization.yaml` — like `infrastructure/harbor/` and `infrastructure/monitoring/` — is a strict resource whitelist; the `cilium-policies` Application only applies files explicitly listed there, not everything in the directory. Three pre-existing files (`ciliumnetpol-ops-agent-to-alertmanager.yaml`, `-to-prometheus.yaml`, `-to-minio.yaml`) were committed but never added to this list, so ops-agent's observability and minio subagents had **no actual network path this whole time** despite being documented as working in `ml`'s CLAUDE.md — confirmed live (`kubectl get ciliumnetworkpolicy -n ops-agent` was missing all three). Fixed in the same commit as the new `argocd-to-alertmanager` policy. **When adding any new file to `infrastructure/cilium/` or `infrastructure/harbor/` or `infrastructure/monitoring/` (or any directory with its own `kustomization.yaml`), it must be added to that local `kustomization.yaml` too — the file existing in git is not sufficient.**
 
-### Removing an ArgoCD Application: no finalizer means children are orphaned, not deleted
+### Removing an ArgoCD Application, and the two finalizer traps around it
 
-The Applications in this repo do **not** set `resources-finalizer.argocd.argoproj.io`.
-Deleting an Application (or removing its manifest from the root `kustomization.yaml` so
-`bootstrap` prunes it) therefore leaves every resource it created **running and
-unmanaged** — it does not cascade. `runners-yana-forex` is a live example: its
-`AutoscalingRunnerSet` still runs in `actions-runner`, still carries an
-`argocd.argoproj.io/tracking-id`, has no Application, no reference anywhere in this repo,
-and points at a GitHub repo that no longer exists.
-
-To remove an app properly: **push the git removal first** (otherwise `bootstrap`'s
-`selfHeal` recreates the Application within seconds of any live deletion), then add the
-finalizer to the live Application and delete it so the deletion cascades:
+**Trap 1 — Applications here set no `resources-finalizer.argocd.argoproj.io`.** Deleting
+an Application (or removing its manifest from the root `kustomization.yaml` so `bootstrap`
+prunes it) leaves the resources it created **running and unmanaged** — it does not
+cascade. To remove an app properly, **push the git removal first** (otherwise
+`bootstrap`'s `selfHeal` recreates the Application within seconds of any live deletion),
+then add the finalizer to the live Application so the delete cascades:
 
 ```bash
 kubectl patch application <name> -n argocd --type=merge \
@@ -399,7 +394,47 @@ kubectl delete application <name> -n argocd
 ```
 
 Then confirm the child resources are actually gone — the Application disappearing proves
-nothing on its own. See `UPDATES.md` (2026-08-20).
+nothing on its own.
+
+**Trap 2 — an ARC `AutoscalingRunnerSet` can hang in Terminating literally forever.** It
+carries `autoscalingrunnerset.actions.github.com/finalizer`, which de-registers the scale
+set from GitHub before the object is removed. If the GitHub repo or the scale set is
+already gone, that call fails and **the finalizer never completes**. Nothing about
+`kubectl get autoscalingrunnerset` reveals this — a stuck object prints as an ordinary
+row with blank status columns, indistinguishable from an idle one. `runners-yana-forex`
+sat in this state from **2026-06-09 to 2026-08-20**, two months, and looked like an
+orphan left behind by a sloppy deletion; its `deletionTimestamp` is what showed the
+delete had actually been issued and had simply never finished. **Always check
+`.metadata.deletionTimestamp` before concluding a resource was orphaned.** Clear it with:
+
+```bash
+kubectl patch autoscalingrunnerset <name> -n actions-runner --type=merge \
+  -p '{"metadata":{"finalizers":null}}'
+```
+
+### ARC listener crash-looping: `RunnerScaleSetNotFoundException`
+
+If a runner scale set's listener restarts every ~10s with
+`createSession failed: ... No runner scale set found with identifier N`, the GitHub-side
+scale set is gone while the in-cluster `AutoscalingRunnerSet` still pins the stale
+`runner-scale-set-id` annotation. Fix is to delete the `AutoscalingRunnerSet` and let
+ArgoCD's `selfHeal` recreate it (~10s), which re-registers and gets a fresh id.
+
+Two things that make this hard to spot, both worth knowing:
+
+- **The ARC controller deletes and recreates the listener pod rather than leaving it in
+  `CrashLoopBackOff`**, so `kubectl get pods` catches it Pending/Terminating/absent and
+  rarely shows an obvious error. Compare pod **AGE** against the other listeners —
+  healthy ones are days old, a churning one is always seconds old.
+- **`gh api repos/<r>/actions/runners` returning `total_count: 0` proves nothing either
+  way.** These scale sets run `minRunners: 0`, so zero registered runners is the normal
+  idle state — before *and* after the fix. The real signal is the listener log: `Getting
+  next message` / `Calculated target runner count` means `createSession` succeeded. Same
+  scale-to-zero misreading that ops-agent's `list_repo_runners` once made.
+
+Also note **a green CI run does not prove the self-hosted runner works** — `ingest-docs.yml`
+runs on `ubuntu-latest`, so routine pushes stay green while every `runs-on:
+runners-k8s-apps` job would sit queued. See `UPDATES.md` (2026-08-20).
 
 ### Application source path discipline
 
