@@ -4,6 +4,72 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20
+
+### MinIO ArgoCD sync failing for weeks on its own Helm post-upgrade hook — and the chart-default `console`/`console123` admin it exists to create
+
+**Symptom:** `argocd app list` showed `minio  Synced  Healthy`, while the app's
+`status.operationState` read `Failed | started 2026-08-19T23:38:02Z | finished
+2026-08-20T00:45:02Z | one or more synchronization tasks completed unsuccessfully`.
+**ArgoCD excludes Helm hooks from Application health**, so a hook that fails forever is
+invisible in the app list and in every "show me non-healthy apps" sweep — the only
+surface was a `minio-post-job` Job sitting `Failed 0/1` with `BackoffLimitExceeded`.
+
+**Cause:** the `minio` namespace's egress allows only 53, 443 and 6443. Verified at the
+datapath, not inferred from YAML — `cilium-dbg bpf policy get <ep>` on the minio endpoint
+lists exactly four Egress entries (53/TCP, 53/UDP, 6443/TCP, 443/TCP) and no 9000. The
+hook's `add-user` script does `mc alias set myminio http://minio:9000 …` in a 30-attempt
+loop, gets dropped every time, exits 1, and burns `backoffLimit: 6`.
+
+**Why nothing else broke:** ingress on 9000 is open from all namespaces, so every
+*external* consumer (CNPG barman, Velero, harbor, kafka-ui, apicurio, lighthouse-ci) was
+unaffected. The post-job is the only *in-namespace* client of minio:9000, so it was the
+only thing the missing egress rule could break.
+
+**The part that actually mattered.** The job's entire purpose is to create the minio chart
+5.4.0 built-in default user — not something this repo ever configured:
+
+```yaml
+users:
+  - accessKey: console
+    secretKey: console123
+    policy: consoleAdmin
+```
+
+`mc admin user list` confirmed it was live and enabled with `consoleAdmin` — a full-admin
+account on a documented default password. It exists because the hook **succeeded once**:
+`feat: MinIO 5.4.0 standalone` landed 2026-06-09 20:29 and `feat: NetworkPolicy for minio
+namespace` 18 minutes later at 20:47, so the post-install run in that window worked and
+every sync since has failed. Mitigating factor: neither `minio.yanatech.co.uk` nor
+`minio-console.yanatech.co.uk` resolves in public DNS (`dig @1.1.1.1` empty for both —
+the deliberate admin-tools-stay-internal pattern), and `minio-console`'s Ingress carries
+no Authentik forward-auth annotations, so this was LAN-reachable but not internet-exposed.
+
+**Fix (both halves — one alone is not enough):**
+
+1. `users: []` in `infrastructure/minio/argocd-app-minio.yaml`. The chart guards the whole
+   Job on `{{- if or .Values.buckets .Values.users .Values.policies .Values.customCommands
+   .Values.svcaccts }}` and the other four are already empty, so the hook stops rendering
+   entirely. Verified with `helm template` against chart 5.4.0 **with a positive control** —
+   chart defaults render 1 Job, these values render 0 while still producing all 9 real
+   resources (Deployment, PVC, 2 Ingress, 2 Service, SA, ConfigMap, Probe).
+2. `mc admin user remove local console`. Step 1 does not touch what is already in MinIO.
+   Checked first that the account had no service accounts (`mc admin user svcacct list`)
+   and no group memberships — removal is clean. The Authentik-derived policies
+   (`akan2000@gmail.com`, `authentik-admins`), which are what actually back console login,
+   are untouched.
+
+The orphaned `minio-post-job` Job object was deleted by hand — once the hook stops
+rendering, ArgoCD no longer manages it and would have left it `Failed` in the namespace
+indefinitely.
+
+**Deliberately NOT done:** adding port 9000 to the minio namespace's egress. That would
+make the hook succeed, which means it would recreate `console`/`console123` on the next
+sync. The missing egress rule was, by accident, the only thing suppressing a default
+admin credential — fixing the "network bug" alone would have quietly reintroduced it.
+
+---
+
 ## 2026-08-19
 
 ### authentik 2026.8 Rust proxy outpost: back-channel token exchange rejected by ingress-nginx → login loop on every gated app

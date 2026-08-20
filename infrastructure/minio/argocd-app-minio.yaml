@@ -15,6 +15,11 @@ spec:
       releaseName: minio
       valuesObject:
         existingSecret: minio-secret
+        # Chart default is a `console`/`console123` user with the consoleAdmin
+        # policy. Empty here also stops the post-install/post-upgrade hook job
+        # (minio-post-job) from rendering at all -- it could never reach
+        # minio:9000 anyway, since this namespace has no egress on 9000.
+        users: []
         mode: standalone
         persistence:
           enabled: true
