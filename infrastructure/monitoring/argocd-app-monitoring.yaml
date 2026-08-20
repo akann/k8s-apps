@@ -27,6 +27,14 @@ spec:
             # issue (control-plane components bind their metrics ports to
             # 127.0.0.1 — see the accompanying bind-address fix), not disabled here.
             KubeProxyDown: true
+            # Replaced by EtcdCommitDurationExcursion in
+            # rules/prometheusrule-etcd.yaml. The 0.25s upstream threshold
+            # sits directly on this cluster's ~240ms baseline commit p99,
+            # so it flaps on jitter and reads as noise; meanwhile the real
+            # chronic problem (fsync p99 150-200ms vs a <10ms target) is
+            # invisible to upstream's 0.5s fsync rule. See UPDATES.md
+            # 2026-08-20.
+            etcdHighCommitDurations: true
         grafana:
           enabled: true
           adminPassword: ""  # managed via grafana-authentik-secret

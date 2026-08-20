@@ -1,0 +1,130 @@
+---
+# Ceph cluster alerting.
+#
+# Written 2026-08-20 after an etcdHighCommitDurations alert turned out to be
+# driven by a Ceph OSD crash. Investigating it surfaced that Ceph had been
+# HEALTH_WARN with three daemon crashes since 2026-08-16 — osd.2 twice on
+# 08-16, osd.5 on 08-20 — and *nothing was watching*. The MGR prometheus
+# exporters on :9283 were up and scraping fine on all three hosts; there were
+# simply zero Ceph alerting rules loaded, so four days of degraded storage
+# passed unnoticed until a downstream etcd latency alert happened to fire.
+#
+# That matters more than usual here because every k8s VM disk is on Ceph RBD,
+# including etcd's WAL — so a Ceph problem shows up as control-plane latency
+# (leader elections, failed proposals) long before anyone looks at Ceph.
+#
+# Metric names and labels below were all verified live against this cluster's
+# own exporter, not taken from documentation.
+#
+# NOTE ON MGR FAILOVER: only the *active* MGR exports these series (currently
+# 192.168.22.11). Every expression is aggregated without `instance` so that a
+# MGR failover changes which host exports, not which alerts fire.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ceph-cluster-health
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: ceph.health
+      rules:
+        - alert: CephHealthError
+          expr: max(ceph_health_status) == 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph cluster is HEALTH_ERR"
+            description: "Ceph has been in HEALTH_ERR for 5 minutes. Every Kubernetes VM disk on this cluster is backed by Ceph RBD, so this is a whole-cluster storage fault, not just a storage-service issue. Check `ceph health detail` and `ceph -s` on a Proxmox node."
+
+        - alert: CephHealthWarn
+          expr: max(ceph_health_status) == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph cluster has been HEALTH_WARN for 30m"
+            description: "Ceph has been HEALTH_WARN for 30 minutes. Use the CephHealthCheckActive alert or `ceph health detail` to see which specific check is failing — this alert deliberately does not tell you, because ceph_health_detail does."
+
+        - alert: CephHealthCheckActive
+          expr: max by(name, severity) (ceph_health_detail) == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph health check {{ $labels.name }} is active"
+            description: "Ceph health check {{ $labels.name }} ({{ $labels.severity }}) has been active for 15 minutes. Run `ceph health detail` on a Proxmox node for the specific daemons/PGs involved."
+
+    - name: ceph.osd
+      rules:
+        - alert: CephOSDDown
+          expr: max by(ceph_daemon) (ceph_osd_up) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph {{ $labels.ceph_daemon }} is down"
+            description: "{{ $labels.ceph_daemon }} has been down for 5 minutes. Expect elevated RBD latency cluster-wide while Ceph backfills — during the 2026-08-20 osd.5 crash, pve3's NVMe write latency went from ~4ms to ~28ms and etcd commit p99 hit 720ms."
+
+        - alert: CephOSDFlapping
+          expr: sum by(ceph_daemon) (changes(ceph_osd_up[1h])) > 2
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph {{ $labels.ceph_daemon }} is flapping"
+            description: "{{ $labels.ceph_daemon }} has changed up/down state {{ $value }} times in the last hour. A repeatedly-restarting OSD degrades RBD latency for every VM without ever showing as durably down."
+
+        # This is the alert that would have caught the 2026-08-16 crashes four
+        # days before anyone noticed. RECENT_CRASH stays set until the crashes
+        # are explicitly acknowledged with `ceph crash archive-all`, so `for` is
+        # short and the alert is expected to persist until a human acts.
+        - alert: CephDaemonRecentlyCrashed
+          expr: max(ceph_health_detail{name="RECENT_CRASH"}) == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "A Ceph daemon has crashed recently"
+            description: "Ceph reports RECENT_CRASH. Capture the evidence BEFORE it ages out — `ceph crash ls` then `ceph crash info <id>` on a Proxmox node, plus /var/log/ceph/ceph-osd.<id>.log. Note pve3's journald retention was only ~2.7h on 2026-08-20, which is why the crashes of 08-16 and 08-20 could not be diagnosed at all. Clear with `ceph crash archive-all` once investigated, or this alert stays firing."
+
+        - alert: CephSlowOps
+          expr: max(ceph_healthcheck_slow_ops) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph is reporting {{ $value }} slow ops"
+            description: "Ceph has had slow operations for 5 minutes. This surfaces directly as guest VM disk latency and, on this cluster, as etcd commit/fsync latency."
+
+    - name: ceph.capacity
+      rules:
+        - alert: CephClusterNearFull
+          expr: max(ceph_cluster_total_used_bytes / ceph_cluster_total_bytes) > 0.75
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph cluster is {{ $value | humanizePercentage }} full"
+            description: "Ceph raw usage is above 75%. Ceph performance degrades well before 100%, and a full cluster blocks writes on every VM disk."
+
+        - alert: CephClusterCriticallyFull
+          expr: max(ceph_cluster_total_used_bytes / ceph_cluster_total_bytes) > 0.85
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph cluster is {{ $value | humanizePercentage }} full"
+            description: "Ceph raw usage is above 85%. Approaching the point where OSDs hit full ratio and writes are refused cluster-wide."
+
+    - name: ceph.pg
+      rules:
+        - alert: CephPGsNotActive
+          expr: max(ceph_pg_total) - max(ceph_pg_active) > 0
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $value }} Ceph PGs are not active"
+            description: "Placement groups have been inactive for 15 minutes. IO to the affected RBD images is stalled — this will present as VMs hanging on disk, not as a Ceph alert, unless you look here."

@@ -4,6 +4,76 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20 (4)
+
+### etcd latency alert traced to a Ceph OSD crash — and Ceph had no alerting at all
+
+An `etcdHighCommitDurations` alert named `192.168.33.23:2381`. Both of its implications
+were wrong: **all three** etcd instances were equally affected, and the condition is
+**chronic, not an incident**.
+
+**Verified causal chain** (each step measured in Prometheus, not inferred):
+
+| time (UTC) | event |
+|---|---|
+| 05:52:36 | `osd.5` crashes on pve3 |
+| 05:55 | etcd commit p99 crosses 250ms (386ms) |
+| 06:05-06:15 | pve3 NVMe write latency **21-28ms**, ~7x its 3-6ms baseline (Ceph backfill) |
+| 06:10 | etcd commit p99 peaks at **720ms** |
+| 06:20 | pve3 NVMe back to 3.9ms; ~06:30 etcd recovered |
+
+**The chronic layer underneath.** `/var/lib/etcd` is on the VM root disk, which is Ceph
+RBD (`rbd:vm-103-disk-1` for k8s-cp-3, from pve3's vzdump log). WAL fsync p99 has averaged
+**~150ms for the entire 30d retention window** against etcd's <10ms target. That is not
+free: **14 leader changes and 353 failed proposals in 7 days**, 140k slow applies in 24h.
+Load is trivial — **~80 write IOPS at ~42% utilisation** — so this is path latency, not
+contention, and adding capacity will not help.
+
+**The finding that mattered most: Ceph had zero alerting.** The MGR exporters on :9283 are
+**up on all three hosts** and export 99 `ceph_*` metrics (this repo's CLAUDE.md claimed
+they were down pending a pfSense rule — stale, now corrected). But no Ceph alert rules
+were ever loaded, so `HEALTH_WARN` with **three daemon crashes since 2026-08-16** — osd.2
+twice on 08-16, osd.5 on 08-20 — went unnoticed for four days, until a *downstream* etcd
+latency alert happened to fire. Storage was degraded and the only thing that noticed was a
+symptom two layers up.
+
+**Added `rules/prometheusrule-ceph.yaml`** — 10 alerts over health/OSD/capacity/PG,
+including `CephDaemonRecentlyCrashed` on `ceph_health_detail{name="RECENT_CRASH"}`, which
+would have caught this on 08-16. All metric names and labels verified live against the
+cluster's own exporter, and every expression was executed against Prometheus before commit:
+3 of the 10 fire against current state (correctly — the cluster *is* HEALTH_WARN with
+RECENT_CRASH set), 7 are quiet. Note only the **active MGR** exports these series, so every
+expression aggregates without `instance` to survive MGR failover.
+
+**Retuned the etcd alerts** (`rules/prometheusrule-etcd.yaml`). Upstream gave the worst of
+both worlds here:
+
+- `etcdHighFsyncDurations` triggers above **0.5s** → never fired, despite fsync sitting at
+  15-20x the healthy target for a month.
+- `etcdHighCommitDurations` triggers above **0.25s** → sits directly on the ~240ms
+  baseline, so it flaps on jitter and reads as noise.
+
+So the real problem was invisible and the firing alert was easy to dismiss.
+`etcdHighCommitDurations` is now disabled via `defaultRules.disabled` and replaced by two
+alerts that separate the questions: `EtcdCommitDurationExcursion` (>500ms/5m — "something
+changed"; verified it would have caught the 06:05-06:15 spike) and
+`EtcdStorageChronicallySlow` (fsync >50ms/6h — "chronically unhealthy").
+
+**`EtcdStorageChronicallySlow` is expected to fire continuously** until etcd's data
+directory moves off Ceph RBD. That is deliberate: it represents a real accepted risk rather
+than a green dashboard. If the risk is consciously accepted, silence it in Alertmanager so
+the decision stays visible — don't delete the rule.
+
+**Still open, needs Proxmox host access (PMX_VLAN blocks SSH from both laptop and kc1):**
+why `osd.5` crashed. The Proxmox API exposes no Ceph crash-module endpoint and pve3's
+journald retains only **~2.7 hours**, so all three crash timestamps have rotated out.
+Needs `ceph crash ls` / `ceph crash info <id>` on the host, plus raising `SystemMaxUse` in
+pve3's journald config or the next crash will be equally unrecoverable. Ruled out by
+measurement: **OOM** (`increase(node_vmstat_oom_kill[7d])` = 0 on all three hosts) and a
+host reboot at crash time (uptime ~1.08d = the 2026-08-19 manual reboot).
+
+---
+
 ## 2026-08-20 (3)
 
 ### `runners-k8s-apps` listener crash-looping for weeks, and `runners-yana-forex` stuck Terminating since June

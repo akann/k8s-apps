@@ -7,3 +7,5 @@ resources:
   - prometheusrule-velero.yaml
   - prometheusrule-cert-manager.yaml
   - prometheusrule-cnpg.yaml
+  - prometheusrule-ceph.yaml
+  - prometheusrule-etcd.yaml

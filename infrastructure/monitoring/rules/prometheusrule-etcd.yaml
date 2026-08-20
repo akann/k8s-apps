@@ -1,0 +1,68 @@
+---
+# etcd storage-latency alerting, replacing one upstream default.
+#
+# Written 2026-08-20. The upstream kube-prometheus-stack etcd rules are tuned
+# for "catastrophically broken", not "chronically unhealthy", and on this
+# cluster that combination produced the worst of both worlds:
+#
+#   etcdHighFsyncDurations   fires above 0.5s  -> NEVER fires here, despite
+#                                                 fsync p99 sitting at
+#                                                 150-200ms for 30+ days,
+#                                                 which is 15-20x etcd's
+#                                                 healthy target of <10ms.
+#   etcdHighCommitDurations  fires above 0.25s -> baseline commit p99 is ~240ms,
+#                                                 so it flaps over the line on
+#                                                 ordinary jitter and reads as
+#                                                 noise.
+#
+# So the genuinely bad chronic condition was invisible, and the alert that did
+# fire was easy to dismiss. etcdHighCommitDurations is disabled in
+# argocd-app-monitoring.yaml (defaultRules.disabled) and replaced below by a
+# pair that separates the two distinct questions: "is it degrading right now"
+# and "is it chronically unhealthy".
+#
+# Root cause of the chronic figure: /var/lib/etcd lives on the VM root disk,
+# which is Ceph RBD (confirmed: pve3 vzdump shows rbd:vm-103-disk-1 for
+# k8s-cp-3). Load is trivial (~80 write IOPS at ~42% util), so this is path
+# latency, not contention. See UPDATES.md 2026-08-20.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: etcd-storage-latency
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: etcd.storage
+      rules:
+        # ACUTE: a genuine excursion above the chronic baseline. Set above the
+        # ~240ms baseline deliberately so it means "something changed", not
+        # "the baseline drifted". Verified against the 2026-08-20 osd.5 crash,
+        # where commit p99 hit 637ms/720ms/503ms across three consecutive 5m
+        # samples — this would have fired, the flapping 0.25s rule merely
+        # added noise on top of an already-noisy signal.
+        - alert: EtcdCommitDurationExcursion
+          expr: histogram_quantile(0.99, sum by(instance, le) (rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[5m]))) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "etcd commit p99 on {{ $labels.instance }} is {{ $value | humanizeDuration }}"
+            description: "etcd backend commit p99 has been above 500ms for 5 minutes — well above this cluster's (already poor) ~240ms baseline, so something has actively degraded. On this cluster the usual cause is Ceph: check Ceph health first (CephOSDDown / CephDaemonRecentlyCrashed), since every VM disk is on Ceph RBD. During the 2026-08-20 osd.5 crash this reached 720ms while pve3's NVMe latency went from 4ms to 28ms."
+
+        # CHRONIC: the condition upstream's 0.5s threshold cannot see.
+        # EXPECTED TO FIRE CONTINUOUSLY until etcd's data directory is moved
+        # off Ceph RBD onto local NVMe. That is the point — it represents a
+        # real, accepted-for-now architectural risk rather than pretending
+        # the cluster is healthy. If the risk is consciously accepted, silence
+        # it deliberately in Alertmanager rather than deleting the rule, so the
+        # decision stays visible.
+        - alert: EtcdStorageChronicallySlow
+          expr: histogram_quantile(0.99, sum by(instance, le) (rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=~".*etcd.*"}[5m]))) > 0.05
+          for: 6h
+          labels:
+            severity: warning
+          annotations:
+            summary: "etcd WAL fsync p99 on {{ $labels.instance }} is {{ $value | humanizeDuration }}"
+            description: "etcd WAL fsync p99 has been above 50ms for 6 hours. etcd's healthy target is under 10ms; sustained latency here causes leader elections and failed proposals even while the cluster looks fine (this cluster saw 14 leader changes and 353 failed proposals in a week at ~150ms). Cause: /var/lib/etcd is on the VM root disk, which is Ceph RBD. Fix is a dedicated virtual disk on local NVMe. Upstream's etcdHighFsyncDurations does not catch this — its threshold is 0.5s."
