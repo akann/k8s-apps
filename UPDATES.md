@@ -4,6 +4,86 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20 (6)
+
+### Root cause of the pve3 OSD crashes: silent corruption on a non-ECC host, not the drives
+
+SSH to pve1 was opened, which made `ceph crash info` reachable and settled this.
+
+**osd.5, 2026-08-20T05:52:36Z** — the crash that spiked etcd. The actual failure, from
+pve3's journal:
+
+```
+Compaction error: Corruption: block checksum mismatch:
+  stored = 3285053843, computed = 2766142385, type = 4
+  in db/177594.sst offset 6562049 size 940
+```
+
+RocksDB read back a block whose contents did not match its stored checksum, set a
+background IO error, and BlueStore's next KV transaction then failed
+`ceph_assert(r == 0)` at `BlueStore.cc:14425` in `_txc_apply_kv` (thread `bstore_kv_sync`)
+and aborted the OSD.
+
+**osd.2, 2026-08-16 x2** — both share one stack signature
+(`73718d9f...`), distinct from osd.5's. Their backtrace is an
+`__assert_perror_fail()` inside **`rocksdb::InlineSkipList::Insert`** — the in-memory
+memtable skiplist. **A disk fault cannot corrupt an in-memory skiplist insert.** This is
+the single most diagnostic fact in the whole investigation.
+
+**The drives are not the problem.** Both pve3 NVMes report clean SMART:
+
+| device | model | Media & Data Integrity Errors | Error log entries | Wear | Spare |
+|---|---|---|---|---|---|
+| nvme0n1 (osd.2) | Lexar NM790 2TB | **0** | 0 | 11% | 100% |
+| nvme1n1 (osd.5) | Lexar NM790 1TB | **0** | 0 | 21% | 100% |
+
+The drives detected nothing, yet RocksDB saw corrupted data — so the corruption happened
+outside the drives' own integrity checking. And the two crashing OSDs are on **two
+different physical devices on the same host**, which argues against a failing drive and for
+a host-level fault.
+
+**pve3's RAM is non-ECC** — `dmidecode -t memory` reports `Error Correction Type: None`
+(DDR5, 2x32GB). So EDAC's zero counters prove nothing: with non-ECC memory there is no
+hardware detection of a bit flip at all, and silent corruption is exactly the expected
+symptom.
+
+**Conclusion: a host-level fault on pve3, most likely memory.** Same class as pve1's bad
+RAM (DIMMs replaced ~2026-07-31). **Next step is `memtest86+` on pve3**, which needs a
+maintenance window — not done here.
+
+**Data integrity is intact.** All **113 PGs are `active+clean`** with no scrub errors, so
+the corruption stayed inside osd.5's own RocksDB metadata and did not reach Ceph object
+data. Both OSDs are currently up and have logged zero corruption events since the crash.
+The three crashes are deliberately **left un-archived** so `RECENT_CRASH` keeps firing —
+the underlying fault is unresolved. Clear with `ceph crash archive-all` only after pve3 is
+actually fixed.
+
+### Two ops-agent claims from entry (3) were wrong — corrected
+
+1. **"pve3's journal retains only ~2.7 hours."** False. `journalctl --list-boots` shows the
+   previous boot covering **2026-06-23 → 08-19** and the current one from 08-19 onward, with
+   **4GB** of journals retained. The crash logs were there the whole time; ops-agent's
+   ~2.7h figure appears to be its API tool's 10,000-entry cap, misread as retention. No
+   journald change is needed on pve3.
+2. **"Absence of hardware errors suggests a software cause rather than failing hardware."**
+   Wrong, and backwards — it *is* hardware. It was also unsound reasoning at the time,
+   since the window searched contained none of the three crashes.
+
+**Lesson: an agent reporting that data is unavailable is a claim to verify, not a fact to
+relay.** Both errors were on the "absence of evidence" axis, and both would have closed the
+investigation prematurely if taken at face value.
+
+### Bonus finding for the etcd latency story
+
+The OSDs run on **Lexar NM790** drives — consumer, DRAM-less, **no power-loss protection**.
+That is a material part of why etcd's WAL fsync p99 sits at ~150ms: without PLP, an
+O_DSYNC write cannot be acknowledged from a volatile cache and must reach flash. So the
+chronic etcd latency in entry (4) is not merely "it's on Ceph" — it is "it's on Ceph on
+consumer NVMe without PLP". Worth weighing when deciding where to move etcd's data
+directory: local NVMe on these same drives would be an improvement but not a cure.
+
+---
+
 ## 2026-08-20 (5)
 
 ### etcd heartbeat/election raised to 500ms/5000ms on all three control planes
