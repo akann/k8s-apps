@@ -4,6 +4,46 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20 (5)
+
+### etcd heartbeat/election raised to 500ms/5000ms on all three control planes
+
+Follow-on from (4). Symptom management for the chronic Ceph RBD latency, applied to reduce
+the 14 leader elections/week — **not a fix**. The fix is moving etcd's data directory onto
+local NVMe.
+
+**Discovery that changes the calculus: etcd was already tuned.** The manifests were not at
+kubeadm defaults (`heartbeat-interval=100`, `election-timeout=1000`) — they were already at
+**250/2500**, i.e. someone had raised them 2.5x previously, and the cluster was *still*
+producing 14 leader changes and 353 failed proposals a week. Raised again to **500/5000**.
+Expect this to reduce spurious elections during IO stalls, but treat further tuning as
+having sharply diminishing returns: the storage is the problem.
+
+Trade-off accepted: a genuinely dead leader now takes up to ~5s to be replaced instead of
+~2.5s.
+
+**These are kubeadm static pod manifests and are NOT in git.** Backups on each control
+plane at `/root/etcd.yaml.bak-20260820`. Rollback is `sudo cp` that back over
+`/etc/kubernetes/manifests/etcd.yaml`; kubelet restarts the pod on file change.
+
+**Rollout order matters, and getting it wrong locks you out.** `kc1`'s kubeconfig points at
+`https://192.168.33.21:6443` — **cp-1's own API server** — and each kubeadm API server is
+configured with `--etcd-servers=https://127.0.0.1:2379`, i.e. only its *local* etcd. So
+restarting cp-1's etcd takes down cp-1's API server, which takes down kubectl-via-kc1, which
+is the only path for verifying and rolling back the other two. **Do cp-1 last.** Order used:
+cp-3 → cp-2 → cp-1. Observed: cp-1's API server was unavailable for ~60s during its restart
+(the cluster stayed up via cp-2/cp-3's API servers; only this admin path was affected).
+
+Restarting a node that currently holds leadership costs one election, so the raft term
+advanced 420 → 421 → 422 across the rollout — two elections, both expected. Every step was
+verified before moving on: `endpoint health` back to 3/3, raft indices aligned, and the new
+flags confirmed **on the running pod spec**, not just in the file on disk.
+
+Final state: all three at `--heartbeat-interval=500 --election-timeout=5000`, all 6 nodes
+Ready, etcd 3/3 healthy.
+
+---
+
 ## 2026-08-20 (4)
 
 ### etcd latency alert traced to a Ceph OSD crash — and Ceph had no alerting at all

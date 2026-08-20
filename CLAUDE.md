@@ -552,6 +552,22 @@ curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/projects?pag
 curl -s -u "admin:$PASS" -k "https://harbor.yanatech.co.uk/api/v2.0/system/gc/schedule" | jq '.schedule'
 ```
 
+### etcd static pod tuning (not in git)
+
+`/etc/kubernetes/manifests/etcd.yaml` on each control plane is kubeadm-generated and **not
+tracked in this repo**. As of 2026-08-20 all three run `--heartbeat-interval=500
+--election-timeout=5000` (raised from 250/2500, which was itself already above the kubeadm
+defaults of 100/1000) to tolerate this cluster's slow Ceph-RBD-backed etcd storage. Backups:
+`/root/etcd.yaml.bak-20260820` on each node.
+
+**Do cp-1 LAST when changing these.** `kc1`'s kubeconfig points at `https://192.168.33.21:6443`
+(cp-1's own API server) and every kubeadm API server uses `--etcd-servers=https://127.0.0.1:2379`
+— only its local etcd. Restarting cp-1's etcd therefore kills kubectl-via-kc1 for ~60s, which
+is the same path you need to verify or roll back the other two. Restarting whichever node holds
+leadership also costs one election. Verify the new flags on the **running pod spec**
+(`kubectl get pod etcd-k8s-cp-N -n kube-system -o jsonpath='{.spec.containers[0].command}'`),
+not just the file on disk. See `UPDATES.md` (2026-08-20 (5)).
+
 ## Network Policies
 
 ### Critical rules
