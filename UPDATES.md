@@ -4,6 +4,57 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-20 (2)
+
+### Removed the unused `runners-yana-ecommerce` ARC scale set — and found `runners-yana-forex` orphaned by the same removal done wrong
+
+`runners-yana-ecommerce` was removed at the user's request as unused. Confirmed before
+deleting: `akann/yana-ecommerce` still exists on GitHub (private, last pushed
+2026-06-04) but has **no `.github/workflows` directory at all** — the API 404s — so
+nothing could ever have dispatched a job to this scale set.
+
+**The trap: these runner Applications carry no `resources-finalizer.argocd.argoproj.io`.**
+Removing the Application manifest from git therefore **orphans** its children rather than
+cascading — `bootstrap` prunes the Application object and the `AutoscalingRunnerSet`,
+`AutoscalingListener` and listener pod are simply left behind, still running, with nobody
+managing them.
+
+This is not hypothetical. `runners-yana-forex` is live in `actions-runner` right now with:
+
+- **no** corresponding ArgoCD Application (`applications.argoproj.io "runners-yana-forex"
+  not found`)
+- **no** reference anywhere in this repo (`grep -rn yana-forex` returns nothing)
+- an `argocd.argoproj.io/tracking-id: runners-yana-forex:...` annotation proving it *was*
+  ArgoCD-managed once
+- a `githubConfigUrl` pointing at `akann/yana-forex`, **a repo that no longer exists**
+
+So a previous removal did exactly the git-only deletion, and the runner set has been
+sitting there un-managed ever since. Left in place for now — flagged, not silently
+cleaned up, since it was outside the scope of this request.
+
+**Correct removal order used here**, to avoid adding a second orphan:
+
+1. Remove from git first (`argocd-app-runners-yana-ecommerce.yaml`, the root
+   `kustomization.yaml` entry, the `bootstrap.sh` apply line, the README runner list) and
+   **push** — otherwise `bootstrap`'s `selfHeal` recreates the Application seconds after
+   any live deletion.
+2. Then add the finalizer to the live Application and delete it, so the deletion actually
+   cascades to the `AutoscalingRunnerSet`:
+
+```bash
+kubectl patch application runners-yana-ecommerce -n argocd --type=merge \
+  -p '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+kubectl delete application runners-yana-ecommerce -n argocd
+```
+
+3. Verify `kubectl get autoscalingrunnerset -n actions-runner` no longer lists it.
+
+The shared `github-pat` secret (`githubConfigSecret`) is used by every runner scale set and
+was deliberately left alone. Harbor's `yana-ecommerce` *project* is a separate thing and
+was also left alone — this change only removes the CI runner.
+
+---
+
 ## 2026-08-20
 
 ### MinIO ArgoCD sync failing for weeks on its own Helm post-upgrade hook — and the chart-default `console`/`console123` admin it exists to create

@@ -74,7 +74,6 @@ resources:
   - infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
   - infrastructure/actions-runner/argocd-app-actions-runner-apps.yaml
   - infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
-  - infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
   - infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
   - infrastructure/actions-runner/argocd-app-runners-shared-services.yaml
   - infrastructure/actions-runner/argocd-app-runners-ml.yaml

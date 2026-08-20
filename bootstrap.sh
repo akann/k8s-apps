@@ -238,7 +238,6 @@ kubectl apply -f infrastructure/kong/ingress-kong-admin.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-controller.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-actions-runner-apps.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-k8s-apps.yaml
-kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-ecommerce.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-yana-stocks.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-shared-services.yaml
 kubectl apply -f infrastructure/actions-runner/argocd-app-runners-ml.yaml

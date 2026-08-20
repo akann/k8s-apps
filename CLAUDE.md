@@ -378,6 +378,29 @@ done.
 
 **Gotcha found while adding this:** `infrastructure/cilium/kustomization.yaml` — like `infrastructure/harbor/` and `infrastructure/monitoring/` — is a strict resource whitelist; the `cilium-policies` Application only applies files explicitly listed there, not everything in the directory. Three pre-existing files (`ciliumnetpol-ops-agent-to-alertmanager.yaml`, `-to-prometheus.yaml`, `-to-minio.yaml`) were committed but never added to this list, so ops-agent's observability and minio subagents had **no actual network path this whole time** despite being documented as working in `ml`'s CLAUDE.md — confirmed live (`kubectl get ciliumnetworkpolicy -n ops-agent` was missing all three). Fixed in the same commit as the new `argocd-to-alertmanager` policy. **When adding any new file to `infrastructure/cilium/` or `infrastructure/harbor/` or `infrastructure/monitoring/` (or any directory with its own `kustomization.yaml`), it must be added to that local `kustomization.yaml` too — the file existing in git is not sufficient.**
 
+### Removing an ArgoCD Application: no finalizer means children are orphaned, not deleted
+
+The Applications in this repo do **not** set `resources-finalizer.argocd.argoproj.io`.
+Deleting an Application (or removing its manifest from the root `kustomization.yaml` so
+`bootstrap` prunes it) therefore leaves every resource it created **running and
+unmanaged** — it does not cascade. `runners-yana-forex` is a live example: its
+`AutoscalingRunnerSet` still runs in `actions-runner`, still carries an
+`argocd.argoproj.io/tracking-id`, has no Application, no reference anywhere in this repo,
+and points at a GitHub repo that no longer exists.
+
+To remove an app properly: **push the git removal first** (otherwise `bootstrap`'s
+`selfHeal` recreates the Application within seconds of any live deletion), then add the
+finalizer to the live Application and delete it so the deletion cascades:
+
+```bash
+kubectl patch application <name> -n argocd --type=merge \
+  -p '{"metadata":{"finalizers":["resources-finalizer.argocd.argoproj.io"]}}'
+kubectl delete application <name> -n argocd
+```
+
+Then confirm the child resources are actually gone — the Application disappearing proves
+nothing on its own. See `UPDATES.md` (2026-08-20).
+
 ### Application source path discipline
 
 All manifests for an app (Deployments, Services, ExternalSecrets, etc.) MUST be inside the directory specified in the Application's `spec.source.path`. Files placed in a parent directory are silently ignored by ArgoCD. For apps with a `manifests/` subdirectory (e.g. `apps/gotify/manifests`), ensure every manifest — including ExternalSecrets — lives inside that subdirectory.

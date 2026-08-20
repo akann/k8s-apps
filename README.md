@@ -426,7 +426,7 @@ graph LR
 
 - **Turborepo** only builds services whose source changed (`--filter=[HEAD^1]`)
 - **Harbor** stores images tagged with git SHA + `latest`
-- **Runners** are self-hosted ARC runners in the `actions-runner` namespace — one dedicated runner scale set **per repo** (`runners-yana-stocks`, `runners-k8s-apps`, `runners-yana-ecommerce`, `runners-shared-services`), since Harbor isn't publicly resolvable and GitHub-hosted runners can't reach it
+- **Runners** are self-hosted ARC runners in the `actions-runner` namespace — one dedicated runner scale set **per repo** (`runners-yana-stocks`, `runners-k8s-apps`, `runners-shared-services`, `runners-ml`), since Harbor isn't publicly resolvable and GitHub-hosted runners can't reach it
 - **Secret:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT` in GitHub Actions (`GH_PAT` only needed by repos whose gitops step pushes to a *different* repo, e.g. yana-stocks → k8s-apps; `shared-services` patches its own repo, so its `gitops` job needs no PAT)
 
 ### 7.4 Known Permanent OutOfSync (cosmetic, all Healthy)
