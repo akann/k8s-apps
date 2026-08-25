@@ -61,22 +61,6 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: dove-house-tt
-      ports:
-        - port: 8000
-        - port: 5432
-        - port: 9187
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: dove-house-tt-stg
-      ports:
-        - port: 8000
-        - port: 5432
-        - port: 9187
-    - to:
-        - namespaceSelector:
-            matchLabels:
               kubernetes.io/metadata.name: ops-agent
       ports:
         - port: 8000

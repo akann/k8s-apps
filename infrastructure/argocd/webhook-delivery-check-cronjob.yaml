@@ -61,7 +61,7 @@ spec:
 
                   webhook_url="https://argocd-webhook.yanatech.co.uk/api/webhook"
                   cutoff_epoch=$(( $(date +%s) - 1200 ))  # 20min window, > 15min schedule
-                  repos="k8s-apps yana-stocks shared-services ml dove-house-tt akan yanatech"
+                  repos="k8s-apps yana-stocks shared-services ml akan yanatech"
                   alerts="[]"
 
                   # GET a GitHub API path. Echoes the JSON array body and returns 0

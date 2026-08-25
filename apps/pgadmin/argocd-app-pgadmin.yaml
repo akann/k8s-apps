@@ -23,22 +23,6 @@ spec:
           enabled: true
           servers:
             "1":
-              Name: "dove-house-tt"
-              Group: "Servers"
-              Host: "dove-house-tt-pg-rw.dove-house-tt.svc.cluster.local"
-              Port: 5432
-              MaintenanceDB: "dove_house_tt"
-              Username: "dove_house"
-              SSLMode: "prefer"
-            "2":
-              Name: "dove-house-tt-stg"
-              Group: "Servers"
-              Host: "dove-house-tt-stg-pg-rw.dove-house-tt-stg.svc.cluster.local"
-              Port: 5432
-              MaintenanceDB: "dove_house_tt"
-              Username: "dove_house"
-              SSLMode: "prefer"
-            "3":
               Name: "yana-stocks"
               Group: "Servers"
               Host: "auth-service-pg-rw.yana-stocks.svc.cluster.local"
@@ -46,7 +30,7 @@ spec:
               MaintenanceDB: "app"
               Username: "app"
               SSLMode: "prefer"
-            "4":
+            "2":
               Name: "app"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
@@ -54,7 +38,7 @@ spec:
               MaintenanceDB: "app"
               Username: "app"
               SSLMode: "prefer"
-            "5":
+            "3":
               Name: "authentik"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
@@ -62,7 +46,7 @@ spec:
               MaintenanceDB: "authentik"
               Username: "authentik"
               SSLMode: "prefer"
-            "6":
+            "4":
               Name: "nextcloud"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
@@ -70,7 +54,7 @@ spec:
               MaintenanceDB: "nextcloud"
               Username: "nextcloud"
               SSLMode: "prefer"
-            "7":
+            "5":
               Name: "vaultwarden"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
@@ -78,7 +62,7 @@ spec:
               MaintenanceDB: "vaultwarden"
               Username: "vaultwarden"
               SSLMode: "prefer"
-            "8":
+            "6":
               Name: "infisical"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"
@@ -86,7 +70,7 @@ spec:
               MaintenanceDB: "infisical"
               Username: "infisical"
               SSLMode: "prefer"
-            "9":
+            "7":
               Name: "apicurio"
               Group: "Servers"
               Host: "pg-main-rw.cnpg-clusters.svc.cluster.local"

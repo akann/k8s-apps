@@ -4,6 +4,10 @@
 # ever removes old tags, so every node that ever pulled a given SHA keeps it
 # forever. Root cause of the 2026-08-04 worker disk-pressure incident
 # (dove-house-tt-migrate alone: 36 tags/12.74GB on one node) — see UPDATES.md.
+# NOTE (2026-08-25): both dove-house-tt packages are retired — that app moved
+# to Fly.io, which builds its own images and pushes to no registry. The
+# incident detail above is kept as provenance. Package discovery is live, so
+# nothing here needed changing.
 #
 # Package list is DISCOVERED live, not hardcoded. The first version of this
 # job hardcoded 3 packages and missed `yanatech` entirely — it also pushes
@@ -17,7 +21,8 @@
 # Two-factor retention, deliberately more conservative than Harbor's plain
 # "keep newest 10": a version is deleted only if it is BOTH outside the 10
 # most-recently-pushed AND older than 14 days. The recency floor exists
-# because dove-house-tt-stg can go quiet for a while between deploys — a
+# because a low-traffic package (akan, yanatech) can go quiet for a while
+# between deploys — a
 # pure rank-based cutoff could delete a tag that's still the live deployed
 # image on a low-traffic environment, which "newest 10" alone cannot
 # distinguish from "superseded". Sized generously given this workspace's
