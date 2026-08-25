@@ -4,6 +4,66 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-25
+
+### dove-house-tt migrated off the cluster to Fly.io + Neon, and torn down here
+
+`dovehousett.org` and `stg.dovehousett.org` now run on Fly.io (apps
+`dove-house-tt` / `dove-house-tt-stg`, region `lhr`) against one Neon Postgres
+project each, deployed by GitHub Actions instead of ArgoCD. The driver was this
+cluster's hardware backlog — `pve3` silent corruption, etcd WAL fsync p99 around
+150ms, recurring worker disk pressure — against the one app with real external
+users and two published mobile apps.
+
+Deliberately **not** a data migration: Neon started empty, `drizzle-kit migrate`
+rebuilt the schema and every migration-seeded lookup table, and only ten accounts
+were ported (five named plus five guests) carrying their better-auth password
+hashes, verified byte-identical. All match/session/rating history was discarded
+by decision, and four real external signups lose access.
+
+Removed from this repo and cluster:
+
+- both ArgoCD Applications (`dove-house-tt-deployment`, `dove-house-tt-stg-deployment`)
+- both namespaces, both CNPG clusters (`dove-house-tt-pg`, `dove-house-tt-stg-pg`)
+  and their ceph-rbd PVs
+- all network policy blocks in `netpol-apps.yaml`, `netpol-cnpg.yaml` and
+  `netpol-apiserver-egress.yaml`, plus the two pgAdmin cross-namespace egress rules
+- the `wildcard-dovehousett` Certificate, its Cloudflare-token ExternalSecret and
+  the `dovehousett.org` solver in `letsencrypt-prod` — the cert was still Ready and
+  being reflected into 46 namespaces while no Ingress referenced it
+- pgAdmin servers "1"/"2", `dove-house-tt` from the webhook-delivery check list,
+  the Grafana ingress-log host list and both uptime-kuma monitor rows
+- `bootstrap.sh`'s namespace/ghcr-secret/repo-credential blocks, and
+  `regenerate-venv.sh`'s GHCR read — that read targeted the `dove-house-tt`
+  namespace's `ghcr-secret`, the only place in the cluster those credentials
+  lived, so it would now fail. Nothing else creates or consumes them; the values
+  remain in Vaultwarden as `ghcr-pull-token`.
+
+**Kept deliberately:** the Infisical folders `/dove-house-tt/` and
+`/dove-house-tt-stg/`. Fly secrets are write-only, so those are the only readable
+record of the values.
+
+Three things worth carrying forward, all found the hard way:
+
+1. **`kubectl scale --replicas=0` does not hold** against an Application with
+   `selfHeal: true`. The live scale-down was reverted within about two minutes,
+   bringing the old prod stack back up while DNS already pointed at Fly. No writes
+   were lost (verified: zero logins, user, match or bench changes in the window),
+   but the freeze had to be committed to git to stick.
+2. **Pruning an Application does not cascade to its resources.** Both Applications
+   were pruned cleanly while their namespaces, CNPG clusters and PVs survived and
+   had to be deleted explicitly.
+3. **A CNAME to the apex follows the apex.** `stg.dovehousett.org` was a CNAME to
+   `dovehousett.org`, so the production DNS flip silently took staging to prod's
+   Fly IP and broke its TLS, since no app there held a cert for that name.
+
+Also on the Fly side, for the record: Fly does **not** auto-allocate a shared
+IPv4 (without `fly ips allocate-v4 --shared` an app is IPv6-only and unreachable
+for most clients), `fly launch` rewrites `fly.toml` and strips every comment, and
+`force_https = true` breaks ACME HTTP-01 because the proxy 301s
+`/.well-known/acme-challenge/*` — every hostname must validate via the
+`_acme-challenge` DNS CNAME.
+
 ## 2026-08-20 (6)
 
 ### Root cause of the pve3 OSD crashes: silent corruption on a non-ECC host, not the drives

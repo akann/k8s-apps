@@ -40,7 +40,6 @@ k8s-apps/
 │   ├── yana-stocks/               # yana-stocks microservices
 │   ├── shared-services/           # shared-services apps (email-api, email-service, source: akann/shared-services k8s/)
 │   ├── ml/                        # ml repo apps (k8s-docs RAG chatbot, source: akann/ml k8s/, directory.recurse: true)
-│   └── dove-house-tt/             # Dove House TT members app (dovehousett.org, wave 9, source: akann/dove-house-tt k8s/dove-house-tt/)
 └── infrastructure/
     ├── argocd/
     ├── authentik/
@@ -91,7 +90,6 @@ k8s-apps/
 - **TLS:** cert-manager, Let's Encrypt wildcards via Cloudflare DNS-01, reflected to all namespaces via Reflector:
   - `wildcard-yanatech-tls` (`*.yanatech.co.uk`) — Cloudflare token from Infisical `/cert-manager/api-token`
   - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)
-  - `wildcard-dovehousett-tls` (`*.dovehousett.org` + apex) — Cloudflare token from Infisical `/cert-manager/api-token-dovehousett` (ExternalSecret `cloudflare-api-token-dovehousett` scoped to dovehousett.org zone)
 
 ### Storage
 
@@ -157,7 +155,7 @@ spec:
 - **harbor-database** (plain StatefulSet, not CNPG): daily pg_dump CronJob (`harbor-db-backup` in `harbor` ns) → MinIO `s3://cnpg-backups/harbor-db/`, rolling 7-day filenames (`harbor-Monday.sql.gz` … `harbor-Sunday.sql.gz`)
 - **PVC data (non-CNPG workloads):** Velero node-agent (Kopia fs-backup) on all nodes, weekly schedule (`velero-weekly-backup`, cron `0 2 * * 0`) → Backblaze B2 `s3://yanatech-velero/`. **Opt-in as of 2026-07-16** (`defaultVolumesToFsBackup: false` in `infrastructure/velero/argocd-app-velero.yaml`) — each real PVC-mounting workload carries an explicit `backup.velero.io/backup-volumes: <volname>` pod annotation (gotify, uptime-kuma, vaultwarden set directly on the Deployment; harbor/infisical-redis/minio/mongodb/monitoring(prometheus+alertmanager)/loki/tempo/nextcloud/pgadmin/redis set via the chart's `podAnnotations`/`podMetadata` Helm value; kafka's `KafkaNodePool.spec.template.pod.metadata.annotations`).
   - **Root cause of the prior `PartiallyFailed` runs (fixed 2026-07-16):** the old opt-out mode (`defaultVolumesToFsBackup: true`) tried to fs-backup *every* volume on *every* pod cluster-wide, including Velero's own short-lived `<namespace>-default-kopia-maintain-job-*` repository-maintenance Job pods (created internally by Velero itself, not editable via this repo) and other pods' scratch/tmp emptyDirs (argocd-repo-server, argocd-applicationset-controller, kong-controller). Most showed up as harmless "Skip pod volume" warnings (126 of 132 warnings in the last run), but ~5-7 were genuine errors — a race where the ephemeral pod's volume was torn down before Velero's node-agent could expose it ("context deadline exceeded" / "etcd timed out" / volume path not found). Switching to opt-in stops Velero from touching any of these ephemeral pods at all.
-  - **CNPG Postgres clusters (`pg-main`, `auth-service-pg`, `k8s-docs-pg`, `dove-house-tt-pg`, `dove-house-tt-stg-pg`, `ops-agent-pg`) are deliberately excluded** from Velero fs-backup as part of this fix — no `backup.velero.io/backup-volumes` annotation is set on them. They were being swept up under the old opt-out mode, but a live Kopia fs-backup of a running PGDATA directory with no `pg_backup_start`/`stop` bracketing has no consistency guarantee (unlike a real snapshot) and was never reliable protection; barman WAL-streaming (below) already gives clean PITR to any second for all of these, so fs-backup was pure redundant risk, not redundant safety.
+  - **CNPG Postgres clusters (`pg-main`, `auth-service-pg`, `k8s-docs-pg`, `ops-agent-pg`) are deliberately excluded** from Velero fs-backup as part of this fix — no `backup.velero.io/backup-volumes` annotation is set on them. They were being swept up under the old opt-out mode, but a live Kopia fs-backup of a running PGDATA directory with no `pg_backup_start`/`stop` bracketing has no consistency guarantee (unlike a real snapshot) and was never reliable protection; barman WAL-streaming (below) already gives clean PITR to any second for all of these, so fs-backup was pure redundant risk, not redundant safety.
 - **MinIO credentials for backup jobs:** Infisical keys `/cnpg-clusters/MINIO_ACCESS_KEY_ID` + `/cnpg-clusters/MINIO_SECRET_KEY`, provisioned via ExternalSecret in each namespace
 
 ### kured (node reboot daemon)
@@ -347,7 +345,7 @@ The `immich` app uses `ServerSideApply=true`. Two CRDs require `ignoreDifference
 `infrastructure/argocd/ghcr-retention-cronjob.yaml` + `external-secret-ghcr-retention.yaml`,
 both explicitly listed in the root `kustomization.yaml` — same pattern as the
 webhook files above): GHCR has no equivalent of Harbor's automated tag
-retention. `akan`/`dove-house-tt`/`dove-house-tt-migrate` are tagged by commit
+retention. `akan`/`yanatech` images are tagged by commit
 SHA on every CI push and nothing ever removed old tags, so every node that
 ever pulled a given SHA kept it forever — root cause of a 2026-08-04 worker
 disk-pressure incident (`dove-house-tt-migrate` alone: 36 tags/12.74GB on one
@@ -358,14 +356,14 @@ same `allow-argocd-egress` NetworkPolicy (no netpol change needed — port 443
 to GitHub's API was already open). **Two-factor retention, deliberately more
 conservative than Harbor's plain "keep newest 10":** a version is deleted only
 if it is BOTH outside the 10 most-recently-pushed AND older than 14 days.
-The recency floor exists because `dove-house-tt-stg` can go quiet between
+The recency floor exists because a low-traffic package can go quiet between
 deploys — a pure rank-based cutoff can't distinguish "still the live deployed
 image on a low-traffic environment" from "superseded"; the 14-day floor
 protects it regardless of how many other packages/branches pushed in the
 meantime. Needs its own new fine-grained GitHub PAT — **not** a reuse of
 `GITHUB_WEBHOOK_MONITOR_TOKEN` or `GITHUB_RUNNERS_PAT`, same
 narrowly-scoped-per-purpose convention as those — `Packages: Read and write`
-permission, scoped to the `dove-house-tt` and `akan` repos, created manually
+permission, scoped to the `akan` repo, created manually
 via GitHub's UI (token creation isn't API-exposed) and added to Infisical as
 `/argocd/GITHUB_GHCR_RETENTION_TOKEN`; the CronJob will fail auth until that's
 done.
@@ -938,27 +936,18 @@ Dedicated `k8s-docs-pg` cluster in the `k8s-docs` namespace (see Databases secti
 
 `runners-ml` — same pattern as `runners-shared-services`.
 
-## dove-house-tt (Dove House Table Tennis Club members app)
+## dove-house-tt — RETIRED 2026-08-25
 
-### Repo
+Migrated off this cluster to **Fly.io + Neon** on 2026-08-25. `dovehousett.org` and
+`stg.dovehousett.org` now resolve to Fly apps (`dove-house-tt` /
+`dove-house-tt-stg`), each backed by its own Neon Postgres project, deployed by
+GitHub Actions rather than ArgoCD. Nothing about running or operating the app
+depends on this cluster any more.
 
-`github.com/akann/dove-house-tt` — standalone Turborepo (Next.js 16 + better-auth + Drizzle), **private** (akan-style): needs the `repo-dove-house-tt` git credential Secret in the `argocd` namespace and a `ghcr-secret` dockerconfigjson in the app namespace. No self-hosted runner needed (images go to ghcr.io, built on `ubuntu-latest`). App manifests live in **its own repo** (`k8s/dove-house-tt/`).
-
-### Namespace / domain
-
-`dove-house-tt` — served at `https://dovehousett.org` (+ www redirect). Third DNS zone on the cluster: own Cloudflare token (`/cert-manager/api-token-dovehousett`), own solver in `letsencrypt-prod`, own reflected wildcard cert `wildcard-dovehousett-tls`.
-
-### Images
-
-`ghcr.io/akann/dove-house-tt` (Next standalone runner) + `ghcr.io/akann/dove-house-tt-migrate` (full node_modules; runs `drizzle-kit migrate` as the deployment's initContainer — the pruned standalone image can't run drizzle migrations). Both packages are **private** — pulled via the `ghcr-secret` in the namespace (akan pattern).
-
-### CNPG
-
-Dedicated `dove-house-tt-pg` cluster (2 instances, plain `ghcr.io/cloudnative-pg/postgresql:16`), same pre-created basic-auth credentials pattern as k8s-docs (`dove-house-tt-db-credentials` via ExternalSecret — CNPG won't auto-generate it). `DATABASE_URL` is composed manually in Infisical (`/dove-house-tt/DATABASE_URL`) against `dove-house-tt-pg-rw.dove-house-tt.svc.cluster.local:5432`.
-
-### Staging environment
-
-A second, self-contained deployment at `https://stg.dovehousett.org`, sourced from the same repo's `staging` branch (`k8s/dove-house-tt-stg/`, own ArgoCD Application `apps/dove-house-tt-stg/`, own namespace `dove-house-tt-stg`). Reuses the existing `repo-dove-house-tt` git credential (not branch-scoped) but needs its own `ghcr-secret` in the new namespace (Secrets don't cross namespaces) and its own Infisical secrets under `/dove-house-tt-stg/`. CNPG is a minimal single-instance `dove-house-tt-stg-pg` cluster with no ScheduledBackup — disposable/re-seedable test data, deliberately not resilient to a node drain. TLS reuses the existing `wildcard-dovehousett-tls` wildcard cert (already covers `*.dovehousett.org`), so no new Certificate was needed — only the network-policy blocks (`netpol-apps.yaml`, `netpol-cnpg.yaml`, `netpol-apiserver-egress.yaml`) and the DNS record for the subdomain (created directly in Cloudflare, outside git) were.
+Both namespaces, both CNPG clusters, both ArgoCD Applications and all associated
+network policies have been deleted. The Infisical folders `/dove-house-tt/` and
+`/dove-house-tt-stg/` are deliberately **kept** — Fly's secrets are write-only, so
+those are the only readable record of the values. See UPDATES.md (2026-08-25).
 
 ## akan (personal site — blog comments + star ratings, added 2026-07-23)
 

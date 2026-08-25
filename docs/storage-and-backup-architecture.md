@@ -11,7 +11,7 @@ Every PVC that doesn't specify otherwise lands on Ceph RBD, backed by a Ceph clu
 Postgres runs entirely on CloudNativePG (CNPG), the Kubernetes-native Postgres operator, but not as one monolithic database. Two patterns are used depending on the app:
 
 - **Shared cluster (`pg-main`)** — a single 4-instance CNPG cluster hosts several lower-traffic apps that don't need isolation from each other: Vaultwarden, Authentik, Nextcloud, Infisical, Apicurio.
-- **Dedicated clusters** — apps with heavier or more specialized database needs get their own CNPG cluster: `auth-service-pg` for yana-stocks' auth service, `immich-postgres` (running a pgvector-enabled Postgres image for similarity search), `k8s-docs-pg` (same pgvector image, backing the RAG chatbot's embeddings), `dove-house-tt-pg`.
+- **Dedicated clusters** — apps with heavier or more specialized database needs get their own CNPG cluster: `auth-service-pg` for yana-stocks' auth service, `immich-postgres` (running a pgvector-enabled Postgres image for similarity search), `k8s-docs-pg` (same pgvector image, backing the RAG chatbot's embeddings).
 
 Every CNPG cluster streams WAL continuously to MinIO via barman, which gives point-in-time recovery to any second, not just to the last scheduled backup. Most clusters also run a daily `ScheduledBackup` on top of continuous WAL streaming.
 

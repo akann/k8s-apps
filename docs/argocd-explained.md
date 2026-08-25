@@ -130,7 +130,7 @@ The root kustomization's comment blocks encode a deliberate boot order, mirrored
 | 6 | secrets | external-secrets-operator (eso), infisical |
 | 7 | databases | cnpg operator, cnpg clusters |
 | 8 | registry / CI | harbor, actions-runner-controller, per-repo runner scale sets |
-| 9 | the workload apps | akan, yanatech, shared-services, ml, dove-house-tt, … |
+| 9 | the workload apps | akan, yanatech, shared-services, ml, … |
 
 The ordering matters: e.g. **eso/infisical (wave 6)** must exist before app `ExternalSecret`s resolve; **cnpg (wave 7)** before any app that wants a Postgres cluster; **cert-manager + ingress (wave 1)** before anything needs TLS.
 
@@ -146,7 +146,7 @@ Child `Application`s split into two kinds:
      repoURL: https://github.com/akann/akan.git   # NOT k8s-apps
      path: k8s/akan
    ```
-   Here the `akan`, `yanatech`, `shared-services`, `ml`, and `dove-house-tt` apps keep their k8s manifests co-located in their own repos (`k8s/` folder), and the `Application` CRD in `k8s-apps` just *points* at them. ArgoCD watches the external repo directly.
+   Here the `akan`, `yanatech`, `shared-services`, and `ml` apps keep their k8s manifests co-located in their own repos (`k8s/` folder), and the `Application` CRD in `k8s-apps` just *points* at them. ArgoCD watches the external repo directly.
 
 This is why the workspace convention is "manifests live next to the app, but the `Application` that wires them into ArgoCD lives in `k8s-apps`."
 

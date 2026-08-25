@@ -32,8 +32,6 @@ against the live UI periodically, since drift here is otherwise invisible.
 | PostgreSQL (pg-main) | port | pg-main-rw.cnpg-clusters.svc.cluster.local |
 | PostgreSQL (auth-service-pg) | port | auth-service-pg-rw.yana-stocks.svc.cluster.local |
 | akan personal site | http | https://akan.nkweini.org |
-| dovehousett.org | http | https://dovehousett.org |
-| stg.dovehousett.org | http | https://stg.dovehousett.org |
 | Grafana | http | https://grafana.yanatech.co.uk |
 | shared-api-docs | http | https://shared-api-docs.yanatech.co.uk (Authentik-gated — monitor checks reachability, not authenticated content) |
 | ops-agent (ml) | http | https://ml.yanatech.co.uk/ops-agent/ (Authentik-gated — same caveat) |

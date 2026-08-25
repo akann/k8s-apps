@@ -40,4 +40,4 @@ MetalLB hands out a small pool of LAN IPs (`192.168.33.200-249`) for `LoadBalanc
 
 ## TLS
 
-cert-manager issues wildcard certificates via Let's Encrypt's DNS-01 challenge against Cloudflare, one per DNS zone the cluster serves (`*.yanatech.co.uk`, `*.nkweini.org`, `*.dovehousett.org`). Each zone's Cloudflare API token is scoped to that zone only. Reflector then copies each wildcard certificate's Secret into every namespace that needs it, so individual apps don't each need their own cert-manager `Certificate` resource — they just reference the reflected Secret by name.
+cert-manager issues wildcard certificates via Let's Encrypt's DNS-01 challenge against Cloudflare, one per DNS zone the cluster serves (`*.yanatech.co.uk`, `*.nkweini.org`). Each zone's Cloudflare API token is scoped to that zone only. Reflector then copies each wildcard certificate's Secret into every namespace that needs it, so individual apps don't each need their own cert-manager `Certificate` resource — they just reference the reflected Secret by name.
