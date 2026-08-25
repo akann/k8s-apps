@@ -38,9 +38,6 @@
 #   REPO_AKAN_PAT                       (Vaultwarden: repo-akan)
 #   REPO_SHARED_SERVICES_PAT            (Vaultwarden: repo-shared-services)
 #   REPO_ML_PAT                         (Vaultwarden: repo-ml)
-#   REPO_DOVE_HOUSE_TT_PAT              (Vaultwarden: repo-dove-house-tt)
-#   GHCR_USERNAME                       (Vaultwarden: ghcr-pull-token)
-#   GHCR_PAT                            (Vaultwarden: ghcr-pull-token)
 #
 # ============================================================
 # INFISICAL FOLDERS — create before ESO syncs (not sourced from ./venv --
@@ -158,22 +155,6 @@ kubectl create secret generic repo-ml -n argocd \
   --from-literal=username="$GIT_PAT_USERNAME" --from-literal=password="$REPO_ML_PAT" \
   --dry-run=client -o yaml | kubectl apply -f -
 kubectl label secret repo-ml -n argocd argocd.argoproj.io/secret-type=repository --overwrite
-
-kubectl create secret generic repo-dove-house-tt -n argocd \
-  --from-literal=type=git --from-literal=url=https://github.com/akann/dove-house-tt \
-  --from-literal=username="$GIT_PAT_USERNAME" --from-literal=password="$REPO_DOVE_HOUSE_TT_PAT" \
-  --dry-run=client -o yaml | kubectl apply -f -
-kubectl label secret repo-dove-house-tt -n argocd argocd.argoproj.io/secret-type=repository --overwrite
-
-kubectl create namespace dove-house-tt --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret docker-registry ghcr-secret -n dove-house-tt \
-  --docker-server=ghcr.io --docker-username="$GHCR_USERNAME" --docker-password="$GHCR_PAT" \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-kubectl create namespace dove-house-tt-stg --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret docker-registry ghcr-secret -n dove-house-tt-stg \
-  --docker-server=ghcr.io --docker-username="$GHCR_USERNAME" --docker-password="$GHCR_PAT" \
-  --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Applying infrastructure apps (wave 0 — storage/network foundation)..."
 kubectl apply -f infrastructure/metallb/argocd-app-metallb.yaml

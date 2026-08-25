@@ -55,9 +55,6 @@ GIT_PAT_USERNAME
 REPO_AKAN_PAT
 REPO_SHARED_SERVICES_PAT
 REPO_ML_PAT
-REPO_DOVE_HOUSE_TT_PAT
-GHCR_USERNAME
-GHCR_PAT
 ```
 
 Also create the Infisical folders/secrets that ESO expects to already exist (see `bootstrap.sh`'s header comment for the current list — `redis`, `mongodb` folders, etc.) — these are freshly `openssl rand` generated, not stored in Vaultwarden, so they're not part of `./venv`.
@@ -122,10 +119,8 @@ All 6 backed-up clusters share one B2 bucket (`yanatech-cnpg`, `s3.eu-central-00
 | `immich-postgres` | `immich` | `s3://yanatech-cnpg/immich-postgres` |
 | `auth-service-pg` | `yana-stocks` | `s3://yanatech-cnpg/auth-service-pg` |
 | `k8s-docs-pg` | `k8s-docs` | `s3://yanatech-cnpg/k8s-docs-pg` |
-| `dove-house-tt-pg` | `dove-house-tt` | `s3://yanatech-cnpg/dove-house-tt-pg` |
 | `ops-agent-pg` | `ops-agent` | `s3://yanatech-cnpg/ops-agent-pg` |
 
-`dove-house-tt-stg-pg` has no backup by design (disposable staging data) — just let it re-`initdb` empty and reseed manually.
 
 ### ⚠️ Critical: disable ArgoCD self-heal for the app first
 

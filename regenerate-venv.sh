@@ -49,10 +49,6 @@ v=$(get repo-akan argocd username); printf "export GIT_PAT_USERNAME=%q\n" "$v"
 v=$(get repo-akan argocd password); printf "export REPO_AKAN_PAT=%q\n" "$v"
 v=$(get repo-shared-services argocd password); printf "export REPO_SHARED_SERVICES_PAT=%q\n" "$v"
 v=$(get repo-ml argocd password); printf "export REPO_ML_PAT=%q\n" "$v"
-v=$(get repo-dove-house-tt argocd password); printf "export REPO_DOVE_HOUSE_TT_PAT=%q\n" "$v"
-dockerconfig=$(kubectl get secret ghcr-secret -n dove-house-tt -o jsonpath="{.data.\.dockerconfigjson}" | base64 -d)
-v=$(echo "$dockerconfig" | jq -r ".auths[\"ghcr.io\"].username"); printf "export GHCR_USERNAME=%q\n" "$v"
-v=$(echo "$dockerconfig" | jq -r ".auths[\"ghcr.io\"].password"); printf "export GHCR_PAT=%q\n" "$v"
 ' > "$OUT"
 
 echo "Written to $OUT"
