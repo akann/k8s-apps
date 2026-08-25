@@ -259,8 +259,6 @@ kubectl apply -f apps/yana-stocks/argocd-app-yana-stocks.yaml
 kubectl apply -f apps/akan/argocd-app-akan.yaml
 kubectl apply -f apps/shared-services/argocd-app-shared-services.yaml
 kubectl apply -f apps/ml/argocd-app-ml.yaml
-kubectl apply -f apps/dove-house-tt/argocd-app-dove-house-tt.yaml
-kubectl apply -f apps/dove-house-tt-stg/argocd-app-dove-house-tt-stg.yaml
 
 echo "Bootstrapping Immich (CNPG cluster + PVC must exist before Helm app)..."
 kubectl apply -f apps/immich/namespace.yaml
