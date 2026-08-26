@@ -62,10 +62,71 @@ health digest understate the problem:
    the Barman Cloud Plugin on 2026-08-19. Backups had in fact run and completed
    daily throughout. Check the `Backup` objects, not this field.
 
-**Still open:** nothing has addressed *why* the cluster failed over repeatedly
-on 2026-08-21..24 — this is the second divergence in nine days. The etcd WAL
-fsync p99 of 126-158ms across all three control planes is a plausible
-contributor and remains unresolved. Re-cloning replicas treats the symptom.
+### Root cause of the failovers: pg-main peer probes blocked on port 8000
+
+Investigated the same day. The trigger is **not** etcd and **not** Velero,
+both of which were ruled out on evidence:
+
+- **etcd is not it.** WAL fsync p99 sits flat at 126-185ms every hour of
+  every day for the whole retention window — no Sunday spike, no correlation
+  with any failover. A constant cannot explain an episodic event. etcd
+  leader changes during the 2026-08-23 incident occurred at 02:30-02:40,
+  *after* both failovers at 02:03 and 02:14, so they are a co-symptom.
+- **Velero is not it.** Its weekly `0 2 * * 0` schedule correlated with
+  failovers on four consecutive Sundays, which is what first drew suspicion,
+  but the backup takes **no volume snapshots at all** — no CSI, no
+  fs-backup, and the VolumeSnapshot CRD is not even installed. It copies
+  6,298 API objects and lifts apiserver load only from ~34 to ~51 req/s.
+  The Sunday correlation is a *detection* artifact: the 02:00 backup
+  reconciliation forces a full instance status extraction, which is when the
+  operator finally notices a sick instance.
+
+The actual chronic fault: `allow-postgres-replication` in
+`infrastructure/network-policies/netpol-cnpg.yaml` listed **only port 5432**
+for pod-to-pod traffic, but CNPG instance managers probe each other's HTTP
+API at **:8000/failsafe** with a 1s deadline. Every one of those probes was
+dropped by `default-deny-all`. Confirmed with a live Hubble trace, not
+inferred:
+
+    cnpg-clusters/pg-main-2:57940 <> cnpg-clusters/pg-main-4:8000
+      policy-verdict:none EGRESS DENIED (TCP Flags: SYN)
+      Policy denied DROPPED (TCP Flags: SYN)
+
+Loki shows the resulting `Instance connectivity error - liveness probe
+succeeding because the API server is reachable` line firing every 10s on
+every pg-main instance for at least 16 days straight, and still firing on
+the current primary when the fix was written.
+
+Why it stayed invisible for 82 days:
+
+1. `allow-cnpg-operator` permits cnpg-system -> pod with **no port
+   restriction**, so the operator's own :8000 calls always worked. Only
+   peer-to-peer was blocked, and nothing surfaces that.
+2. CNPG's liveness probe deliberately **passes** when it cannot reach a peer
+   but can still reach the API server — by design, to avoid mass restarts
+   during a control-plane outage. So Kubernetes reported every pod `Ready
+   2/2` throughout.
+3. Every other CNPG namespace carries a blanket `allow-intra-namespace`
+   policy, so none of them show the symptom; `cnpg-clusters` deliberately
+   does not, and its peer ports must be enumerated explicitly.
+
+Consequence: the failsafe peer-liveness check — the mechanism that lets an
+instance tell "I am isolated" apart from "my peer is down" — was inoperative
+for the cluster's entire life, leaving failover decisions with no damping.
+pg-main burned ~62 timelines in 82 days.
+
+The immediate trigger of each individual failover is a separate, episodic
+fault: the operator gets a 500 from an instance whose manager cannot reach
+its own postgres over the local socket
+(`/controller/run/.s.PGSQL.5432`). Those bursts line up with the timeline
+forks — 08-19 16:54, 08-20 06:08, 08-21 04:13, 08-23 02:34. Fixing the
+port-8000 gap restores the safety net but does not by itself explain those
+local-socket stalls, which remain open and are the next thing to chase.
+
+**Still open:** the local-socket stalls above, and whether they share a
+cause with the `pve3` Ceph OSD crashes. Note that etcd's 126-185ms fsync p99
+is still a real and separate problem worth fixing on its own merits — it
+just is not what was causing these failovers.
 
 ### ops-agent RBAC still bound to the retired dove-house-tt namespaces
 
