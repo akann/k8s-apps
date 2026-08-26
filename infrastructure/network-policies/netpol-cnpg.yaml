@@ -268,6 +268,26 @@ spec:
   policyTypes:
     - Ingress
     - Egress
+  # 5432 is streaming replication. 8000 is the instance manager's own HTTP
+  # API, which the instances use to probe EACH OTHER at /failsafe (see the
+  # "Instance connectivity error" log line). Until 2026-08-26 only 5432 was
+  # listed here, so every peer probe was dropped by default-deny-all and
+  # timed out after its 1s deadline — confirmed with a live Hubble trace:
+  #
+  #   cnpg-clusters/pg-main-2:57940 <> cnpg-clusters/pg-main-4:8000
+  #     policy-verdict:none EGRESS DENIED (TCP Flags: SYN)
+  #     Policy denied DROPPED (TCP Flags: SYN)
+  #
+  # This ran for at least 16 days across every pg-main instance. It is NOT
+  # caught by allow-cnpg-operator, which covers cnpg-system -> pod only, so
+  # the operator's own calls to :8000 always worked and the gap stayed
+  # invisible. Other CNPG namespaces (akan, k8s-docs, ...) are unaffected
+  # because they carry a blanket allow-intra-namespace policy; cnpg-clusters
+  # deliberately does not, so peer ports must be listed explicitly here.
+  #
+  # Consequence: CNPG's failsafe peer-liveness check — the mechanism that
+  # lets an instance distinguish "I am isolated" from "my peer is down" —
+  # was inoperative, so the cluster had no damping on failover decisions.
   ingress:
     - from:
         - podSelector:
@@ -275,6 +295,7 @@ spec:
               cnpg.io/cluster: pg-main
       ports:
         - port: 5432
+        - port: 8000
   egress:
     - to:
         - podSelector:
@@ -282,6 +303,7 @@ spec:
               cnpg.io/cluster: pg-main
       ports:
         - port: 5432
+        - port: 8000
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
