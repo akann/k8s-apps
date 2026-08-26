@@ -4,6 +4,81 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-08-26
+
+### pg-main lost two of four instances to timeline divergence (recurrence of 2026-08-18)
+
+Between 2026-08-21 and 2026-08-24 `pg-main` failed over repeatedly, advancing
+its timeline 60 -> 64. Two replicas, `pg-main-3` and `pg-main-5`, had already
+replayed WAL past the fork point on timeline 60 and could not be rewound by
+streaming:
+
+    new timeline 64 forked off current database system timeline 60
+    before current recovery point 53/4A000000
+
+Their slots were then invalidated by the `max_slot_wal_keep_size: "16GB"` cap
+added on 2026-08-18 (`_cnpg_pg_main_3` reached `wal_status: lost`), so neither
+could ever catch up. This is the *same* failure the cap was introduced for —
+the cap worked as designed, converting an unbounded pg_wal growth into a
+re-clone requirement, but nothing addressed the failovers causing it.
+
+Effective redundancy at discovery was **two working instances, not four**:
+
+- `pg-main-3` — postgres up, permanently stuck in recovery, frozen at
+  `2026-08-21 03:55:21 UTC`, yet reported by CNPG as healthy
+- `pg-main-5` — `invalid resource manager ID in checkpoint record` ->
+  `PANIC: could not locate a valid checkpoint record at 53/490000F8`;
+  data directory unreadable, 699 CrashLoopBackOff restarts
+- primary `pg-main-2` and its only streaming replica `pg-main-1` were **both
+  on k8s-worker-1**, so one node loss would have taken out the write path and
+  the last good standby together
+
+Fixed by re-cloning both replicas one at a time (`kubectl delete pvc/<inst>
+pod/<inst> -n cnpg-clusters`; the operator runs a `-join` bootstrap job and
+re-creates the instance). `pg-main-5` came back as `pg-main-4` on worker-2,
+`pg-main-3` on worker-3 — CNPG's default *preferred* pod anti-affinity spread
+them correctly once recreated, so no manifest change was needed. Final state:
+all four instances on timeline 64, three standbys streaming at zero lag, all
+three slots `active`/`reserved`.
+
+**Three monitoring traps this exposed**, all of which made the daily ops-agent
+health digest understate the problem:
+
+1. **CNPG reports a permanently-stuck replica as healthy.** `pg-main-3` sat in
+   `instancesStatus.healthy` and passed its readiness probe the whole time,
+   because the instance manager was alive. The only reliable signals are
+   `status.instancesReportedState[*].timeLineID` diverging from the cluster
+   `timelineID`, and `pg_replication_slots.wal_status = 'lost'`. After the
+   first re-clone the cluster even reported `Cluster in healthy state` 4/4
+   while `pg-main-3` was still frozen.
+2. **A frozen replica stays in the read endpoints.** `pg-main-3` remained in
+   `pg-main-r` and `pg-main-ro` serving data five days stale. Nothing in the
+   workspace uses those services today (apicurio and nextcloud both use
+   `pg-main-rw`), so no stale reads were actually served — but the trap is live
+   for anything that starts using them.
+3. **`status.lastSuccessfulBackup` goes stale after a backup-method switch.**
+   It still read `2026-08-18`, the last `barmanObjectStore` backup, because
+   `lastSuccessfulBackupByMethod` only tracked that method after the move to
+   the Barman Cloud Plugin on 2026-08-19. Backups had in fact run and completed
+   daily throughout. Check the `Backup` objects, not this field.
+
+**Still open:** nothing has addressed *why* the cluster failed over repeatedly
+on 2026-08-21..24 — this is the second divergence in nine days. The etcd WAL
+fsync p99 of 126-158ms across all three control planes is a plausible
+contributor and remains unresolved. Re-cloning replicas treats the symptom.
+
+### ops-agent RBAC still bound to the retired dove-house-tt namespaces
+
+The 2026-08-25 teardown missed `ml/k8s/ops-agent/rbac.yaml`, which still bound
+`ops-agent-reader` and `ops-agent-remediator` into `dove-house-tt` and
+`dove-house-tt-stg`. Every ArgoCD sync of `ml-deployment` failed on
+`rbacReconcile: ... namespaces "dove-house-tt" not found`, leaving the
+Application permanently OutOfSync. Fixed in the `ml` repo (commit `ea35822`);
+the four dead RoleBindings were removed and all 13 remaining RoleBinding
+namespaces verified present.
+
+---
+
 ## 2026-08-25
 
 ### dove-house-tt migrated off the cluster to Fly.io + Neon, and torn down here
