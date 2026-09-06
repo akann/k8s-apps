@@ -32,7 +32,36 @@ at `/root/fw-backup-20260906-152524/` on pve1.
 Note for a future doc pass: the rule tables in `proxmox-cluster-setup.md` §13 and
 the rebuild commands in `pve-node-operations.md` §3.8 predate the 2026-07-16
 APP_VLAN additions and still omit the `192.168.33.0/24` and Prometheus-exporter
-rules that are live in `host.fw`.
+rules that are live in `host.fw`. (Done — see below.)
+
+### Node-firewall docs reconciled against live `host.fw`
+
+Closed the doc gap noted above. Both stale places predated the 2026-07-16
+APP_VLAN additions made for `ops-agent`, so they described a 13-rule firewall
+against a live one with 23 rules.
+
+Missing from both: every `192.168.33.0/24` (APP_VLAN) rule — Ceph mon v1/v2, Ceph
+OSD, the three exporters, and PVE API on 8006 — plus the three Prometheus
+exporter ports (9100 node-exporter, 9221 pve-exporter, 9283 Ceph MGR exporter)
+on `192.168.22.0/24` as well.
+
+The `pve-node-operations.md` §3.8 omission was the one that actually mattered: a
+node rebuilt from that command list would have come up silently invisible to
+Prometheus and unreachable by `ops-agent`'s Proxmox subagent, with no error at
+either end. The APP_VLAN block there now carries that warning inline, along with
+the fact that the VLAN deliberately gets no SSH, ICMP or Corosync.
+
+Also corrected in `proxmox-cluster-setup.md` §13: it claimed the datacenter-level
+firewall was **not** enabled. `cluster.fw` does hold `enable: 1` — it is the
+master switch that activates the node firewalls — it just defines no rules of its
+own, which is what the sentence was reaching for. The section now also states
+that rules live in per-node `host.fw` and that all three nodes are byte-identical
+(md5 confirmed), and §3.8 gained an `md5sum /etc/pve/nodes/*/host.fw` check.
+
+Documentation only — nothing changed on pve1-3. Both documents were then
+cross-checked mechanically against the live `host.fw` in both directions:
+23 rules live, 23 in the §13 table, 23 in the §3.8 command list, no rule in one
+set and not the other.
 
 ---
 

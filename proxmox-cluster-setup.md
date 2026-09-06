@@ -1129,23 +1129,28 @@ Backups land in `/mnt/pve/cephfs/dump/` and are visible in the PVE UI under each
 
 ## 13. Firewall
 
-The PVE node firewall is enabled on all three nodes. Rules allow management access from the cluster LAN (192.168.22.0/24), the laptop network (192.168.11.0/24), and — for SSH only — the WireGuard remote-access subnet (172.17.172.0/24); all other inbound traffic is dropped.
+The PVE node firewall is enabled on all three nodes. Rules allow management access from the cluster LAN / PMX_VLAN (192.168.22.0/24) and the laptop network (192.168.11.0/24); Ceph, Prometheus scraping and the PVE API from the Kubernetes APP_VLAN (192.168.33.0/24); the Ceph cluster network (10.10.0.0/16); and — for SSH only — the WireGuard remote-access subnet (172.17.172.0/24). All other inbound traffic is dropped.
+
+The rules live in the **per-node** `/etc/pve/nodes/<node>/host.fw`, and all three nodes are byte-identical. `/etc/pve/firewall/cluster.fw` holds only `enable: 1` — the datacenter-level master switch that activates the node firewalls; it defines no rules of its own, so no inter-VM traffic is filtered there.
 
 ### Rule Set (per node)
 
 | Proto | Port      | Source                           | Purpose              |
 | ----- | --------- | -------------------------------- | -------------------- |
 | TCP   | 22        | 192.168.22.0/24, 192.168.11.0/24, 172.17.172.0/24 | SSH (last = WireGuard remote access) |
-| TCP   | 8006      | 192.168.22.0/24, 192.168.11.0/24 | PVE web UI           |
+| TCP   | 8006      | 192.168.22.0/24, 192.168.11.0/24, 192.168.33.0/24 | PVE web UI / API (last = APP_VLAN, ops-agent) |
 | ICMP  | —         | 192.168.22.0/24, 192.168.11.0/24 | Ping                 |
 | UDP   | 5404:5412 | 192.168.22.0/24                  | Corosync ring0       |
 | UDP   | 5404:5412 | 10.10.0.0/16                     | Corosync ring1       |
 | any   | any       | 10.10.0.0/16                     | Ceph cluster network |
-| TCP   | 3300      | 192.168.22.0/24                  | Ceph mon v2          |
-| TCP   | 6789      | 192.168.22.0/24                  | Ceph mon v1          |
-| TCP   | 6800:7300 | 192.168.22.0/24                  | Ceph OSD             |
+| TCP   | 3300      | 192.168.22.0/24, 192.168.33.0/24 | Ceph mon v2          |
+| TCP   | 6789      | 192.168.22.0/24, 192.168.33.0/24 | Ceph mon v1          |
+| TCP   | 6800:7300 | 192.168.22.0/24, 192.168.33.0/24 | Ceph OSD             |
+| TCP   | 9100      | 192.168.22.0/24, 192.168.33.0/24 | node-exporter (Prometheus scrape) |
+| TCP   | 9221      | 192.168.22.0/24, 192.168.33.0/24 | pve-exporter (Prometheus scrape)  |
+| TCP   | 9283      | 192.168.22.0/24, 192.168.33.0/24 | Ceph MGR Prometheus exporter      |
 
-The cluster firewall is **not** enabled at the datacenter level (which would filter inter-VM traffic) — only node-level firewalls are active.
+Note the APP_VLAN (192.168.33.0/24) rules are deliberately narrower than the management VLAN's: no SSH, no ICMP, no Corosync. They were added 2026-07-16 so `ops-agent` could reach the PVE API on 8006 and so the in-cluster Prometheus could scrape the exporters — a replacement node that omits them silently loses both.
 
 For the exact CLI commands to recreate rules on a replacement node, see `pve-node-operations.md` §2.10 (restore) and §3.8 (new node).
 

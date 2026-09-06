@@ -829,15 +829,44 @@ pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp -
 pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 6789 --source 192.168.22.0/24 --enable 1
 # Ceph OSD
 pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 6800:7300 --source 192.168.22.0/24 --enable 1
+# node-exporter (Prometheus scrape)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9100 --source 192.168.22.0/24 --enable 1
+# pve-exporter (Prometheus scrape)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9221 --source 192.168.22.0/24 --enable 1
+# Ceph MGR Prometheus exporter
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9283 --source 192.168.22.0/24 --enable 1
+
+# --- APP_VLAN (192.168.33.0/24, Kubernetes) ---
+# Omitting this block leaves the node invisible to Prometheus and unreachable
+# by ops-agent's Proxmox subagent — both fail silently. Note: no SSH, no ICMP,
+# no Corosync from this VLAN, deliberately.
+
+# Ceph OSD (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 6800:7300 --source 192.168.33.0/24 --enable 1
+# Ceph mon v1 (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 6789 --source 192.168.33.0/24 --enable 1
+# Ceph mon v2 (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 3300 --source 192.168.33.0/24 --enable 1
+# node-exporter (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9100 --source 192.168.33.0/24 --enable 1
+# pve-exporter (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9221 --source 192.168.33.0/24 --enable 1
+# Ceph MGR exporter (k8s VLAN)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 9283 --source 192.168.33.0/24 --enable 1
+# PVE web UI/API (k8s VLAN, ops-agent)
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 8006 --source 192.168.33.0/24 --enable 1
 
 # Enable node firewall
 pvesh set /nodes/$node/firewall/options --enable 1
 ```
 
-Verify all rules show `enable: 1`:
+Verify all rules show `enable: 1`, and that the new node's rule set matches the existing ones exactly:
 
 ```bash
 pvesh get /nodes/$node/firewall/rules
+
+# Rules live in per-node host.fw; all nodes should be byte-identical.
+md5sum /etc/pve/nodes/*/host.fw
 ```
 
 ### 3.9 Final Verification
