@@ -6,6 +6,74 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-09-06
 
+### Redis crashloop: a chart pin is not an image pin
+
+Cluster-wide Redis (`redis-master-0`) sat in CrashLoopBackOff for ~12h. The
+`redis` container exited 1 on every start:
+
+    * Reading RDB base file on AOF loading...
+    # Can't handle RDB format version 15
+    # Error reading the RDB base file appendonly.aof.10.base.rdb, AOF loading aborted
+
+The running binary was Redis 8.8.1 and the AOF base on disk had been written by
+Redis 8.10.1, whose RDB format 8.8.1 cannot read. In other words the pod had
+silently *downgraded*.
+
+That is possible even though `argocd-app-redis.yaml` pins the chart at
+`targetRevision: 27.0.4`, because **chart 27.0.4's own default is
+`image.tag: latest`** — Bitnami's free `bitnami/` namespace publishes only the
+mutable `latest` tag now (versioned tags moved to `bitnamilegacy`), so the chart
+has nothing else to point at. `latest` rolled 8.8.1 -> 8.10.1 on 2026-09-03; the
+pod picked up 8.10.1 and rewrote its AOF base in RDB v15. On the restart ~12h ago
+it was scheduled to `k8s-worker-3`, whose image cache still held the July 8.8.1
+build, and `imagePullPolicy: IfNotPresent` reused it. Pinning the chart pinned
+the *templates*, never the *binary*; the effective Redis version was whatever
+each node happened to have cached.
+
+Diagnosed without touching the PVC by resolving both digests against Docker Hub
+and reading `org.opencontainers.image.version` out of each image config —
+running `sha256:08863c2c...` = 8.8.1 (built 2026-07-24), current `latest`
+`sha256:ffa455a3...` = 8.10.1 (built 2026-09-03). That rules out disk corruption
+as an explanation, which mattered here given the volume is `ceph-rbd` and pve3
+has a silent-corruption history — and it means the data is intact and simply
+needs 8.10.1 to read it, rather than the AOF being wiped.
+
+Fix is a digest pin, since there is no version tag to pin to (the repo's only
+human-readable tags are `latest` and `latest-metadata`; everything else is a
+cosign `sha256-*` artifact):
+
+    image:
+      digest: sha256:ffa455a3ad00bccc24dfde113ef55329dde687da242e9feb6ccd2b30eb93e8f3
+
+Verified by `helm template` that this renders `bitnami/redis@sha256:ffa455a3...`
+on the StatefulSet. This now needs a deliberate bump to move versions, which for
+a stateful service is the point. `redis-exporter` is still on `latest` — same
+floating-tag risk, but it holds no persistent state so it cannot fail this way.
+
+Blast radius while down: `ops-agent` (1 of 2 replicas crashlooping — it dies at
+startup on the Redis ping, so the "independently-optional" prompt history is a
+hard startup dependency in practice) and yana-stocks' two Kong `rate-limiting`
+plugins, both of which point at `redis-master.redis.svc.cluster.local`. ArgoCD
+surfaced it as `redis` Progressing, `ml-deployment` Degraded, and `bootstrap`
+Degraded (the app-of-apps inheriting from its child).
+
+### Redis was never scraped by Prometheus at all
+
+The reason a shared dependency could be down for 12h with no alert: Prometheus
+held **zero** `redis_*` series and no redis scrape target.
+
+`serviceMonitorSelector` on the Prometheus CR is `release: kube-prometheus-stack`,
+and the live ServiceMonitor did not carry that label — because the Application
+set `metrics.serviceMonitor.labels`, while chart 27.0.4's key is
+`metrics.serviceMonitor.additionalLabels`. Helm silently ignores unknown values
+keys, so this presented as a ServiceMonitor that existed, looked enabled, and
+never scraped anything. Corrected to `additionalLabels` and confirmed by
+`helm template` that the rendered ServiceMonitor now carries the release label.
+
+Worth a sweep of the other charts in this repo for the same shape — a values key
+that was renamed upstream fails silently rather than loudly.
+
+
 ### SSH to pve1-3 from the WireGuard remote-access subnet
 
 SSH to the Proxmox nodes from outside the house over WireGuard had never worked.

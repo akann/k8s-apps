@@ -15,6 +15,17 @@ spec:
       releaseName: redis
       valuesObject:
         architecture: standalone
+        # Pinned by digest, not tag. Bitnami's free `bitnami/` namespace publishes
+        # ONLY the mutable `latest` tag (versioned tags moved to `bitnamilegacy`),
+        # and chart 27.0.4's own default is `image.tag: latest`. Combined with
+        # imagePullPolicy: IfNotPresent that means the running Redis version is
+        # whatever each node happens to have cached. On 2026-09-06 that caused a
+        # silent DOWNGRADE (8.10.1 -> a stale cached 8.8.1) on reschedule, and the
+        # 8.8.1 binary could not read the AOF base its 8.10.1 predecessor wrote:
+        #   "Can't handle RDB format version 15" -> CrashLoopBackOff.
+        # This digest is Redis 8.10.1 (image built 2026-09-03). Bump deliberately.
+        image:
+          digest: sha256:ffa455a3ad00bccc24dfde113ef55329dde687da242e9feb6ccd2b30eb93e8f3
         auth:
           enabled: true
           existingSecret: redis-secret
@@ -38,7 +49,13 @@ spec:
           serviceMonitor:
             enabled: true
             namespace: monitoring
-            labels:
+            # MUST be `additionalLabels` - chart 27.0.4 has no `serviceMonitor.labels`
+            # key, so the old spelling was silently dropped by Helm and the
+            # ServiceMonitor never carried `release: kube-prometheus-stack`.
+            # Prometheus' serviceMonitorSelector matches on exactly that label, so
+            # Redis was never scraped at all: zero redis_* series, no alerting, and
+            # the 2026-09-06 outage went unnoticed for 12h.
+            additionalLabels:
               release: kube-prometheus-stack
   destination:
     server: https://kubernetes.default.svc
