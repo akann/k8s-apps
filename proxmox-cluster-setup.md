@@ -1129,13 +1129,13 @@ Backups land in `/mnt/pve/cephfs/dump/` and are visible in the PVE UI under each
 
 ## 13. Firewall
 
-The PVE node firewall is enabled on all three nodes. Rules allow management access from the cluster LAN (192.168.22.0/24) and the laptop network (192.168.11.0/24); all other inbound traffic is dropped.
+The PVE node firewall is enabled on all three nodes. Rules allow management access from the cluster LAN (192.168.22.0/24), the laptop network (192.168.11.0/24), and — for SSH only — the WireGuard remote-access subnet (172.17.172.0/24); all other inbound traffic is dropped.
 
 ### Rule Set (per node)
 
 | Proto | Port      | Source                           | Purpose              |
 | ----- | --------- | -------------------------------- | -------------------- |
-| TCP   | 22        | 192.168.22.0/24, 192.168.11.0/24 | SSH                  |
+| TCP   | 22        | 192.168.22.0/24, 192.168.11.0/24, 172.17.172.0/24 | SSH (last = WireGuard remote access) |
 | TCP   | 8006      | 192.168.22.0/24, 192.168.11.0/24 | PVE web UI           |
 | ICMP  | —         | 192.168.22.0/24, 192.168.11.0/24 | Ping                 |
 | UDP   | 5404:5412 | 192.168.22.0/24                  | Corosync ring0       |

@@ -807,6 +807,8 @@ node=pve4
 pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 22 --source 192.168.22.0/24 --enable 1
 # SSH - laptop
 pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 22 --source 192.168.11.0/24 --enable 1
+# SSH - WireGuard remote access
+pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 22 --source 172.17.172.0/24 --enable 1
 # PVE UI - cluster LAN
 pvesh create /nodes/$node/firewall/rules --type in --action ACCEPT --proto tcp --dport 8006 --source 192.168.22.0/24 --enable 1
 # PVE UI - laptop

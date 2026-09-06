@@ -4,6 +4,38 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-09-06
+
+### SSH to pve1-3 from the WireGuard remote-access subnet
+
+SSH to the Proxmox nodes from outside the house over WireGuard had never worked.
+pfSense passes the traffic (there is a blanket "WG Allow from remote access"
+rule), but `pve-firewall` on each node is a per-source-subnet allowlist ending in
+`PVEFW-Drop` -> `DROP`, and `172.17.172.0/24` was not on it. Packets reached the
+host and were dropped before sshd ever saw them, so it presented as a plain
+connection timeout, indistinguishable from the node being down.
+
+The allowlist lives in per-node `/etc/pve/nodes/pveN/host.fw`, not in
+`cluster.fw` — `cluster.fw` here holds only `enable: 1`. Because `/etc/pve` is
+pmxcfs, all three files were edited from pve1 in one pass. Added to each:
+
+    IN ACCEPT -source 172.17.172.0/24 -p tcp -dport 22 # SSH WireGuard remote access
+
+Tunnel subnet confirmed against the WireGuard configs themselves (server peers
+`172.17.172.2-.4`), not assumed. SSH only — 8006 and ICMP from the VPN are still
+dropped, so the PVE web UI over WireGuard needs a further rule if wanted.
+
+Verified live on all three: `pve-firewall compile` clean, and the rule present in
+`PVEFW-HOST-IN` ahead of the terminal drop. Backups of the pre-change files are
+at `/root/fw-backup-20260906-152524/` on pve1.
+
+Note for a future doc pass: the rule tables in `proxmox-cluster-setup.md` §13 and
+the rebuild commands in `pve-node-operations.md` §3.8 predate the 2026-07-16
+APP_VLAN additions and still omit the `192.168.33.0/24` and Prometheus-exporter
+rules that are live in `host.fw`.
+
+---
+
 ## 2026-08-26
 
 ### pg-main lost two of four instances to timeline divergence (recurrence of 2026-08-18)
