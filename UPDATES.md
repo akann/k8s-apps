@@ -6,6 +6,68 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ## 2026-09-06
 
+### Four Helm values keys that were silently doing nothing
+
+Follow-up to the Redis incident below, where `metrics.serviceMonitor.labels` turned
+out not to be a key in the chart and Helm dropped it without a word. Swept all 25
+Helm-sourced Applications in this repo for the same shape.
+
+Method: comparing values keys against `values.yaml` gives ~25 candidates that are
+mostly noise (subchart passthrough, free-form maps like `podAnnotations`, valid but
+undocumented keys), and grepping templates for the leaf name is useless for generic
+names like `labels`. What is decisive is **differential rendering**: `helm pull
+--untar`, render once with the real valuesObject, then re-render with exactly one key
+deleted. Byte-identical output means the key has no effect. That narrowed 25
+candidates to 10 real ones, and cleared the candidates in kong, harbor, minio and
+argocd as genuinely honored.
+
+Second step matters just as much: "no effect" has two causes — a wrong key name, or a
+correct key made inert by a sibling toggle — so every hit was checked against live
+cluster state before being called a bug. Several render correctly anyway via some
+other mechanism.
+
+Fixed here (all four verified by re-rendering before commit):
+
+- **immich `machine-learning.resources`** — the chart uses the bjw-s common library,
+  where resources are per-container under `controllers.<n>.containers.<n>`. The
+  top-level key was dropped, and `immich-app-machine-learning` was running with
+  `resources={}` — BestEffort, no memory limit — while the manifest asked for
+  250m/1Gi requests and 2/4Gi limits. This was the one with real blast radius, on a
+  cluster with a node-pressure history.
+- **infisical `ingress-nginx.enabled: false`** — not the disable switch. Chart.yaml
+  gates that subchart on `condition: ingress.nginx.enabled`. The subchart kept
+  rendering and only the separate `controller.replicaCount: 0` held it at zero, while
+  its LoadBalancer Service still held MetalLB IP **192.168.33.201** for a controller
+  that could never serve. Setting the real condition stops it rendering; ArgoCD will
+  prune the Deployment and Service and release the IP. Nothing referenced it (docs
+  already said "do not use"); README/CLAUDE VIP tables updated to match.
+- **infisical `infisical.ingress`** — ingress config belongs at the chart ROOT, and
+  the host key is `hostName`, capital N. Nested under `infisical:` the entire block
+  was ignored, which is why the live Ingress had to be hand-edited and then masked
+  with the `ignoreDifferences` block on `/spec/rules`.
+- **argo-rollouts `dashboard.ingress.extraTls`** — the chart's key is `tls`
+  (`extraPaths` is the "extra" one). The dashboard Ingress rendered with an empty TLS
+  block and only served HTTPS because the sibling
+  `argo-rollouts-dashboard-outpost` Ingress for the same host carries the wildcard
+  cert.
+
+**`ignoreDifferences` on `infisical-ingress` was deliberately left in place.** With
+the values fixed, the rendered Ingress now matches live on host, class and TLS — but
+NOT on `spec.rules`: the chart renders extra paths the live object lacks, including
+`/ss-webhook`. Removing the mask would let ArgoCD rewrite live routing, which is a
+separate decision from fixing the values key. Worth a look on its own: the live
+Ingress may be missing routes the chart intends.
+
+Found and not fixed, as reported-only: authentik's `redis:` and `postgresql:` keys are
+both ignored (there is no Redis or Postgres workload in that namespace at all — it
+takes both from `authentik-secret` env, so the manifest misleadingly reads as though
+it runs its own Redis on ceph-rbd); nextcloud's `ingress.hosts` is redundant with the
+honored `nextcloud.host`; and immich's `server.ingress.main.ingressClassName` is dead
+but the Ingress still gets `nginx` from the cluster's default IngressClass — it works
+by accident and would break if that default changed. `kubernetes-dashboard` (chart
+pull failed) and `cilium` (baseline render failed) were not covered by the sweep.
+
+
 ### Redis crashloop: a chart pin is not an image pin
 
 Cluster-wide Redis (`redis-master-0`) sat in CrashLoopBackOff for ~12h. The

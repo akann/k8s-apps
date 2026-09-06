@@ -21,22 +21,29 @@ spec:
           autoDatabaseSchemaMigration: true
           existingSecret: infisical-secrets
           kubeSecretRef: infisical-secrets
-          ingress:
-            enabled: true
-            ingressClassName: nginx
-            hostname: infisical.yanatech.co.uk
-            nginx:
-              enabled: false
-            tls:
-              - secretName: wildcard-yanatech-tls
-                hosts:
-                  - infisical.yanatech.co.uk
-        ingress-nginx:
-          enabled: false
-          controller:
-            replicaCount: 0
-            admissionWebhooks:
-              enabled: false
+        # Ingress config belongs at the chart ROOT, not under `infisical:` —
+        # the chart's own key is top-level `ingress:` (and `hostName`, capital N).
+        # Nested under `infisical:` the whole block was silently ignored, which is
+        # why the live Ingress had to be hand-edited and masked with the
+        # ignoreDifferences block below.
+        #
+        # `ingress.nginx.enabled` is also the Chart.yaml `condition:` gating the
+        # bundled ingress-nginx SUBCHART. The old top-level `ingress-nginx.enabled:
+        # false` was not that condition and did nothing: the subchart kept
+        # rendering, and only the separate `controller.replicaCount: 0` held it at
+        # 0 replicas — while its LoadBalancer Service still held MetalLB IP
+        # 192.168.33.201 for a controller that could never serve. Setting the real
+        # condition stops the subchart rendering at all.
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hostName: infisical.yanatech.co.uk
+          nginx:
+            enabled: false
+          tls:
+            - secretName: wildcard-yanatech-tls
+              hosts:
+                - infisical.yanatech.co.uk
         postgresql:
           enabled: false
         redis:

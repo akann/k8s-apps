@@ -82,8 +82,9 @@ k8s-apps/
 - **CNI:** Cilium (native routing mode — no encapsulation)
 - **Load Balancer:** MetalLB, pool `192.168.33.200-249`
   - `192.168.33.200` — ingress-nginx
-  - `192.168.33.201` — infisical bundled nginx (scaled to 0, do not use)
   - `192.168.33.202` — Kong API Gateway
+  - (`.201` was held by a bundled ingress-nginx the Infisical chart rendered
+    because its disable key sat on the wrong values path; released 2026-09-06)
 - **Ingress:** ingress-nginx at `192.168.33.200`
   - `externalTrafficPolicy: Local` + `use-forwarded-headers` with `forwarded-for-header: CF-Connecting-IP` and `proxy-real-ip-cidr` = Cloudflare ranges → access logs show the real visitor IP for Cloudflare-proxied hosts (LAN visitors bypass Cloudflare via split-horizon DNS and log their LAN IP directly). Don't revert to `Cluster` — kube SNAT rewrites sources to node IPs and breaks the Cloudflare trust check.
   - Access logs are JSON (`log-format-upstream` + `log-format-escape-json`, includes `$host` which the default format lacks) → queryable in Loki with `| json | host="..."`. The "Ingress Access Logs" Grafana dashboard (`infrastructure/monitoring/dashboards/cm-ingress-access-logs.yaml`, per-host template variable) is built on this — don't remove the JSON format without reworking it. Promtail's custom `scrapeConfigs` must keep its inline `pipeline_stages: [cri: {}]` — overriding `scrapeConfigs` discards the chart-default pipeline, and without the cri stage log lines keep their `<ts> stdout F` prefix in Loki, silently breaking `| json` everywhere.

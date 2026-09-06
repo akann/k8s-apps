@@ -64,13 +64,22 @@ spec:
                     - photos.yanatech.co.uk
         machine-learning:
           enabled: true
-          resources:
-            requests:
-              cpu: "250m"
-              memory: 1Gi
-            limits:
-              cpu: "2"
-              memory: 4Gi
+          controllers:
+            main:
+              containers:
+                main:
+                  # This chart uses the bjw-s common library, where resources live
+                  # per-container under controllers.<name>.containers.<name>. A
+                  # top-level `machine-learning.resources:` is NOT a chart key, so
+                  # Helm silently dropped it and the pod ran BestEffort with no
+                  # memory limit (verified live: resources={}).
+                  resources:
+                    requests:
+                      cpu: "250m"
+                      memory: 1Gi
+                    limits:
+                      cpu: "2"
+                      memory: 4Gi
         valkey:
           enabled: true
           controllers:

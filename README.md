@@ -158,20 +158,20 @@ MetalLB provides `LoadBalancer` type services in bare-metal mode.
 | VIP            | Service                                           |
 | -------------- | ------------------------------------------------- |
 | 192.168.33.200 | ingress-nginx (all web traffic)                   |
-| 192.168.33.201 | infisical bundled nginx (scaled to 0, do not use) |
 | 192.168.33.202 | Kong API Gateway (`kong-gateway-proxy`)           |
 
-Pool: `192.168.33.200–249` (active range: .200–.202 in use; .203–.249 reserved)
+Pool: `192.168.33.200–249` (active range: .200 and .202 in use; .201 and .203–.249
+free). `.201` was held by a bundled ingress-nginx the Infisical chart rendered
+because the disable key was on the wrong path; released 2026-09-06.
 
 ### 4.3 Ingress Controllers
 
 Two ingress classes are active:
 
-| Class             | Controller              | VIP            | Purpose                                 |
-| ----------------- | ----------------------- | -------------- | --------------------------------------- |
-| `nginx`           | ingress-nginx           | 192.168.33.200 | All web UIs, TLS termination            |
-| `kong`            | Kong Ingress Controller | 192.168.33.202 | yana-stocks API routing, JWT validation |
-| `infisical-nginx` | infisical bundled nginx | 192.168.33.201 | Infisical internal (disabled)           |
+| Class   | Controller              | VIP            | Purpose                                 |
+| ------- | ----------------------- | -------------- | --------------------------------------- |
+| `nginx` | ingress-nginx           | 192.168.33.200 | All web UIs, TLS termination            |
+| `kong`  | Kong Ingress Controller | 192.168.33.202 | yana-stocks API routing, JWT validation |
 
 **Note:** `ingress-nginx` requires `allowSnippetAnnotations: true` and `annotations-risk-level: Critical` for Authentik forward-auth `auth-snippet` annotations.
 

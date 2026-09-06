@@ -21,7 +21,12 @@ spec:
             ingressClassName: nginx
             hosts:
               - rollouts.yanatech.co.uk
-            extraTls:
+            # `tls`, not `extraTls` — the latter is not a key in this chart
+            # (it has `extraPaths`), so Helm dropped it and the dashboard
+            # Ingress rendered with an empty TLS block. It only served HTTPS
+            # because the sibling argo-rollouts-dashboard-outpost Ingress for
+            # the same host happens to carry the wildcard cert.
+            tls:
               - hosts:
                   - rollouts.yanatech.co.uk
                 secretName: wildcard-yanatech-tls
