@@ -15,6 +15,18 @@ spec:
       releaseName: minio
       valuesObject:
         existingSecret: minio-secret
+        # Built from source and hosted in Harbor, NOT the chart default
+        # (quay.io/minio/minio): upstream images stopped being anonymously
+        # pullable ~2026-09-25 and dl.min.io binaries return 410, which took
+        # MinIO down for ~3.5 days. Same release the chart defaulted to.
+        # Rebuild instructions: infrastructure/minio/image/Dockerfile.
+        # ⚠️ The chart's mcImage (quay.io/minio/mc) has the same problem, but
+        # nothing renders it while `users: []` and no buckets/policies are
+        # configured. Enabling any of those needs mc mirrored too.
+        image:
+          repository: harbor.yanatech.co.uk/library/minio
+          tag: RELEASE.2024-12-18T13-15-44Z
+          pullPolicy: IfNotPresent
         # Chart default is a `console`/`console123` user with the consoleAdmin
         # policy. Empty here also stops the post-install/post-upgrade hook job
         # (minio-post-job) from rendering at all -- it could never reach

@@ -140,6 +140,7 @@ spec:
 - **MongoDB:** `mongodb-headless.mongodb.svc.cluster.local:27017` (replicaSet=rs0)
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
+  - **Image is built from source and hosted in Harbor** (`harbor.yanatech.co.uk/library/minio`), not the chart default: upstream `quay.io`/Docker Hub images stopped being anonymously pullable ~2026-09-25 and `dl.min.io` binaries return 410. Rebuild via `infrastructure/minio/image/Dockerfile`. The chart's `mcImage` has the same problem and must be mirrored before enabling any `users`/buckets/policies values. See `UPDATES.md` (2026-09-28).
 
 ### Backup Strategy
 

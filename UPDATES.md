@@ -4,6 +4,46 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-09-28
+
+### MinIO down ~3.5 days: upstream images no longer publicly pullable
+
+**Symptom:** `minio` Application `Progressing`, `minio` Deployment 0/1 with the pod in
+`ImagePullBackOff` since ~2026-09-25 (≈22,000 pull retries). Knock-on: `yana-stocks`
+went `Degraded` because `ml-predictor` crash-loops on startup when it can't reach
+`minio.minio.svc.cluster.local:9000` (bucket `yana-stocks-models`). Nothing in git had
+changed; the pod had simply been rescheduled onto `k8s-worker-1`, which had no cached
+copy of the image.
+
+**Cause:** `quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z` (the minio chart 5.4.0
+default) now returns **401 UNAUTHORIZED** to an anonymous manifest HEAD even with a
+valid anonymous pull token, and quay's repository API returns 401 too, i.e. the repo is
+no longer public. Docker Hub `minio/minio` returns 401 for the same tag, and the release
+binaries on `dl.min.io` return **410 Gone**. No node, and no Harbor proxy, held a copy.
+So this was never a cluster fault: any reschedule was going to break it eventually.
+
+**Fix:** built the *same* release from source and hosted it in Harbor —
+`infrastructure/minio/image/Dockerfile`, source pinned to the tag's commit
+(`16f8cf1c…`), pushed as `harbor.yanatech.co.uk/library/minio:RELEASE.2024-12-18T13-15-44Z`
+(`library` is public, so no pull secret is needed), and the Helm values now override
+`image.repository`/`image.tag`. Verified before pushing by running it exactly as the
+chart does (`/bin/sh -ce "/usr/bin/docker-entrypoint.sh minio server …"` as UID 1000):
+`/minio/health/live` and `/ready` both 200, and `minio --version` reports
+`RELEASE.2024-12-18T13-15-44Z (commit-id=16f8cf1c…)`, byte-for-byte the upstream format.
+
+**Traps:**
+- `buildscripts/gen-ldflags.go` wants `MINIO_RELEASE=RELEASE` (the prefix) and appends
+  the commit time itself. Passing the full tag doubles it
+  (`RELEASE.2024-…Z.2024-…Z`); omitting it reports a `DEVELOPMENT` build.
+- The chart's `mcImage` (`quay.io/minio/mc`) is equally unpullable, but nothing renders
+  it while `users: []` and no buckets/policies are configured. Enabling any of those
+  needs `mc` mirrored the same way first.
+- Backup impact was smaller than it first looked: the CNPG clusters moved to B2 on
+  2026-07-18, so the MinIO outage affected the `harbor-db` pg_dump CronJob, the turbo
+  remote cache and `ml-predictor`'s model bucket, not Postgres PITR.
+
+---
+
 ## 2026-09-06
 
 ### Four Helm values keys that were silently doing nothing
