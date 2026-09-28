@@ -38,6 +38,15 @@ chart does (`/bin/sh -ce "/usr/bin/docker-entrypoint.sh minio server …"` as UI
 - The chart's `mcImage` (`quay.io/minio/mc`) is equally unpullable, but nothing renders
   it while `users: []` and no buckets/policies are configured. Enabling any of those
   needs `mc` mirrored the same way first.
+- **The rollout then deadlocked on the RWO volume**, same shape as the Harbor case in
+  CLAUDE.md: the chart uses `RollingUpdate` (maxUnavailable 0), the new pod landed on
+  `k8s-worker-2` with `Multi-Attach error` because the Ceph RBD volume was still attached
+  to `k8s-worker-1` for the old, never-started pod, and the old pod would not go until
+  the new one was Ready. Broken by `kubectl scale rs minio-d66d957b4 -n minio
+  --replicas=0` (safe: that pod had never run); ready 20s later with all buckets intact,
+  and `ml-predictor` recovered on its next back-off retry. **Open follow-up:** set the
+  chart's `DeploymentUpdate.type: Recreate` so the next image change can't deadlock the
+  same way. This is a single-replica RWO workload, so Recreate costs nothing extra.
 - Backup impact was smaller than it first looked: the CNPG clusters moved to B2 on
   2026-07-18, so the MinIO outage affected the `harbor-db` pg_dump CronJob, the turbo
   remote cache and `ml-predictor`'s model bucket, not Postgres PITR.
