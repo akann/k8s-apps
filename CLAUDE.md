@@ -15,7 +15,7 @@ GitOps repository for Akan's on-prem cloud Kubernetes cluster. All infrastructur
 ## Cluster
 
 - **6-node Kubernetes** (kubeadm, v1.32): control planes k8s-cp-1/2/3 (192.168.33.21-23), workers k8s-worker-1/2/3 (192.168.33.31-33)
-- **3-node Proxmox:** pve1-3 (192.168.22.11-13)
+- **3-node Proxmox:** pve1-3 (192.168.22.11-13) — web UI/API at `https://pveN.adm.akantech.org:8006`, Let's Encrypt certs via built-in ACME since 2026-09-30 (see `proxmox-cluster-setup.md` §13); raw-IP access now warns on hostname mismatch by design
 - **Domain:** `yanatech.co.uk`
 - **kubectl alias on k8s-cp-1:** `argocd='argocd --grpc-web'`
 

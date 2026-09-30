@@ -313,36 +313,14 @@ This means backup job results, HA failover events, and any cluster warnings will
 
 ## 8. TLS for PVE Web UI
 
-### Current state
+**DONE 2026-09-30.** All three nodes serve Let's Encrypt certificates via Proxmox's built-in ACME client with the Cloudflare DNS-01 plugin, for `pve1/2/3.adm.akantech.org` (not `pveN.yanatech.co.uk` as originally suggested here — the `akantech.org` zone already carried the per-VLAN `*.adm`/`*.app`/`*.pri` naming, so the nodes joined that scheme). Renewal is automatic through `pve-daily-update.timer`.
 
-The PVE web UI at `https://192.168.22.11:8006` (and similarly for pve2/pve3) uses **self-signed certificates**. Browsers warn on every visit and the cert cannot be pinned reliably.
+Two things worth knowing that the original recipe below did not:
 
-You already use Cloudflare DNS-01 with Let's Encrypt for `*.yanatech.co.uk`. Proxmox has built-in ACME support with a Cloudflare DNS plugin.
+- The Cloudflare token needs `Zone → Zone → Read` in addition to `Zone → DNS → Edit`; the bundled acme.sh `dns_cf.sh` does `GET /zones/<id>` before adding the TXT record, and without it the order fails with `invalid domain`.
+- Enter the token via the Proxmox UI (Datacenter → ACME → Challenge Plugins) or from a root-only file with `pvenode acme plugin add dns cloudflare --api cf --data <file>` — the `--data` flag takes a *file* of `KEY=value` lines, not an inline string as the old snippet implied.
 
-### Recommended — configure PVE ACME per node
-
-```bash
-# 1. Register ACME account (once per cluster)
-pvenode acme account register default your-email@example.com \
-  --directory https://acme-v02.api.letsencrypt.org/directory
-
-# 2. Add Cloudflare DNS plugin (needs CF API token with Zone:DNS:Edit)
-pvenode acme plugin add dns cloudflare-dns \
-  --api cf \
-  --data "CF_Token=<your-token>"
-
-# 3. Set the domain for each node (run on each host)
-pvenode config set \
-  --acme "account=default" \
-  --acmedomain0 "domain=pve1.yanatech.co.uk,plugin=cloudflare-dns"
-
-# 4. Issue the certificate
-pvenode acme cert order
-```
-
-After this, `pve1.yanatech.co.uk` (add DNS A record → 192.168.22.11) gets a valid TLS cert. Add a Cloudflare A record for each node.
-
-Certificates auto-renew via a systemd timer (`pvenode acme cert renew`).
+Full operating notes: `proxmox-cluster-setup.md` §13 "TLS for PVE Web UI".
 
 ---
 
@@ -440,7 +418,7 @@ ceph osd pool set cephfs_data compression_algorithm zstd
 | 5 | Configure VM backup jobs to cephfs | Low | Covers VM-level recovery gap | High |
 | 6 | Enroll K8s VMs in Proxmox HA | Low | Automatic VM migration on node failure | Medium |
 | 7 | Route notifications to Gotify | Trivial | Ensures alerts are actually received | High |
-| 8 | ACME TLS for PVE web UI | Medium | Trusted TLS on management portal | Low |
+| 8 | ACME TLS for PVE web UI | ~~Medium~~ **Done 2026-09-30** | Trusted TLS on management portal | Low |
 | 9 | Disable unused nfs MGR module | Trivial | Reduce MGR memory footprint | Low |
 | 10 | Add secondary DNS server | Trivial | DNS resilience | Medium |
 | 11 | Pool compression for kubernetes/cephfs | Low | Storage efficiency | Optional |

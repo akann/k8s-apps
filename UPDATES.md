@@ -4,6 +4,57 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-09-30
+
+### Proxmox web UI/API: Let's Encrypt certificates for pve1-3 via built-in ACME
+
+**Before:** every node served the self-signed cluster-CA cert (`CN=pveN.akan.home`), so
+browsers warned on each visit and ops-agent had to pin all three leaf certs in a ConfigMap
+(Proxmox's CA lacks the Key Usage extension OpenSSL 3 demands for chain building).
+`proxmox-cluster-setup.md` §13 claimed TLS was handled by an HAProxy that never existed;
+`docs/pve-cluster-improvements.md` §8 had the real plan, unexecuted.
+
+**Change:** Proxmox's built-in ACME (`pvenode acme`) with the Cloudflare DNS-01 plugin, one
+cert per node for `pve1/2/3.adm.akantech.org` — the `adm` label matches the per-VLAN wildcards
+already in that zone (`*.adm` → 192.168.22.1 = PMX_VLAN). Three unproxied A records
+(`pveN.adm.akantech.org` → 192.168.22.1N) were added in Cloudflare, overriding the wildcard for
+just those names. Cluster-wide: ACME account `default`, plugin `cloudflare` (`CF_Token` +
+`CF_Zone_ID`, zone-scoped token; canonical home Infisical `/cert-manager/api-token-akantech` — not verified from this session that it was saved there).
+Per node: `acme=account=default`, `acmedomain0=domain=pveN.adm.akantech.org,plugin=cloudflare`.
+pve1 was ordered locally; pve2/pve3 were configured and ordered from pve1 through the cluster
+API (`pvesh set /nodes/pveN/config ...`, `pvesh create /nodes/pveN/certificates/acme/certificate`),
+so no SSH to those nodes was needed. Renewal is `pve-daily-update.timer`'s job (< 30 days left).
+
+**Gotchas hit:**
+
+1. `pvenode acme account register` is interactive (ToS prompt) — use
+   `pvesh create /cluster/acme/account --name default --contact <email> --directory <url>
+   --tos_url <LE ToS pdf>` for a non-interactive registration.
+2. The order failed twice with `invalid domain` from acme.sh's `dns_cf.sh`. That message is
+   emitted whenever `_get_root` fails, which with `CF_Zone_ID` set means `GET /zones/<id>`
+   failed — i.e. the token is wrong or lacks `Zone → Zone → Read`. In our case the staged
+   `CF_Token` was a literal 22-char `$VARIABLE_NAME` (a quoted heredoc `<<'EOF'` had stopped
+   the shell expanding it). Diagnosed without ever printing the value: decoded the stored plugin
+   data on pve1 and printed only key names, value lengths and an alnum-masked shape.
+3. Cloudflare API tokens are **not** always 40 characters — the working one is 53
+   (`xxxx_` + 48). A length gate would have rejected a valid token; test with
+   `GET /user/tokens/verify` + `GET /zones/<id>` from the host instead.
+4. `pvesh create .../certificates/acme/certificate` blocks and streams the task log to stdout
+   rather than returning a UPID, so don't wrap it in a status-polling loop.
+
+**Verified:** `openssl s_client` per node shows issuer Let's Encrypt, subject
+`CN=pveN.adm.akantech.org`; `curl https://pveN.adm.akantech.org:8006/api2/json/version` passes
+TLS verification from the laptop (HTTP 401 = unauthenticated, expected); cross-node `pvesh get
+/nodes/pveN/status` from pve1 still works (pmxcfs-shared `pveproxy-ssl.pem` fingerprint trust);
+all 9 Prometheus targets on 192.168.22.x (`pve-exporter`, `pve-node-exporter`, `ceph`) `up=1`;
+`pve-exporter.service` active on all nodes with no TLS errors logged.
+
+**Consumer change:** `ml` commit `6e4a745` moves ops-agent to
+`https://pve1.adm.akantech.org:8006` with default system-CA verification and deletes the
+`ops-agent-pve-ca` ConfigMap + mount. Roll it out only now that the nodes serve the new certs.
+
+---
+
 ## 2026-09-28
 
 ### MinIO down ~3.5 days: upstream images no longer publicly pullable

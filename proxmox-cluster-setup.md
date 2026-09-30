@@ -1169,7 +1169,40 @@ iptables -L PVEFW-HOST-IN -n --line-numbers
 
 ### TLS for PVE Web UI
 
-Handled via HAProxy reverse proxy — not using the built-in `pvenode acme` method. The Cloudflare DNS-01 + Let's Encrypt cert is terminated at HAProxy; PVE web UI behind it uses its self-signed cert on the internal side.
+Since 2026-09-30 each node serves a **Let's Encrypt certificate issued by Proxmox's built-in ACME client** (`pvenode acme`, Cloudflare DNS-01). An earlier version of this section claimed TLS was terminated by an HAProxy reverse proxy — no such proxy ever existed; the UI served the self-signed cluster-CA cert until this change.
+
+| Node | UI / API hostname | Cloudflare A record |
+|------|-------------------|---------------------|
+| pve1 | `https://pve1.adm.akantech.org:8006` | 192.168.22.11 (unproxied) |
+| pve2 | `https://pve2.adm.akantech.org:8006` | 192.168.22.12 (unproxied) |
+| pve3 | `https://pve3.adm.akantech.org:8006` | 192.168.22.13 (unproxied) |
+
+The `adm` label follows the per-VLAN naming already in the `akantech.org` zone (`*.adm` = PMX_VLAN 192.168.22.x, `*.app` = APP_VLAN, `*.pri` = LAN). The explicit A records override the `*.adm` wildcard (which points at pfSense, 192.168.22.1) for just these three names. Node hostnames stay `pveN.akan.home` — the ACME domain is independent of the hostname, so no cluster rename was needed.
+
+**Cluster-wide pieces** (`/etc/pve/priv/acme/`, replicated by pmxcfs):
+
+- ACME account `default` (`akan2000@gmail.com`, Let's Encrypt production directory).
+- Challenge plugin `cloudflare` (`type dns`, `api cf`) holding `CF_Token` + `CF_Zone_ID` for the `akantech.org` zone. The token is zone-scoped (`Zone → DNS → Edit` + `Zone → Zone → Read`, `akantech.org` only) and its canonical home is Infisical `/cert-manager/api-token-akantech`, alongside the two cert-manager tokens (store it there when creating or rotating it — Proxmox's own copy in `plugins.cfg` is not readable back out through the API). `Zone → Read` is required: with a zone id set, the bundled acme.sh `dns_cf.sh` first calls `GET /zones/<id>`, and a token without it fails with the misleading message `invalid domain`.
+
+**Per-node config** (`pvenode config get`): `acme: account=default`, `acmedomain0: domain=pveN.adm.akantech.org,plugin=cloudflare`. The issued cert lands in `/etc/pve/nodes/pveN/pveproxy-ssl.pem` (+ `-key`), which pveproxy serves on :8006; `pve-ssl.pem` (cluster CA) is still used for internal node-to-node traffic. Because `pveproxy-ssl.pem` is in pmxcfs, other nodes fingerprint-verify it when proxying UI/API requests — cross-node `pvesh get /nodes/pveN/...` was confirmed working after the switch.
+
+**Renewal** is automatic: `pve-daily-update.timer` (01:00 daily) renews any ACME cert with < 30 days left. Nothing else to schedule.
+
+**Operating it:**
+
+```bash
+# order / re-order for the local node
+pvenode acme cert order
+# same for another node, from any node, via the cluster API (streams the task log)
+pvesh create /nodes/pve2/certificates/acme/certificate
+# rotate the Cloudflare token: stage a root-only file, load it, delete it
+printf 'CF_Token=%s\nCF_Zone_ID=78884cf1ac8e417d211ad9decb5a4bba\n' "$TOKEN" > /root/cf-acme.env
+pvenode acme plugin set cloudflare --data /root/cf-acme.env && rm -f /root/cf-acme.env
+# roll back one node to the self-signed cert
+pvenode config delete acme,acmedomain0 && pvenode cert delete
+```
+
+**Consumers updated with this change:** ops-agent (`ml` repo) now connects to `https://pve1.adm.akantech.org:8006` with ordinary system-CA verification; its pinned-leaf-cert ConfigMap (`ops-agent-pve-ca`) is gone. Prometheus's `pve-exporter`/`node-exporter`/Ceph MGR scrapes (:9221/:9100/:9283) were unaffected — all 9 targets stayed `up=1`. Accessing the UI by raw IP now shows a hostname-mismatch warning by design (no IP SAN on a public cert); use the hostnames.
 
 ---
 
