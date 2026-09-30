@@ -301,6 +301,8 @@ auto vmbr0
 iface vmbr0 inet static
     address 192.168.22.11/24
     gateway 192.168.22.1
+    # port-less PVE UI: 443 -> 8006, pinned to this node's mgmt IP (bridge-nf is on); see §13 TLS
+    post-up iptables -t nat -C PREROUTING -d 192.168.22.11/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006 2>/dev/null || iptables -t nat -A PREROUTING -d 192.168.22.11/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006
     bridge-ports enp87s0
     bridge-stp off
     bridge-fd 0
@@ -654,6 +656,8 @@ auto vmbr0
 iface vmbr0 inet static
     address 192.168.22.14/24
     gateway 192.168.22.1
+    # port-less PVE UI: 443 -> 8006, pinned to this node's mgmt IP (bridge-nf is on); see §13 TLS
+    post-up iptables -t nat -C PREROUTING -d 192.168.22.14/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006 2>/dev/null || iptables -t nat -A PREROUTING -d 192.168.22.14/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006
     bridge-ports enp87s0
     bridge-stp off
     bridge-fd 0

@@ -49,6 +49,18 @@ TLS verification from the laptop (HTTP 401 = unauthenticated, expected); cross-n
 all 9 Prometheus targets on 192.168.22.x (`pve-exporter`, `pve-node-exporter`, `ceph`) `up=1`;
 `pve-exporter.service` active on all nodes with no TLS errors logged.
 
+**Follow-up, same evening — port-less URL.** `https://pveN.adm.akantech.org/` (no `:8006`) now
+works too: one legacy-iptables rule per node, `-t nat -A PREROUTING -d 192.168.22.1N/32 -p tcp
+--dport 443 -j REDIRECT --to-ports 8006`, persisted as an idempotent `post-up` on `vmbr0` in
+`/etc/network/interfaces` (backup `interfaces.bak-20260930-443redirect`). Two things that made
+it small: the `-d <own mgmt IP>/32` pin is mandatory because `bridge-nf-call-iptables=1` would
+otherwise redirect VM-bound 443 traffic to the host; and no pve-firewall rule was needed, since
+the filter chain sees the post-NAT port 8006 and the existing allowlist applies. HAProxy on
+pfSense was assessed and set aside — it would either move `pveN.adm` DNS to pfSense (breaking
+ops-agent's fresh `toCIDR` path) or need a fourth name plus the pfSense acme package, and would
+silently grant WireGuard clients UI access that pve-firewall currently denies. `ifreload -a -s`
+verified on all nodes; verified `GET /` = 200 with TLS verification from the laptop on all three.
+
 **Consumer change:** `ml` commit `6e4a745` moves ops-agent to
 `https://pve1.adm.akantech.org:8006` with default system-CA verification and deletes the
 `ops-agent-pve-ca` ConfigMap + mount. Roll it out only now that the nodes serve the new certs.

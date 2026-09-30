@@ -275,6 +275,8 @@ auto vmbr0
 iface vmbr0 inet static
     address 192.168.22.11/24
     gateway 192.168.22.1
+    # port-less PVE UI: 443 -> 8006, pinned to this node's mgmt IP (bridge-nf is on); see §13 TLS
+    post-up iptables -t nat -C PREROUTING -d 192.168.22.11/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006 2>/dev/null || iptables -t nat -A PREROUTING -d 192.168.22.11/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006
     bridge-ports enp87s0
     bridge-stp off
     bridge-fd 0
@@ -1201,6 +1203,18 @@ pvenode acme plugin set cloudflare --data /root/cf-acme.env && rm -f /root/cf-ac
 # roll back one node to the self-signed cert
 pvenode config delete acme,acmedomain0 && pvenode cert delete
 ```
+
+**Port-less URL (`https://pveN.adm.akantech.org/`, no `:8006`)** — added the same day. pveproxy only listens on 8006 and nothing listens on 443, so each node carries one legacy-iptables NAT rule redirecting 443 → 8006, **pinned to that node's own management IP**:
+
+```
+iptables -t nat -A PREROUTING -d 192.168.22.1N/32 -p tcp --dport 443 -j REDIRECT --to-ports 8006
+```
+
+- The `-d <mgmt IP>/32` is load-bearing: `net.bridge.bridge-nf-call-iptables=1` on these hosts, so an unpinned rule would also rewrite 443 traffic bridged to VMs.
+- **No pve-firewall change was needed**: NAT happens in PREROUTING before the filter chain, so `PVEFW-HOST-IN` sees `dport 8006` and the existing 8006 allowlist applies unchanged (same sources, same restrictions — WireGuard still can't reach the UI).
+- Persisted as an idempotent `post-up` line (`iptables -C … || iptables -A …`) on the `vmbr0` stanza in `/etc/network/interfaces` — safe under `ifreload -a`, which re-runs `post-up`. A pre-change backup sits beside it as `interfaces.bak-20260930-443redirect`. `ifreload -a -s` was run on all nodes after the edit; its only warnings (`bridge-fd: value of out range "0"` on vmbr0/vmbr1) concern lines the edit did not touch — the diff against the backup is exactly the three added lines — and `ifquery vmbr0` parses the new `post-up`.
+- `:8006` keeps working as before. `pveproxy-ssl.pem` covers both, since the cert is per hostname, not per port.
+- Rebuilding a node: the interfaces templates in this file (§4) and `pve-node-operations.md` now include the line.
 
 **Consumers updated with this change:** ops-agent (`ml` repo) now connects to `https://pve1.adm.akantech.org:8006` with ordinary system-CA verification; its pinned-leaf-cert ConfigMap (`ops-agent-pve-ca`) is gone. Prometheus's `pve-exporter`/`node-exporter`/Ceph MGR scrapes (:9221/:9100/:9283) were unaffected — all 9 targets stayed `up=1`. Accessing the UI by raw IP now shows a hostname-mismatch warning by design (no IP SAN on a public cert); use the hostnames.
 
