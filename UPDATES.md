@@ -19,7 +19,7 @@ cert per node for `pve1/2/3.adm.akantech.org` — the `adm` label matches the pe
 already in that zone (`*.adm` → 192.168.22.1 = PMX_VLAN). Three unproxied A records
 (`pveN.adm.akantech.org` → 192.168.22.1N) were added in Cloudflare, overriding the wildcard for
 just those names. Cluster-wide: ACME account `default`, plugin `cloudflare` (`CF_Token` +
-`CF_Zone_ID`, zone-scoped token; canonical home Infisical `/cert-manager/api-token-akantech` — not verified from this session that it was saved there).
+`CF_Zone_ID`, zone-scoped token; stored in Infisical as `/cert-manager/api-token-akantech`, confirmed by the user 2026-10-01).
 Per node: `acme=account=default`, `acmedomain0=domain=pveN.adm.akantech.org,plugin=cloudflare`.
 pve1 was ordered locally; pve2/pve3 were configured and ordered from pve1 through the cluster
 API (`pvesh set /nodes/pveN/config ...`, `pvesh create /nodes/pveN/certificates/acme/certificate`),
