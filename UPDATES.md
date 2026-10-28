@@ -19,6 +19,8 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 - ArgoCD's auto-sync kept retrying the **old** revision after the fix was pushed (`operationState.syncResult.revision` stayed on the broken commit, and a hard refresh alone didn't help). Fix: `kubectl patch application <app> -n argocd --type merge -p '{"operation":null}'`, then refresh; auto-sync restarts on HEAD.
 - cert-manager DNS-01 challenges created before the Infisical tokens existed logged `PresentError ... secret not found` and only presented ~6 min after the ExternalSecret synced. Both certs reached `Ready` ~13 min after creation.
 
+- Cloudflare (proxied zone) caches 404s for ~4h by default. Probing `https://mboho.org/logo.svg` before the new image had rolled out cached a 404 at the edge that outlived the rollout (`cf-cache-status: HIT`, origin served 200 with a `?cb=` query). Fixed going forward by `Cache-Control: no-cache` in the app's nginx; an already-cached URL needs a Cloudflare purge.
+
 **Manual prerequisites before first sync** (not in git): the two Infisical tokens, the DNS records for all four hostnames, a `repo-mboho` git credential Secret in `argocd` if the repo is private, and `ghcr-secret` in the `mboho` namespace.
 
 ---
