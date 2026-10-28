@@ -26,6 +26,7 @@ k8s-apps/
 ├── bootstrap.sh                    # Ordered app deployment for fresh cluster
 ├── apps/                           # Application ArgoCD apps
 │   ├── akan/                      # akan personal site (akan.nkweini.org, wave 9, source: akann/akan k8s/akan/)
+│   ├── mboho/                     # mboho static site (mboho.org, wave 9, source: akann/mboho k8s/mboho/)
 │   ├── immich/
 │   ├── kafka/
 │   ├── kafka-ui/
@@ -91,6 +92,7 @@ k8s-apps/
 - **TLS:** cert-manager, Let's Encrypt wildcards via Cloudflare DNS-01, reflected to all namespaces via Reflector:
   - `wildcard-yanatech-tls` (`*.yanatech.co.uk`) — Cloudflare token from Infisical `/cert-manager/api-token`
   - `wildcard-nkweini-tls` (`*.nkweini.org`) — Cloudflare token from Infisical `/cert-manager/api-token-nkweini` (separate ExternalSecret `cloudflare-api-token-nkweini` scoped to nkweini.org zone)
+  - `wildcard-mboho-org-tls` / `wildcard-mboho-com-tls` — one per zone, same pattern; tokens in Infisical `/cert-manager/api-token-mboho-org` / `-com`
 
 ### Storage
 
@@ -1024,4 +1026,5 @@ kubectl create token headlamp -n headlamp --duration=8760h
 | Lighthouse CI (basic auth)          | https://lighthouse.yanatech.co.uk    |
 | yana-stocks                         | https://stocks.yanatech.co.uk        |
 | Akan personal site                  | https://akan.nkweini.org             |
+| mboho (static site)                 | https://mboho.org (www.mboho.org, mboho.com, www.mboho.com redirect here) |
 | K8s Docs Chat (k8s-docs, public UI) | https://akan.nkweini.org/k8s-docs    |

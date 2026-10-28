@@ -4,6 +4,20 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-10-28
+
+### New site: mboho.org (Astro static, own repo `akann/mboho`)
+
+`mboho.org` is canonical; `www.mboho.org`, `mboho.com`, `www.mboho.com` 301 to it via a second Ingress (`permanent-redirect`, no backend reached). Manifests live in the app repo (`k8s/mboho/`, akan-style); this repo gained:
+
+- Two wildcard certs, `wildcard-mboho-org-tls` / `wildcard-mboho-com-tls` (`infrastructure/cert-manager/certificate-mboho-*.yaml`), each with its own Cloudflare-token ExternalSecret (`/cert-manager/api-token-mboho-org|com` in Infisical) and a matching `dns01` solver in `clusterissuer.yaml` (one token per zone, like nkweini).
+- `apps/mboho/argocd-app-mboho.yaml` (wave 9), registered in root `kustomization.yaml` and `bootstrap.sh`.
+- `default-deny-all` + `allow-mboho` NetworkPolicies for the `mboho` namespace (ingress 8080 from ingress-nginx/monitoring/uptime-kuma, egress DNS only).
+
+**Manual prerequisites before first sync** (not in git): the two Infisical tokens, the DNS records for all four hostnames, a `repo-mboho` git credential Secret in `argocd` if the repo is private, and `ghcr-secret` in the `mboho` namespace.
+
+---
+
 ## 2026-09-30
 
 ### Proxmox web UI/API: Let's Encrypt certificates for pve1-3 via built-in ACME

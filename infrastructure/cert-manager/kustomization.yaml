@@ -5,4 +5,8 @@ resources:
   - certificate.yaml
   - certificate-nkweini.yaml
   - external-secret-nkweini.yaml
+  - certificate-mboho-org.yaml
+  - external-secret-mboho-org.yaml
+  - certificate-mboho-com.yaml
+  - external-secret-mboho-com.yaml
   - service-monitor.yaml

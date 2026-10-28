@@ -238,6 +238,7 @@ kubectl apply -f apps/apicurio/argocd-app-apicurio.yaml
 # kubernetes-dashboard excluded — chart repo moved, fix URL before re-enabling (see root kustomization.yaml)
 kubectl apply -f apps/yana-stocks/argocd-app-yana-stocks.yaml
 kubectl apply -f apps/akan/argocd-app-akan.yaml
+kubectl apply -f apps/mboho/argocd-app-mboho.yaml
 kubectl apply -f apps/shared-services/argocd-app-shared-services.yaml
 kubectl apply -f apps/ml/argocd-app-ml.yaml
 

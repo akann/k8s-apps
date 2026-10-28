@@ -25,3 +25,19 @@ spec:
         selector:
           dnsZones:
             - nkweini.org
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-mboho-org
+              key: api-token
+        selector:
+          dnsZones:
+            - mboho.org
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-mboho-com
+              key: api-token
+        selector:
+          dnsZones:
+            - mboho.com
