@@ -4,6 +4,16 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-10-31
+
+### mboho.org moved off the cluster to Cloudflare Workers
+
+`akann/mboho` now deploys to Cloudflare Workers Static Assets (one assets-only Worker per site, `mboho-www` for `mboho.org` and `mboho-manchester` for the forthcoming `manchester.mboho.org`), built and deployed by Cloudflare Workers Builds from `main` with per-PR preview URLs. The apex was cut over 2026-10-31 ~21:00 UTC by attaching the Worker custom domain (Cloudflare refuses to attach while an "externally managed" DNS record exists for the hostname — error 100117 — so the old proxied record had to be deleted in the dashboard first; wrangler then creates its own). `www.mboho.org`, `mboho.com` and `www.mboho.com` now 301 via zone Redirect Rules instead of the pod's nginx default server.
+
+Removed from this repo: `apps/mboho/argocd-app-mboho.yaml` (+ root `kustomization.yaml` and `bootstrap.sh` entries), the `mboho` namespace's `default-deny-all`/`allow-mboho` NetworkPolicies, `certificate-mboho-{org,com}.yaml` + their ExternalSecrets and the two `dns01` solvers in `clusterissuer.yaml`. The ArgoCD Application has no resource finalizer, so pruning it orphans the namespace: `kubectl delete ns mboho` by hand after sync. The Infisical tokens `/cert-manager/api-token-mboho-org` and `-com` and the GHCR package `akann/mboho` are no longer used and can be deleted.
+
+---
+
 ## 2026-10-28
 
 ### New site: mboho.org (Astro static, own repo `akann/mboho`)
