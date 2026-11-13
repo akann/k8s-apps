@@ -46,6 +46,22 @@ spec:
               location ~* \.php$ {
                 return 444;
               }
+              more_set_headers "X-Robots-Tag: $yanatech_robots_tag";
+            # Keep search engines off the internal tools under yanatech.co.uk
+            # (authentik, grafana, harbor, gotify, argocd, api-gateway, ...).
+            # Allowlist, not denylist: every *.yanatech.co.uk host is noindex
+            # unless listed as public here, so a new internal host is covered
+            # by default. Exact names win over regexes in a map. An empty value
+            # makes more_set_headers send no header, so the public sites and
+            # every other domain (akan.nkweini.org, ...) are untouched.
+            http-snippet: |
+              map $host $yanatech_robots_tag {
+                default                 "";
+                yanatech.co.uk          "";
+                www.yanatech.co.uk      "";
+                stocks.yanatech.co.uk   "";
+                ~\.yanatech\.co\.uk$     "noindex, nofollow";
+              }
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx

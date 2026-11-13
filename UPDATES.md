@@ -4,6 +4,14 @@ Chronological log of fixes, incidents, and resolved issues. For ongoing operatio
 
 ---
 
+## 2026-11-13
+
+### Internal yanatech.co.uk hosts marked noindex
+
+Once the `sc-domain:yanatech.co.uk` Search Console property was verified, its Pages report showed 67 URLs, and every one except `https://yanatech.co.uk/` was on a subdomain. Google had indexed `authentik.yanatech.co.uk/` and stocks' register/forgot-password pages, and had crawled gotify, ml, api-gateway and argocd-webhook. Fixed once, in the ingress-nginx controller config (`infrastructure/ingress-nginx/argocd-app-ingress-nginx.yaml`), rather than per-Ingress: an `http-snippet` `map $host $yanatech_robots_tag` gives every `*.yanatech.co.uk` host `noindex, nofollow`, except an allowlist of the public sites (`yanatech.co.uk`, `www.`, `stocks.`). The existing global `server-snippet` sends it as `X-Robots-Tag` via `more_set_headers`. An empty map value sends no header, so the public sites and every other domain are untouched. **A new public `*.yanatech.co.uk` site must be added to that map**, or it ships noindexed.
+
+Gotchas, checked before pushing against a copy of the live `nginx.conf` with `nginx -t -c /tmp/...`: the `map` must come after the generated `map_hash_bucket_size` (placed before it, `nginx -t` fails with "directive is duplicate"; ingress-nginx renders `http-snippet` late in the `http` block, so the real config is fine). And headers-more directives are not inherited into a location that has its own `more_set_headers`; no Ingress here has one today, so the server-level header reaches every location. An Ingress that later adds one will silently lose the robots header.
+
 ## 2026-10-31
 
 ### mboho.org moved off the cluster to Cloudflare Workers
